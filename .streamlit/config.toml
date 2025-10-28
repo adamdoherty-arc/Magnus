@@ -1,0 +1,12 @@
+[client]
+showErrorDetails = true
+
+[runner]
+magicEnabled = true
+
+[browser]
+gatherUsageStats = false
+
+[ui]
+hideTopBar = false
+hideSidebarNav = false

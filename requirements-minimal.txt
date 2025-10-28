@@ -1,0 +1,26 @@
+# Minimal requirements for basic functionality
+# Use this if full requirements.txt has issues
+
+# Core
+fastapi
+uvicorn[standard]
+pydantic
+python-dotenv
+
+# Data
+pandas
+numpy
+yfinance
+requests
+
+# Database
+redis
+psycopg2-binary
+
+# Dashboard
+streamlit
+plotly
+
+# Utilities
+loguru
+aiohttp

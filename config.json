@@ -1,0 +1,64 @@
+{
+  "starting_capital": 50000,
+  "max_stock_price": 50.0,
+  "watchlist": [],
+  "strategy_params": {
+    "min_premium_yield": 0.01,
+    "target_delta": 0.30,
+    "min_dte": 21,
+    "max_dte": 45,
+    "max_position_size_pct": 0.05,
+    "max_sector_exposure": 0.30
+  },
+  "risk_limits": {
+    "max_total_risk": 0.20,
+    "max_correlation": 0.70,
+    "min_liquidity_volume": 1000000,
+    "min_options_volume": 100
+  },
+  "alert_channels": ["console", "discord"],
+  "discord_webhook": "",
+  "email": {
+    "enabled": false,
+    "smtp_server": "smtp.gmail.com",
+    "smtp_port": 587,
+    "from": "your-email@gmail.com",
+    "to": "recipient@gmail.com",
+    "username": "",
+    "password": ""
+  },
+  "telegram": {
+    "enabled": false,
+    "bot_token": "",
+    "chat_id": ""
+  },
+  "data_sources": {
+    "primary_market_data": "yfinance",
+    "options_data": "yfinance",
+    "tradingview_enabled": true
+  },
+  "database": {
+    "host": "localhost",
+    "port": 5432,
+    "database": "wheel_strategy",
+    "user": "postgres",
+    "password": "postgres123!"
+  },
+  "redis": {
+    "host": "localhost",
+    "port": 6379,
+    "db": 0
+  },
+  "auto_trading": {
+    "enabled": false,
+    "broker": "alpaca",
+    "paper_trading": true,
+    "api_key": "",
+    "api_secret": ""
+  },
+  "monitoring": {
+    "scan_interval_minutes": 5,
+    "position_check_interval_minutes": 1,
+    "risk_check_interval_minutes": 5
+  }
+}

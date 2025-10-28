@@ -1,0 +1,28 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir:*)",
+      "WebSearch",
+      "Bash(python dashboard.py:*)",
+      "Bash(streamlit run:*)",
+      "Bash(python src/tradingview_api_sync.py:*)",
+      "Bash(python src/stock_data_sync.py:*)",
+      "Bash(python src/watchlist_sync_service.py:*)",
+      "Bash(psql:*)",
+      "Bash(set:*)",
+      "Bash(python test_watchlist_query.py:*)",
+      "Bash(python:*)",
+      "Bash(curl:*)",
+      "Bash(dir C:CodeWheelStrategy)",
+      "Bash(dir:*)",
+      "Bash(powershell -Command \"Get-Process | Where-Object { $_Id -eq ''a018f5'' } | Select-Object Id, ProcessName, StartTime\")",
+      "Bash(powershell -Command \"netstat -ano | findstr '':8502''\")",
+      "Bash(powershell:*)",
+      "Bash(timeout /t 3)",
+      "Bash(git init:*)",
+      "Bash(git add:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

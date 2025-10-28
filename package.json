@@ -1,0 +1,34 @@
+{
+  "name": "wheel-strategy",
+  "version": "1.0.0",
+  "description": "Options income generation system for cash-secured puts and covered calls",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/app.js scan",
+    "scan": "node src/app.js scan",
+    "setup": "node src/app.js setup",
+    "holdings": "node src/app.js holdings",
+    "watchlist": "node src/app.js watchlist",
+    "dev": "nodemon src/app.js",
+    "test": "jest",
+    "lint": "eslint src/",
+    "build": "npm run lint && npm run test"
+  },
+  "keywords": ["options", "trading", "cash-secured-puts", "covered-calls", "income"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "axios": "^1.6.0",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "moment": "^2.29.4",
+    "lodash": "^4.17.21",
+    "winston": "^3.11.0",
+    "pg": "^8.11.3"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "nodemon": "^3.0.1",
+    "eslint": "^8.54.0"
+  }
+}

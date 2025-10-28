@@ -1,0 +1,59 @@
+# WheelStrategy Trading Dashboard - Git Ignore
+
+# SECURITY - NEVER COMMIT THESE FILES
+.env
+.env.local
+*.env
+robin_stocks/
+**/pickle_files/
+.robinhood_device_token
+database.ini
+*.key
+*.pem
+api_keys.json
+secrets.json
+
+# Python
+__pycache__/
+*.py[cod]
+*.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+.pytest_cache/
+.coverage
+*.log
+
+# IDEs
+.vscode/
+.idea/
+*.sublime-project
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Streamlit
+.streamlit/secrets.toml
+
+# Logs and temp
+logs/
+temp/
+*.tmp
+*.bak
+cache/
+
+# Windows reserved names
+nul
+con
+prn
+aux
+com*
+lpt*
+
+# Keep examples
+!.env.example
+!config.example.yml
