@@ -105,6 +105,8 @@ if st.sidebar.button("📅 Earnings Calendar", use_container_width=True):
     st.session_state.page = "Earnings Calendar"
 if st.sidebar.button("📆 Calendar Spreads", use_container_width=True):
     st.session_state.page = "Calendar Spreads"
+if st.sidebar.button("🎲 Prediction Markets", use_container_width=True):
+    st.session_state.page = "Prediction Markets"
 if st.sidebar.button("⚙️ Settings", use_container_width=True):
     st.session_state.page = "Settings"
 
@@ -1894,6 +1896,10 @@ elif page == "Earnings Calendar":
 elif page == "Calendar Spreads":
     from calendar_spreads_page import show_calendar_spreads
     show_calendar_spreads()
+
+elif page == "Prediction Markets":
+    from prediction_markets_page import show_prediction_markets
+    show_prediction_markets()
 
 elif page == "Settings":
     st.title("⚙️ Settings")
