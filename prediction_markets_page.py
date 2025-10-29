@@ -82,20 +82,20 @@ def show_prediction_markets():
         display_market_card(market)
 
 @st.cache_data(ttl=300)  # Cache for 5 minutes
-def fetch_and_score_markets(kalshi, analyzer, category, limit=50):
+def fetch_and_score_markets(_kalshi, _analyzer, category, limit=50):
     """Fetch markets from Kalshi and score them"""
     try:
         # Fetch markets
         if category == "All":
-            markets = kalshi.get_enriched_markets(limit=limit)
+            markets = _kalshi.get_enriched_markets(limit=limit)
         else:
-            markets = kalshi.get_markets_by_category(category, limit=limit)
+            markets = _kalshi.get_markets_by_category(category, limit=limit)
 
         # Score each market
         scored_markets = []
         for market in markets:
             try:
-                analysis = analyzer.analyze_market(market)
+                analysis = _analyzer.analyze_market(market)
                 market.update(analysis)
                 scored_markets.append(market)
             except Exception as e:
