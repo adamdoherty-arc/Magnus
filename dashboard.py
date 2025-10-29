@@ -573,12 +573,18 @@ elif page == "Positions":
             if position_effect != 'close':
                 continue
 
-            opt_id = leg.get('option')
-            if not opt_id:
+            opt_url = leg.get('option')
+            if not opt_url:
                 continue
 
-            # Get option instrument data
-            opt_data = rh.get_option_instrument_data(opt_id)
+            # Get option instrument data - extract ID from URL
+            # URL format: https://api.robinhood.com/options/instruments/UUID/
+            if isinstance(opt_url, str) and 'options/instruments/' in opt_url:
+                opt_id = opt_url.split('/')[-2]
+            else:
+                opt_id = opt_url
+
+            opt_data = rh.get_option_instrument_data_by_id(opt_id)
             if not opt_data:
                 continue
 
