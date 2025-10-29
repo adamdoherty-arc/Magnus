@@ -423,217 +423,222 @@ elif page == "Opportunities":
 
 elif page == "Positions":
     st.title("💼 Active Positions")
+    st.caption("Live option positions from Robinhood - auto-refreshed data")
 
-    # Robinhood integration section
-    # Try to load credentials from environment
-    import os
-    from dotenv import load_dotenv
-    from pathlib import Path
-    load_dotenv()
+    # Import required modules
+    import robin_stocks.robinhood as rh
+    import pandas as pd
+    from datetime import datetime
 
-    env_username = os.getenv('ROBINHOOD_USERNAME', '')
-    env_password = os.getenv('ROBINHOOD_PASSWORD', '')
-    env_mfa = os.getenv('ROBINHOOD_MFA_CODE', '')
+    # Current Positions Section - Show ALL active positions from Robinhood
+    st.markdown("### 🎯 Your Current Option Positions")
 
-    # Check for cached session
-    session_exists = (Path.home() / '.robinhood_token.pickle').exists()
+    try:
+        # Login to Robinhood
+        rh.login(username='brulecapital@gmail.com', password='FortKnox')
 
-    # Initialize connection state
-    if 'rh_connected' not in st.session_state:
-        st.session_state['rh_connected'] = False
+        # Get all open option positions
+        positions_raw = rh.get_open_option_positions()
 
-        # Auto-connect if we have credentials and cached session
-        if env_username and env_password and session_exists:
-            with st.spinner("Auto-connecting with cached session..."):
-                try:
-                    from src.robinhood_fixed import (
-                        login_robinhood,
-                        get_account_summary,
-                        get_positions,
-                        get_options,
-                        identify_wheel_positions
-                    )
+        if positions_raw:
+            positions_data = []
 
-                    if login_robinhood(env_username, env_password):
-                        st.session_state['rh_connected'] = True
-                        st.session_state['rh_functions'] = {
-                            'get_account': get_account_summary,
-                            'get_positions': get_positions,
-                            'get_options': get_options,
-                            'identify_wheel': identify_wheel_positions
-                        }
-                        st.success("✅ Auto-connected using cached session!")
-                except Exception as e:
-                    st.info(f"Auto-connect not available: {str(e)[:50]}")
+            for pos in positions_raw:
+                # Get option details
+                opt_id = pos.get('option_id')
+                if not opt_id:
+                    continue
 
-    with st.expander("🔗 Robinhood Settings", expanded=not st.session_state.get('rh_connected', False)):
+                opt_data = rh.get_option_instrument_data_by_id(opt_id)
+                symbol = opt_data.get('chain_symbol', 'Unknown')
+                strike = float(opt_data.get('strike_price', 0))
+                exp_date = opt_data.get('expiration_date', 'Unknown')
+                opt_type = opt_data.get('type', 'unknown')  # 'call' or 'put'
 
-        col1, col2 = st.columns(2)
-        with col1:
-            rh_username = st.text_input("Username/Email", value=env_username, type="default")
-            rh_password = st.text_input("Password", value=env_password, type="password")
-        with col2:
-            rh_mfa = st.text_input("MFA Secret (optional)", value=env_mfa, type="password", help="Your 2FA secret key, not the 6-digit code")
-            connect_btn = st.button("Connect to Robinhood", type="primary")
+                # Position details
+                position_type = pos.get('type', 'unknown')  # 'long' or 'short'
+                quantity = float(pos.get('quantity', 0))
+                avg_price = abs(float(pos.get('average_price', 0)))
 
-        # Show session status
-        if session_exists:
-            st.info("💾 Cached session found - no MFA needed!")
-        else:
-            st.warning("⚠️ No cached session - MFA may be required")
+                # Calculate values - Robinhood's average_price is per contract, not per share
+                # No need to multiply by 100, it's already the full contract premium
+                total_premium = avg_price * quantity
 
-        if connect_btn and rh_username and rh_password:
-            with st.spinner("Connecting to Robinhood..."):
-                try:
-                    from src.robinhood_fixed import (
-                        login_robinhood,
-                        get_account_summary,
-                        get_positions,
-                        get_options,
-                        identify_wheel_positions
-                    )
+                # Get current market price
+                market_data = rh.get_option_market_data_by_id(opt_id)
+                if market_data and len(market_data) > 0:
+                    # adjusted_mark_price is per share, multiply by 100 for contract value
+                    current_price = float(market_data[0].get('adjusted_mark_price', 0)) * 100
+                else:
+                    current_price = 0
 
-                    # Login with session caching
-                    if login_robinhood(rh_username, rh_password):
-                        st.success("✅ Connected to Robinhood! (Session saved for next time)")
-                        st.session_state['rh_connected'] = True
-                        st.session_state['rh_functions'] = {
-                            'get_account': get_account_summary,
-                            'get_positions': get_positions,
-                            'get_options': get_options,
-                            'identify_wheel': identify_wheel_positions
-                        }
-                        st.rerun()
-                    else:
-                        st.error("Failed to connect. If you have MFA enabled, check your phone/email.")
-                        st.info("Note: First-time login requires MFA verification")
-                except Exception as e:
-                    st.error(f"Error: {str(e)[:100]}")
-                    if "mfa" in str(e).lower() or "challenge" in str(e).lower():
-                        st.warning("MFA verification required - check your phone/email")
+                current_value = current_price * quantity
 
-    # Position filters
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        position_filter = st.selectbox(
-            "Filter",
-            ["All", "Cash-Secured Puts", "Covered Calls", "Stock Holdings"]
-        )
-    with col2:
-        if st.session_state.get('rh_connected'):
-            if st.button("🔄 Refresh Positions"):
-                st.rerun()
-    with col3:
-        if st.session_state.get('rh_connected'):
-            if st.button("🚪 Disconnect"):
-                import robin_stocks.robinhood as rh
-                rh.authentication.logout()
-                st.session_state['rh_connected'] = False
-                if 'rh_functions' in st.session_state:
-                    del st.session_state['rh_functions']
-                st.rerun()
-    
-    # Get positions from Robinhood (NO DUMMY DATA - real data only)
-    if st.session_state.get('rh_connected') and st.session_state.get('rh_functions'):
-        # Get real positions from Robinhood
-        with st.spinner("Loading positions from Robinhood..."):
-            try:
-                # Use the simple functions
-                get_account = st.session_state['rh_functions']['get_account']
-                get_positions_fn = st.session_state['rh_functions']['get_positions']
-                get_options_fn = st.session_state['rh_functions']['get_options']
-                identify_wheel = st.session_state['rh_functions']['identify_wheel']
+                # Calculate P/L
+                if position_type == 'short':
+                    # Sold option - profit when it goes down
+                    pl = total_premium - current_value
+                else:
+                    # Bought option - profit when it goes up
+                    pl = current_value - total_premium
 
-                account_info = get_account()
-                stocks = get_positions_fn()
-                options = get_options_fn()
-                wheel_positions = identify_wheel(stocks, options)
+                # Calculate DTE
+                if exp_date != 'Unknown':
+                    exp_dt = datetime.strptime(exp_date, '%Y-%m-%d')
+                    dte = (exp_dt - datetime.now()).days
+                else:
+                    dte = 0
 
-                # Display account summary
-                st.subheader("📊 Account Summary")
+                # Determine strategy type
+                if position_type == 'short' and opt_type == 'put':
+                    strategy = 'CSP (Cash-Secured Put)'
+                elif position_type == 'short' and opt_type == 'call':
+                    strategy = 'CC (Covered Call)'
+                elif position_type == 'long' and opt_type == 'call':
+                    strategy = 'Long Call'
+                elif position_type == 'long' and opt_type == 'put':
+                    strategy = 'Long Put'
+                else:
+                    strategy = 'Other'
+
+                positions_data.append({
+                    'Symbol': symbol,
+                    'Strategy': strategy,
+                    'Strike': f'${strike:.2f}',
+                    'Expiration': exp_date,
+                    'DTE': dte,
+                    'Contracts': int(quantity),
+                    'Avg Price': f'${avg_price:.2f}',
+                    'Total Premium': f'${total_premium:.2f}',
+                    'Current Value': f'${current_value:.2f}',
+                    'P/L': f'${pl:.2f}',
+                    'P/L %': f'{(pl/total_premium*100):.1f}%' if total_premium > 0 else '0%'
+                })
+
+            if positions_data:
+                df_positions = pd.DataFrame(positions_data)
+
+                # Display metrics
+                total_pl = sum([float(p['P/L'].replace('$', '').replace(',', '')) for p in positions_data])
+                total_premium = sum([float(p['Total Premium'].replace('$', '').replace(',', '')) for p in positions_data])
+
                 col1, col2, col3, col4 = st.columns(4)
                 with col1:
-                    st.metric("Total Value", f"${account_info.get('total_value', 0):,.0f}")
+                    st.metric("Active Positions", len(positions_data))
                 with col2:
-                    st.metric("Buying Power", f"${account_info.get('buying_power', 0):,.0f}")
+                    st.metric("Total Premium", f'${total_premium:,.2f}')
                 with col3:
-                    st.metric("Cash", f"${account_info.get('cash', 0):,.0f}")
+                    st.metric("Total P/L", f'${total_pl:,.2f}', delta=f'{(total_pl/total_premium*100):.1f}%' if total_premium > 0 else '0%')
                 with col4:
-                    st.metric("Day Trades", f"{account_info.get('day_trade_count', 0)}/3")
+                    csps = len([p for p in positions_data if 'CSP' in p['Strategy']])
+                    st.metric("CSPs", csps)
 
-                st.divider()
+                # Display positions table
+                st.dataframe(df_positions, hide_index=True, use_container_width=True)
 
-                # Convert wheel positions to display format with P&L
-                positions = []
-                for wp in wheel_positions:
-                    if wp['strategy'] == 'CSP':
-                        premium_collected = wp.get('premium', 0)
-                        current_value = abs(wp.get('current_value', 0))
-                        current_option_price = wp.get('current_price', 0)  # Get current option price
-                        pnl = premium_collected - current_value if premium_collected > 0 else 0
-                        pnl_pct = (pnl / premium_collected * 100) if premium_collected > 0 else 0
+            else:
+                st.info("No open option positions found in Robinhood")
 
-                        positions.append({
-                            'Symbol': wp['symbol'],
-                            'Type': 'CSP',
-                            'Strike': wp.get('strike', 0),
-                            'Expiration': wp.get('expiration', ''),
-                            'Premium': premium_collected,
-                            'Current Value': current_value,
-                            'Option Price': current_option_price,  # Add current option price
-                            'P&L': pnl,
-                            'P&L %': pnl_pct,
-                            'Days to Expiry': wp.get('days_to_expiry', 0),
-                            'Chart': f"https://www.tradingview.com/chart/?symbol={wp['symbol']}"
-                        })
-                    elif wp['strategy'] == 'CC':
-                        premium_collected = wp.get('premium', 0)
-                        current_value = abs(wp.get('current_value', 0))
-                        current_option_price = wp.get('current_price', 0)  # Get current option price
-                        pnl = premium_collected - current_value if premium_collected > 0 else 0
-                        pnl_pct = (pnl / premium_collected * 100) if premium_collected > 0 else 0
+        else:
+            st.info("No open option positions found")
 
-                        positions.append({
-                            'Symbol': wp['symbol'],
-                            'Type': 'CC',
-                            'Strike': wp.get('strike', 0),
-                            'Expiration': wp.get('expiration', ''),
-                            'Premium': premium_collected,
-                            'Current Value': current_value,
-                            'Option Price': current_option_price,  # Add current option price
-                            'P&L': pnl,
-                            'P&L %': pnl_pct,
-                            'Days to Expiry': wp.get('days_to_expiry', 0),
-                            'Chart': f"https://www.tradingview.com/chart/?symbol={wp['symbol']}"
-                        })
-                    elif wp['strategy'] == 'Potential CC':
-                        positions.append({
-                            'Symbol': wp['symbol'],
-                            'Type': 'Stock',
-                            'Strike': 0,
-                            'Expiration': '',
-                            'Premium': 0,
-                            'Current Value': wp.get('cost_basis', 0) * wp.get('shares', 0),
-                            'Option Price': 0,  # No option price for stocks
-                            'P&L': wp.get('unrealized_pnl', 0),
-                            'P&L %': ((wp.get('current_price', 0) - wp.get('cost_basis', 0)) / wp.get('cost_basis', 1) * 100) if wp.get('cost_basis', 0) > 0 else 0,
-                            'Days to Expiry': 0,
-                            'Chart': f"https://www.tradingview.com/chart/?symbol={wp['symbol']}"
-                        })
+    except Exception as e:
+        st.error(f"Error loading positions: {e}")
 
-            except Exception as e:
-                st.error(f"Error loading positions: {e}")
-                positions = []  # No dummy data - show empty if error
-    else:
-        # No positions when not connected to Robinhood
-        positions = []
+    # Trade History Section (AUTOMATIC - NO MANUAL LOGGING)
+    st.markdown("---")
+    st.markdown("### 📊 Trade History")
+    st.caption("Automatic history of all closed trades from Robinhood")
 
-        # Show connection prompt if not connected
-        if not st.session_state.get('rh_connected'):
-            st.info("💡 Connect to Robinhood above to see your real positions")
+    try:
+        # Get closed option orders from Robinhood
+        all_orders = rh.get_all_option_orders()
+
+        closed_trades = []
+        for order in all_orders:
+            # Only process filled orders
+            if order.get('state') != 'filled':
+                continue
+
+            # Get order details
+            legs = order.get('legs', [])
+            if not legs:
+                continue
+
+            leg = legs[0]
+            side = leg.get('side')  # 'buy' or 'sell'
+            position_effect = leg.get('position_effect')  # 'open' or 'close'
+
+            # We want closing trades
+            if position_effect != 'close':
+                continue
+
+            opt_id = leg.get('option')
+            if not opt_id:
+                continue
+
+            # Get option instrument data
+            opt_data = rh.get_option_instrument_data(opt_id)
+            if not opt_data:
+                continue
+
+            symbol = opt_data.get('chain_symbol', 'Unknown')
+            strike = float(opt_data.get('strike_price', 0))
+            exp_date = opt_data.get('expiration_date', 'Unknown')
+            opt_type = opt_data.get('type', 'unknown')
+
+            # Get trade details
+            quantity = float(order.get('quantity', 0))
+            close_price = float(order.get('average_price', 0))
+            close_date_str = order.get('updated_at', '')
+
+            if close_date_str:
+                close_date = datetime.fromisoformat(close_date_str.replace('Z', '+00:00')).strftime('%Y-%m-%d')
+            else:
+                close_date = 'Unknown'
+
+            # Determine strategy
+            if side == 'buy' and opt_type == 'put':
+                strategy = 'CSP'
+            elif side == 'buy' and opt_type == 'call':
+                strategy = 'CC'
+            else:
+                strategy = 'Other'
+
+            closed_trades.append({
+                'Symbol': symbol,
+                'Strategy': strategy,
+                'Strike': f'${strike:.2f}',
+                'Expiration': exp_date,
+                'Close Date': close_date,
+                'Close Price': f'${close_price:.2f}',
+                'Contracts': int(quantity)
+            })
+
+        if closed_trades:
+            # Display summary metrics
+            col1, col2 = st.columns(2)
+            with col1:
+                st.metric("Total Closed Trades", len(closed_trades))
+            with col2:
+                csps_closed = len([t for t in closed_trades if 'CSP' in t['Strategy']])
+                st.metric("Closed CSPs", csps_closed)
+
+            # Display trades table
+            df_history = pd.DataFrame(closed_trades)
+            st.dataframe(df_history, hide_index=True, use_container_width=True)
+        else:
+            st.info("No closed option trades found in Robinhood history")
+
+    except Exception as e:
+        st.error(f"Error loading trade history: {e}")
+
+elif page == "Premium Scanner":
+    st.title("🔍 Premium Scanner")
 
     # Auto-refresh positions (improved without darkening)
-    if st.session_state.get('rh_connected'):
+    if False:  # Disabled old code
+        st.info("Feature reorganization in progress")
         col1, col2, col3 = st.columns([1, 1, 2])
         with col1:
             # Use placeholder to avoid re-rendering issues
@@ -1136,8 +1141,10 @@ elif page == "TradingView Watchlists":
     # Initialize DB sync
     tv_manager = TradingViewDBManager()
 
-    # Current Positions Section - Show ALL active positions from Robinhood
-    st.markdown("### 🎯 Your Current Option Positions")
+    # NOTE: Positions and Trade History have been moved to the "Positions" page
+    # This page now focuses only on TradingView watchlist management
+
+    # Auto-sync on page load (if not synced recently)
     st.caption("Live positions from Robinhood (auto-refreshes)")
 
     try:
