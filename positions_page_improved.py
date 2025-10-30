@@ -418,13 +418,19 @@ def get_closed_trades_with_pl(rh_session):
 
         # Trade details
         quantity = float(order.get('quantity', 0))
-        price = float(order.get('average_price', 0))  # This is already per-contract from Robinhood
+
+        # Use processed_premium (total premium) and divide by quantity to get per-contract price
+        processed_premium = float(order.get('processed_premium', 0))
+        price = (processed_premium / quantity) if quantity > 0 else 0
+
         date_str = order.get('updated_at', '')
 
         if date_str:
             trade_date = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
         else:
-            trade_date = datetime.now()
+            # Make sure we use timezone-aware datetime
+            from datetime import timezone
+            trade_date = datetime.now(timezone.utc)
 
         # Key for matching
         trade_key = (symbol, strike, exp_date, opt_type)
@@ -484,7 +490,8 @@ def get_closed_trades_with_pl(rh_session):
 
 def calculate_performance_by_period(closed_trades):
     """Calculate performance metrics for different time periods"""
-    now = datetime.now()
+    from datetime import timezone
+    now = datetime.now(timezone.utc)
 
     periods = {
         'Last 7 Days': timedelta(days=7),
