@@ -178,7 +178,7 @@ def show_positions_page():
                 # Drop helper column
                 display_df = display_df.drop(columns=['pl_raw'])
 
-                # Function to apply background color
+                # Function to apply text color
                 def highlight_pl(row):
                     """Apply row-wise styling based on P/L value"""
                     idx = row.name
@@ -190,13 +190,13 @@ def show_positions_page():
                     pl_idx = list(display_df.columns).index('P/L')
                     pl_pct_idx = list(display_df.columns).index('P/L %')
 
-                    # Profit (positive P/L) = GREEN, Loss (negative P/L) = RED
+                    # Profit (positive P/L) = GREEN TEXT, Loss (negative P/L) = RED TEXT
                     if pl_val > 0:
-                        styles[pl_idx] = 'background-color: #90EE90; color: black; font-weight: bold'  # Green for profit
-                        styles[pl_pct_idx] = 'background-color: #90EE90; color: black; font-weight: bold'
+                        styles[pl_idx] = 'color: #00AA00; font-weight: bold'  # Green text for profit
+                        styles[pl_pct_idx] = 'color: #00AA00; font-weight: bold'
                     elif pl_val < 0:
-                        styles[pl_idx] = 'background-color: #FFB6C1; color: black; font-weight: bold'  # Red for loss
-                        styles[pl_pct_idx] = 'background-color: #FFB6C1; color: black; font-weight: bold'
+                        styles[pl_idx] = 'color: #DD0000; font-weight: bold'  # Red text for loss
+                        styles[pl_pct_idx] = 'color: #DD0000; font-weight: bold'
                     # else pl_val == 0, no styling (neutral)
 
                     return styles
@@ -231,6 +231,7 @@ def show_positions_page():
     st.markdown("### 📊 Trade History")
     st.caption("Closed trades with P/L calculations")
 
+    closed_trades = []  # Initialize outside try block for use in performance analytics
     try:
         closed_trades = get_closed_trades_with_pl(rh)
 
@@ -287,13 +288,13 @@ def show_positions_page():
                 pl_idx = list(df_display.columns).index('P/L')
                 pl_pct_idx = list(df_display.columns).index('P/L %')
 
-                # Profit (positive P/L) = GREEN, Loss (negative P/L) = RED
+                # Profit (positive P/L) = GREEN TEXT, Loss (negative P/L) = RED TEXT
                 if pl_val > 0:
-                    styles[pl_idx] = 'background-color: #90EE90; color: black; font-weight: bold'  # Green for profit
-                    styles[pl_pct_idx] = 'background-color: #90EE90; color: black; font-weight: bold'
+                    styles[pl_idx] = 'color: #00AA00; font-weight: bold'  # Green text for profit
+                    styles[pl_pct_idx] = 'color: #00AA00; font-weight: bold'
                 elif pl_val < 0:
-                    styles[pl_idx] = 'background-color: #FFB6C1; color: black; font-weight: bold'  # Red for loss
-                    styles[pl_pct_idx] = 'background-color: #FFB6C1; color: black; font-weight: bold'
+                    styles[pl_idx] = 'color: #DD0000; font-weight: bold'  # Red text for loss
+                    styles[pl_pct_idx] = 'color: #DD0000; font-weight: bold'
                 # else pl_val == 0, no styling (neutral)
 
                 return styles
@@ -332,17 +333,19 @@ def show_positions_page():
 
             # Apply color coding to Total P/L column
             def color_perf_pl(val):
-                """Apply background color to P/L cells"""
+                """Apply text color to P/L cells"""
                 try:
                     if '$' in str(val):
                         num_val = float(str(val).replace('$', '').replace(',', ''))
                     else:
                         num_val = float(val)
 
-                    if num_val >= 0:
-                        return 'background-color: #90EE90; color: black; font-weight: bold'
+                    if num_val > 0:
+                        return 'color: #00AA00; font-weight: bold'  # Green text for profit
+                    elif num_val < 0:
+                        return 'color: #DD0000; font-weight: bold'  # Red text for loss
                     else:
-                        return 'background-color: #FFB6C1; color: black; font-weight: bold'
+                        return 'font-weight: bold'  # Neutral for zero
                 except:
                     return ''
 
