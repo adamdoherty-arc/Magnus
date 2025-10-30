@@ -162,40 +162,60 @@ def show_positions_page():
                 # Create dataframe
                 df = pd.DataFrame(positions_data)
 
-                # Function to apply background color based on P/L
-                def color_pl_background(val):
-                    """Apply background color to P/L cells"""
-                    try:
-                        num_val = float(val) if isinstance(val, (int, float)) else 0
-                        if num_val >= 0:
-                            return 'background-color: #90EE90; color: black; font-weight: bold'  # Light green
-                        else:
-                            return 'background-color: #FFB6C1; color: black; font-weight: bold'  # Light red
-                    except:
-                        return ''
-
-                # Format numeric columns
+                # Format display columns
                 display_df = df.copy()
                 display_df['Strike'] = display_df['Strike'].apply(lambda x: f'${x:.2f}')
                 display_df['Premium'] = display_df['Premium'].apply(lambda x: f'${x:,.2f}')
                 display_df['Current'] = display_df['Current'].apply(lambda x: f'${x:,.2f}')
+
+                # Store raw P/L values for coloring before formatting
+                pl_vals = display_df['P/L'].copy()
+                pl_pct_vals = display_df['P/L %'].copy()
+
                 display_df['P/L'] = display_df['P/L'].apply(lambda x: f'${x:,.2f}')
                 display_df['P/L %'] = display_df['P/L %'].apply(lambda x: f'{x:.1f}%')
 
                 # Drop helper column
                 display_df = display_df.drop(columns=['pl_raw'])
 
-                # Apply styling with background colors
-                styled_df = display_df.style.applymap(
-                    color_pl_background,
-                    subset=['P/L', 'P/L %']
-                )
+                # Function to apply background color
+                def highlight_pl(row):
+                    """Apply row-wise styling based on P/L value"""
+                    idx = row.name
+                    pl_val = pl_vals.iloc[idx] if idx < len(pl_vals) else 0
 
-                # Display styled table with TradingView links
-                st.dataframe(styled_df, hide_index=True, use_container_width=True,
-                            column_config={
-                                "TradingView": st.column_config.LinkColumn("TradingView Chart")
-                            })
+                    styles = [''] * len(row)
+
+                    # Find P/L and P/L % column indices
+                    pl_idx = list(display_df.columns).index('P/L')
+                    pl_pct_idx = list(display_df.columns).index('P/L %')
+
+                    # Profit (positive P/L) = GREEN, Loss (negative P/L) = RED
+                    if pl_val > 0:
+                        styles[pl_idx] = 'background-color: #90EE90; color: black; font-weight: bold'  # Green for profit
+                        styles[pl_pct_idx] = 'background-color: #90EE90; color: black; font-weight: bold'
+                    elif pl_val < 0:
+                        styles[pl_idx] = 'background-color: #FFB6C1; color: black; font-weight: bold'  # Red for loss
+                        styles[pl_pct_idx] = 'background-color: #FFB6C1; color: black; font-weight: bold'
+                    # else pl_val == 0, no styling (neutral)
+
+                    return styles
+
+                # Apply styling
+                styled_df = display_df.style.apply(highlight_pl, axis=1)
+
+                # Display table
+                st.dataframe(
+                    styled_df,
+                    hide_index=True,
+                    use_container_width=True,
+                    column_config={
+                        "TradingView": st.column_config.LinkColumn(
+                            "Chart",
+                            display_text="📈"
+                        )
+                    }
+                )
 
             else:
                 st.info("No open option positions found in Robinhood")
@@ -245,6 +265,9 @@ def show_positions_page():
             display_cols = ['Close Date', 'Symbol', 'Strategy', 'Strike',
                           'Open Premium', 'Close Cost', 'P/L', 'P/L %', 'Days Held', 'TradingView']
 
+            # Store raw P/L values before formatting
+            pl_raw_vals = df_history['P/L'].copy()
+
             # Format numeric columns
             df_display = df_history[display_cols].copy()
             df_display['Open Premium'] = df_display['Open Premium'].apply(lambda x: f'${x:,.2f}')
@@ -252,35 +275,41 @@ def show_positions_page():
             df_display['P/L'] = df_display['P/L'].apply(lambda x: f'${x:,.2f}')
             df_display['P/L %'] = df_display['P/L %'].apply(lambda x: f'{x:.1f}%')
 
-            # Apply color coding
-            def color_history_pl(val):
-                """Apply background color to P/L cells"""
-                try:
-                    if '$' in str(val):
-                        num_val = float(str(val).replace('$', '').replace(',', ''))
-                    elif '%' in str(val):
-                        num_val = float(str(val).replace('%', ''))
-                    else:
-                        num_val = float(val)
+            # Function to apply row-wise styling
+            def highlight_history_pl(row):
+                """Apply row-wise styling based on P/L value"""
+                idx = row.name
+                pl_val = pl_raw_vals.iloc[idx] if idx < len(pl_raw_vals) else 0
 
-                    if num_val >= 0:
-                        return 'background-color: #90EE90; color: black; font-weight: bold'
-                    else:
-                        return 'background-color: #FFB6C1; color: black; font-weight: bold'
-                except:
-                    return ''
+                styles = [''] * len(row)
 
-            styled_history = df_display.style.applymap(
-                color_history_pl,
-                subset=['P/L', 'P/L %']
-            )
+                # Find P/L and P/L % column indices
+                pl_idx = list(df_display.columns).index('P/L')
+                pl_pct_idx = list(df_display.columns).index('P/L %')
+
+                # Profit (positive P/L) = GREEN, Loss (negative P/L) = RED
+                if pl_val > 0:
+                    styles[pl_idx] = 'background-color: #90EE90; color: black; font-weight: bold'  # Green for profit
+                    styles[pl_pct_idx] = 'background-color: #90EE90; color: black; font-weight: bold'
+                elif pl_val < 0:
+                    styles[pl_idx] = 'background-color: #FFB6C1; color: black; font-weight: bold'  # Red for loss
+                    styles[pl_pct_idx] = 'background-color: #FFB6C1; color: black; font-weight: bold'
+                # else pl_val == 0, no styling (neutral)
+
+                return styles
+
+            # Apply styling
+            styled_history = df_display.style.apply(highlight_history_pl, axis=1)
 
             st.dataframe(
                 styled_history,
                 hide_index=True,
                 use_container_width=True,
                 column_config={
-                    "TradingView": st.column_config.LinkColumn("TradingView Chart")
+                    "TradingView": st.column_config.LinkColumn(
+                        "Chart",
+                        display_text="📈"
+                    )
                 }
             )
 
