@@ -46,8 +46,10 @@ def show_positions_page():
     st.markdown("---")
 
     # === LOGIN TO ROBINHOOD (once for entire page) ===
+    rh_session = None
     try:
         rh.login(username='brulecapital@gmail.com', password='FortKnox')
+        rh_session = rh  # Store the logged-in session
     except Exception as e:
         st.error(f"Failed to connect to Robinhood: {e}")
         st.info("Please refresh the page to try again")
@@ -238,7 +240,7 @@ def show_positions_page():
 
     closed_trades = []  # Initialize outside try block for use in performance analytics
     try:
-        closed_trades = get_closed_trades_with_pl(rh)
+        closed_trades = get_closed_trades_with_pl(rh_session)
 
         if closed_trades:
             # Calculate summary metrics
