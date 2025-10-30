@@ -430,9 +430,15 @@ def get_closed_trades_with_pl(rh_session):
         # Trade details
         quantity = float(order.get('quantity', 0))
 
-        # Use processed_premium (total premium) and divide by quantity to get per-contract price
+        # Use processed_premium (total premium) with direction
         processed_premium = float(order.get('processed_premium', 0))
-        price = (processed_premium / quantity) if quantity > 0 else 0
+        premium_direction = order.get('processed_premium_direction', 'debit')
+
+        # Credit = you received money (positive), Debit = you paid money (negative)
+        if premium_direction == 'credit':
+            price = (processed_premium / quantity) if quantity > 0 else 0
+        else:  # debit
+            price = -(processed_premium / quantity) if quantity > 0 else 0
 
         date_str = order.get('updated_at', '')
 
@@ -459,20 +465,23 @@ def get_closed_trades_with_pl(rh_session):
             if trade_key in open_orders:
                 open_order = open_orders[trade_key]
 
-                # Calculate P/L (both prices are per-contract already)
-                open_premium = abs(open_order['open_price']) * quantity
-                close_cost = abs(price) * quantity
+                # Calculate P/L using signed values
+                # open_price: positive for credit (sold), negative for debit (bought)
+                # price: positive for credit (sold), negative for debit (bought)
+                # P/L = open_price + price (because close price already has correct sign)
 
-                # For short positions: profit = premium - close_cost
-                # For long positions: profit = close_cost - premium
-                if side == 'buy':  # Closing a short position
-                    pl = open_premium - close_cost
+                open_amount = open_order['open_price'] * quantity
+                close_amount = price * quantity
+                pl = open_amount + close_amount  # Simply add (signs handle the math)
+
+                # Determine strategy
+                if side == 'buy':  # Buying to close a short position
                     strategy = 'CSP' if opt_type == 'put' else 'CC'
-                else:  # Closing a long position
-                    pl = close_cost - open_premium
+                else:  # Selling to close a long position
                     strategy = 'Long Call' if opt_type == 'call' else 'Long Put'
 
-                pl_pct = (pl / open_premium * 100) if open_premium > 0 else 0
+                # For percentage, use absolute value of the opening amount
+                pl_pct = (pl / abs(open_amount) * 100) if abs(open_amount) > 0 else 0
 
                 # Days held
                 days_held = (trade_date - open_order['open_date']).days
@@ -482,8 +491,8 @@ def get_closed_trades_with_pl(rh_session):
                     'Symbol': symbol,
                     'Strategy': strategy,
                     'Strike': f'${strike:.2f}',
-                    'Open Premium': open_premium,
-                    'Close Cost': close_cost,
+                    'Open Premium': abs(open_amount),  # Show as positive for display
+                    'Close Cost': abs(close_amount),   # Show as positive for display
                     'P/L': pl,
                     'P/L %': pl_pct,
                     'Days Held': days_held,
