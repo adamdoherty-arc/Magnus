@@ -124,11 +124,19 @@ def show_positions_page():
                 else:
                     strategy = 'Other'
 
+                # Get current stock price
+                try:
+                    stock_quote = rh.get_latest_price(symbol)
+                    stock_price = float(stock_quote[0]) if stock_quote else 0
+                except:
+                    stock_price = 0
+
                 # Create TradingView link
                 tv_link = f"https://www.tradingview.com/chart/?symbol={symbol}"
 
                 positions_data.append({
                     'Symbol': symbol,
+                    'Stock Price': stock_price,
                     'Strategy': strategy,
                     'Strike': strike,
                     'Expiration': exp_date,
@@ -171,6 +179,7 @@ def show_positions_page():
 
                 # Format display columns
                 display_df = df.copy()
+                display_df['Stock Price'] = display_df['Stock Price'].apply(lambda x: f'${x:.2f}')
                 display_df['Strike'] = display_df['Strike'].apply(lambda x: f'${x:.2f}')
                 display_df['Premium'] = display_df['Premium'].apply(lambda x: f'${x:,.2f}')
                 display_df['Current'] = display_df['Current'].apply(lambda x: f'${x:,.2f}')
