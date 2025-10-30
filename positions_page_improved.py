@@ -52,6 +52,11 @@ def show_positions_page():
         # Login to Robinhood
         rh.login(username='brulecapital@gmail.com', password='FortKnox')
 
+        # Get total account value
+        account_profile = rh.load_account_profile()
+        portfolio = rh.load_portfolio_profile()
+        total_equity = float(portfolio.get('equity', 0)) if portfolio else 0
+
         # Get all open option positions
         positions_raw = rh.get_open_option_positions()
 
@@ -112,6 +117,9 @@ def show_positions_page():
                 else:
                     strategy = 'Other'
 
+                # Create TradingView link
+                tv_link = f"https://www.tradingview.com/chart/?symbol={symbol}"
+
                 positions_data.append({
                     'Symbol': symbol,
                     'Strategy': strategy,
@@ -123,6 +131,7 @@ def show_positions_page():
                     'Current': current_value,
                     'P/L': pl,
                     'P/L %': (pl/total_premium*100) if total_premium > 0 else 0,
+                    'TradingView': tv_link,
                     'pl_raw': pl  # For color coding
                 })
 
@@ -131,12 +140,14 @@ def show_positions_page():
                 total_pl = sum([p['P/L'] for p in positions_data])
                 total_premium = sum([p['Premium'] for p in positions_data])
 
-                col1, col2, col3, col4 = st.columns(4)
+                col1, col2, col3, col4, col5 = st.columns(5)
                 with col1:
-                    st.metric("Active Positions", len(positions_data))
+                    st.metric("Total Account Value", f'${total_equity:,.2f}')
                 with col2:
-                    st.metric("Total Premium", f'${total_premium:,.2f}')
+                    st.metric("Active Positions", len(positions_data))
                 with col3:
+                    st.metric("Total Premium", f'${total_premium:,.2f}')
+                with col4:
                     pl_color = "normal" if total_pl >= 0 else "inverse"
                     st.metric(
                         "Total P/L",
@@ -144,46 +155,47 @@ def show_positions_page():
                         delta=f'{(total_pl/total_premium*100):.1f}%' if total_premium > 0 else '0%',
                         delta_color=pl_color
                     )
-                with col4:
+                with col5:
                     csps = len([p for p in positions_data if 'CSP' in p['Strategy']])
                     st.metric("CSPs", csps)
 
-                # Create styled dataframe with color coding
+                # Create dataframe
                 df = pd.DataFrame(positions_data)
 
-                # Format for display
-                def color_pl(val):
-                    """Color code P/L values"""
-                    color = 'green' if val >= 0 else 'red'
-                    return f'color: {color}; font-weight: bold'
+                # Function to apply background color based on P/L
+                def color_pl_background(val):
+                    """Apply background color to P/L cells"""
+                    try:
+                        num_val = float(val) if isinstance(val, (int, float)) else 0
+                        if num_val >= 0:
+                            return 'background-color: #90EE90; color: black; font-weight: bold'  # Light green
+                        else:
+                            return 'background-color: #FFB6C1; color: black; font-weight: bold'  # Light red
+                    except:
+                        return ''
 
-                # Apply styling
-                styled_df = df.style.applymap(
-                    color_pl,
+                # Format numeric columns
+                display_df = df.copy()
+                display_df['Strike'] = display_df['Strike'].apply(lambda x: f'${x:.2f}')
+                display_df['Premium'] = display_df['Premium'].apply(lambda x: f'${x:,.2f}')
+                display_df['Current'] = display_df['Current'].apply(lambda x: f'${x:,.2f}')
+                display_df['P/L'] = display_df['P/L'].apply(lambda x: f'${x:,.2f}')
+                display_df['P/L %'] = display_df['P/L %'].apply(lambda x: f'{x:.1f}%')
+
+                # Drop helper column
+                display_df = display_df.drop(columns=['pl_raw'])
+
+                # Apply styling with background colors
+                styled_df = display_df.style.applymap(
+                    color_pl_background,
                     subset=['P/L', 'P/L %']
-                ).format({
-                    'Strike': '${:.2f}',
-                    'Premium': '${:.2f}',
-                    'Current': '${:.2f}',
-                    'P/L': '${:.2f}',
-                    'P/L %': '{:.1f}%'
-                })
+                )
 
-                # Display table (drop pl_raw helper column)
-                display_df = df.drop(columns=['pl_raw'])
-                st.dataframe(display_df, hide_index=True, use_container_width=True)
-
-                # Add TradingView links below table
-                st.markdown("**📈 TradingView Charts:**")
-                chart_cols = st.columns(min(len(positions_data), 7))
-                for idx, pos in enumerate(positions_data[:7]):  # Show first 7
-                    with chart_cols[idx]:
-                        tv_url = f"https://www.tradingview.com/chart/?symbol={pos['Symbol']}"
-                        st.link_button(
-                            f"{pos['Symbol']}",
-                            tv_url,
-                            use_container_width=True
-                        )
+                # Display styled table with TradingView links
+                st.dataframe(styled_df, hide_index=True, use_container_width=True,
+                            column_config={
+                                "TradingView": st.column_config.LinkColumn("TradingView Chart")
+                            })
 
             else:
                 st.info("No open option positions found in Robinhood")
@@ -221,17 +233,55 @@ def show_positions_page():
             with col4:
                 st.metric("Avg P/L", f'${avg_pl:.2f}')
 
-            # Display trades table
+            # Display trades table with color coding
             df_history = pd.DataFrame(closed_trades[:50])  # Show last 50
 
-            # Format display
+            # Add TradingView links
+            df_history['TradingView'] = df_history['Symbol'].apply(
+                lambda x: f"https://www.tradingview.com/chart/?symbol={x}"
+            )
+
+            # Format display columns
             display_cols = ['Close Date', 'Symbol', 'Strategy', 'Strike',
-                          'Open Premium', 'Close Cost', 'P/L', 'P/L %', 'Days Held']
+                          'Open Premium', 'Close Cost', 'P/L', 'P/L %', 'Days Held', 'TradingView']
+
+            # Format numeric columns
+            df_display = df_history[display_cols].copy()
+            df_display['Open Premium'] = df_display['Open Premium'].apply(lambda x: f'${x:,.2f}')
+            df_display['Close Cost'] = df_display['Close Cost'].apply(lambda x: f'${x:,.2f}')
+            df_display['P/L'] = df_display['P/L'].apply(lambda x: f'${x:,.2f}')
+            df_display['P/L %'] = df_display['P/L %'].apply(lambda x: f'{x:.1f}%')
+
+            # Apply color coding
+            def color_history_pl(val):
+                """Apply background color to P/L cells"""
+                try:
+                    if '$' in str(val):
+                        num_val = float(str(val).replace('$', '').replace(',', ''))
+                    elif '%' in str(val):
+                        num_val = float(str(val).replace('%', ''))
+                    else:
+                        num_val = float(val)
+
+                    if num_val >= 0:
+                        return 'background-color: #90EE90; color: black; font-weight: bold'
+                    else:
+                        return 'background-color: #FFB6C1; color: black; font-weight: bold'
+                except:
+                    return ''
+
+            styled_history = df_display.style.applymap(
+                color_history_pl,
+                subset=['P/L', 'P/L %']
+            )
 
             st.dataframe(
-                df_history[display_cols],
+                styled_history,
                 hide_index=True,
-                use_container_width=True
+                use_container_width=True,
+                column_config={
+                    "TradingView": st.column_config.LinkColumn("TradingView Chart")
+                }
             )
 
         else:
@@ -251,9 +301,30 @@ def show_positions_page():
 
             df_perf = pd.DataFrame(performance_data)
 
-            # Style the table
+            # Apply color coding to Total P/L column
+            def color_perf_pl(val):
+                """Apply background color to P/L cells"""
+                try:
+                    if '$' in str(val):
+                        num_val = float(str(val).replace('$', '').replace(',', ''))
+                    else:
+                        num_val = float(val)
+
+                    if num_val >= 0:
+                        return 'background-color: #90EE90; color: black; font-weight: bold'
+                    else:
+                        return 'background-color: #FFB6C1; color: black; font-weight: bold'
+                except:
+                    return ''
+
+            styled_perf = df_perf.style.applymap(
+                color_perf_pl,
+                subset=['Total P/L']
+            )
+
+            # Display styled table
             st.dataframe(
-                df_perf,
+                styled_perf,
                 hide_index=True,
                 use_container_width=True
             )
@@ -310,7 +381,7 @@ def get_closed_trades_with_pl(rh_session):
 
         # Trade details
         quantity = float(order.get('quantity', 0))
-        price = float(order.get('average_price', 0))
+        price = float(order.get('average_price', 0))  # This is already per-contract from Robinhood
         date_str = order.get('updated_at', '')
 
         if date_str:
@@ -324,7 +395,7 @@ def get_closed_trades_with_pl(rh_session):
         if position_effect == 'open':
             # Store opening order
             open_orders[trade_key] = {
-                'open_price': price,
+                'open_price': price,  # Per-contract price
                 'open_date': trade_date,
                 'quantity': quantity,
                 'side': side
@@ -334,9 +405,9 @@ def get_closed_trades_with_pl(rh_session):
             if trade_key in open_orders:
                 open_order = open_orders[trade_key]
 
-                # Calculate P/L
-                open_premium = open_order['open_price'] * quantity
-                close_cost = price * quantity
+                # Calculate P/L (both prices are per-contract already)
+                open_premium = abs(open_order['open_price']) * quantity
+                close_cost = abs(price) * quantity
 
                 # For short positions: profit = premium - close_cost
                 # For long positions: profit = close_cost - premium
