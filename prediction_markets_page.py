@@ -81,7 +81,7 @@ def show_prediction_markets():
     for market in filtered_markets[:20]:  # Show top 20
         display_market_card(market)
 
-@st.cache_data(ttl=300)  # Cache for 5 minutes
+@st.cache_data(ttl=3600)  # Cache for 1 hour to avoid rate limiting
 def fetch_and_score_markets(_kalshi, _analyzer, category, limit=50):
     """Fetch markets from Kalshi and score them"""
     try:
