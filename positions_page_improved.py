@@ -45,13 +45,18 @@ def show_positions_page():
 
     st.markdown("---")
 
+    # === LOGIN TO ROBINHOOD (once for entire page) ===
+    try:
+        rh.login(username='brulecapital@gmail.com', password='FortKnox')
+    except Exception as e:
+        st.error(f"Failed to connect to Robinhood: {e}")
+        st.info("Please refresh the page to try again")
+        return
+
     # === ACTIVE POSITIONS ===
     st.markdown("### 🎯 Your Current Option Positions")
 
     try:
-        # Login to Robinhood
-        rh.login(username='brulecapital@gmail.com', password='FortKnox')
-
         # Get total account value
         account_profile = rh.load_account_profile()
         portfolio = rh.load_portfolio_profile()
