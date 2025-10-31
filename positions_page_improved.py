@@ -124,12 +124,24 @@ def show_positions_page():
                 else:
                     strategy = 'Other'
 
-                # Get current stock price
+                # Get current stock price (regular hours)
                 try:
                     stock_quote = rh.get_latest_price(symbol)
                     stock_price = float(stock_quote[0]) if stock_quote else 0
                 except:
                     stock_price = 0
+
+                # Get after-hours stock price
+                try:
+                    fundamentals = rh.get_fundamentals(symbol)
+                    if fundamentals and len(fundamentals) > 0:
+                        # Try to get after hours price, fallback to regular price
+                        after_hours = fundamentals[0].get('last_extended_hours_trade_price', None)
+                        after_hours_price = float(after_hours) if after_hours else stock_price
+                    else:
+                        after_hours_price = stock_price
+                except:
+                    after_hours_price = stock_price
 
                 # Create TradingView link
                 tv_link = f"https://www.tradingview.com/chart/?symbol={symbol}"
@@ -137,6 +149,7 @@ def show_positions_page():
                 positions_data.append({
                     'Symbol': symbol,
                     'Stock Price': stock_price,
+                    'After-Hours': after_hours_price,
                     'Strategy': strategy,
                     'Strike': strike,
                     'Expiration': exp_date,
@@ -146,7 +159,7 @@ def show_positions_page():
                     'Current': current_value,
                     'P/L': pl,
                     'P/L %': (pl/total_premium*100) if total_premium > 0 else 0,
-                    'TradingView': tv_link,
+                    'Chart': tv_link,
                     'pl_raw': pl  # For color coding
                 })
 
@@ -180,6 +193,7 @@ def show_positions_page():
                 # Format display columns
                 display_df = df.copy()
                 display_df['Stock Price'] = display_df['Stock Price'].apply(lambda x: f'${x:.2f}')
+                display_df['After-Hours'] = display_df['After-Hours'].apply(lambda x: f'${x:.2f}')
                 display_df['Strike'] = display_df['Strike'].apply(lambda x: f'${x:.2f}')
                 display_df['Premium'] = display_df['Premium'].apply(lambda x: f'${x:,.2f}')
                 display_df['Current'] = display_df['Current'].apply(lambda x: f'${x:,.2f}')
@@ -226,9 +240,9 @@ def show_positions_page():
                     hide_index=True,
                     use_container_width=True,
                     column_config={
-                        "TradingView": st.column_config.LinkColumn(
+                        "Chart": st.column_config.LinkColumn(
                             "Chart",
-                            display_text="📈"
+                            help="Click to view TradingView chart"
                         )
                     }
                 )
