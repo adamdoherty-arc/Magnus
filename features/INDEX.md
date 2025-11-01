@@ -182,12 +182,15 @@ Manage all platform settings including Robinhood integration, strategy parameter
 
 ## Documentation Structure
 
-Each feature includes four types of documentation:
+Each feature includes **seven types of documentation**:
 
 1. **README.md** - User-focused guide with step-by-step instructions, screenshots, and troubleshooting
 2. **ARCHITECTURE.md** - Technical implementation details for developers
 3. **SPEC.md** - Detailed feature specifications and requirements
 4. **WISHLIST.md** - Planned enhancements and future features
+5. **AGENT.md** - AI agent documentation: capabilities, responsibilities, communication patterns
+6. **TODO.md** - Current tasks, priorities, known issues, and technical debt
+7. **CHANGELOG.md** - Version history and notable changes following Keep a Changelog format
 
 ## Additional Resources
 
@@ -214,6 +217,11 @@ Each feature includes four types of documentation:
 - [NO_DUMMY_DATA_POLICY](../NO_DUMMY_DATA_POLICY.md) - Critical development policy
 - [Options Trading Guide](../README_OPTIONS_GUIDE.md) - Educational resource
 
+### Multi-Agent System
+
+- [MAIN_AGENT.md](../MAIN_AGENT.md) - Main orchestrator agent documentation
+- [Feature Agents](./dashboard/AGENT.md) - Each feature has a specialized agent (AGENT.md in each folder)
+
 
 ### 9. Calendar Spreads
 
@@ -225,6 +233,9 @@ Discover optimal calendar spread opportunities using advanced AI scoring. Profit
 - [Architecture](./calendar_spreads/ARCHITECTURE.md) - AI scoring engine & Greeks calculations
 - [Specifications](./calendar_spreads/SPEC.md) - Max profit/loss formulas & requirements
 - [Wishlist](./calendar_spreads/WISHLIST.md) - Auto-roll, backtesting, advanced features
+- [Agent](./calendar_spreads/AGENT.md) - Agent capabilities & coordination
+- [TODO](./calendar_spreads/TODO.md) - Current tasks & priorities
+- [Changelog](./calendar_spreads/CHANGELOG.md) - Version history
 
 **Key Features:**
 - TradingView watchlist integration
@@ -242,6 +253,39 @@ Discover optimal calendar spread opportunities using advanced AI scoring. Profit
 - Best in low IV, range-bound markets
 - Limited risk (max loss = net debit)
 - Neutral market outlook
+
+---
+
+### 10. Prediction Markets
+
+**AI-Powered Event Contract Analysis**
+
+Discover high-quality event contract opportunities from Kalshi with quantitative scoring. Trade on real-world events with defined outcomes.
+
+- [User Guide](./prediction_markets/README.md) - Understanding prediction markets
+- [Architecture](./prediction_markets/ARCHITECTURE.md) - Kalshi integration & AI scoring
+- [Specifications](./prediction_markets/SPEC.md) - Scoring algorithm & data models
+- [Wishlist](./prediction_markets/WISHLIST.md) - Real-time updates, ML scoring, portfolio tracking
+- [Agent](./prediction_markets/AGENT.md) - Agent capabilities & communication
+- [TODO](./prediction_markets/TODO.md) - Current priorities & technical debt
+- [Changelog](./prediction_markets/CHANGELOG.md) - Version history
+
+**Key Features:**
+- 8 market categories (Politics, Sports, Economics, Crypto, Companies, Tech, Climate, World)
+- AI-powered scoring (0-100) with 4-component analysis
+- Liquidity score (volume analysis)
+- Time value optimization (7-30 day sweet spot)
+- Risk-reward potential calculation
+- Spread quality assessment
+- Smart position recommendations (Yes/No/Maybe/Skip)
+- Detailed reasoning for each market
+- Expected value calculations
+
+**Strategy Focus:**
+- Event-based trading (binary outcomes)
+- Quantitative analysis with AI
+- Smart timing (days to close optimization)
+- Risk management with spread analysis
 
 ---
 
@@ -290,16 +334,18 @@ Discover optimal calendar spread opportunities using advanced AI scoring. Profit
 
 ## Feature Comparison
 
-| Feature | Data Source | Real-time | AI Analysis | Export |
-|---------|-------------|-----------|-------------|--------|
-| Dashboard | Robinhood + DB | Yes | Yes | CSV |
-| Opportunities | yfinance + DB | Yes | Yes | CSV |
-| Positions | Robinhood | Yes | Yes | CSV |
-| Premium Scanner | yfinance | Yes | Score-based | CSV |
-| TradingView Watchlists | TradingView API | Yes | No | CSV |
-| Database Scan | PostgreSQL | No | No | CSV |
-| Earnings Calendar | Robinhood + APIs | Daily | No | CSV |
-| Settings | .env + DB | N/A | N/A | N/A |
+| Feature | Data Source | Real-time | AI Analysis | Export | Agent |
+|---------|-------------|-----------|-------------|--------|-------|
+| Dashboard | Robinhood + DB | Yes | Yes | CSV | [✓](./dashboard/AGENT.md) |
+| Opportunities | yfinance + DB | Yes | Yes | CSV | [✓](./opportunities/AGENT.md) |
+| Positions | Robinhood | Yes | Yes | CSV | [✓](./positions/AGENT.md) |
+| Premium Scanner | yfinance | Yes | Score-based | CSV | [✓](./premium_scanner/AGENT.md) |
+| TradingView Watchlists | TradingView API | Yes | No | CSV | [✓](./tradingview_watchlists/AGENT.md) |
+| Database Scan | PostgreSQL | No | No | CSV | [✓](./database_scan/AGENT.md) |
+| Earnings Calendar | Robinhood + APIs | Daily | No | CSV | [✓](./earnings_calendar/AGENT.md) |
+| Calendar Spreads | yfinance + DB | Yes | Yes | CSV | [✓](./calendar_spreads/AGENT.md) |
+| Prediction Markets | Kalshi API | Cached (1h) | Yes | CSV | [✓](./prediction_markets/AGENT.md) |
+| Settings | .env + DB | N/A | N/A | N/A | [✓](./settings/AGENT.md) |
 
 ## Support
 
@@ -320,15 +366,158 @@ We welcome feedback on documentation:
 - Suggestions: Use GitHub Discussions
 - Typos/errors: Submit a PR with fixes
 
+## Multi-Agent Architecture
+
+Magnus uses a sophisticated **multi-agent system** where each feature has its own specialized AI agent that maintains context, tracks changes, and coordinates with other agents.
+
+### Main Orchestrator Agent
+
+The [MAIN_AGENT.md](../MAIN_AGENT.md) serves as the central intelligence that:
+
+- **Routes requests** to appropriate feature agents
+- **Coordinates multi-feature workflows** (e.g., finding opportunities while avoiding earnings)
+- **Maintains platform-wide context** (positions, watchlists, trade history)
+- **Ensures data consistency** across all features
+- **Monitors system health** and feature dependencies
+
+### Feature-Specific Agents
+
+Each of the 10 features has its own agent documented in `AGENT.md`:
+
+| Feature | Agent Location | Primary Responsibility |
+|---------|----------------|------------------------|
+| Dashboard | [dashboard/AGENT.md](./dashboard/AGENT.md) | Portfolio visualization & performance tracking |
+| Opportunities | [opportunities/AGENT.md](./opportunities/AGENT.md) | Finding new CSP/CC trading opportunities |
+| Positions | [positions/AGENT.md](./positions/AGENT.md) | Real-time position tracking & management |
+| Premium Scanner | [premium_scanner/AGENT.md](./premium_scanner/AGENT.md) | Multi-expiration options scanning |
+| TradingView Watchlists | [tradingview_watchlists/AGENT.md](./tradingview_watchlists/AGENT.md) | Watchlist synchronization & analysis |
+| Database Scan | [database_scan/AGENT.md](./database_scan/AGENT.md) | Market-wide database scanning |
+| Earnings Calendar | [earnings_calendar/AGENT.md](./earnings_calendar/AGENT.md) | Earnings tracking & risk warnings |
+| Calendar Spreads | [calendar_spreads/AGENT.md](./calendar_spreads/AGENT.md) | Time decay spread opportunities |
+| Prediction Markets | [prediction_markets/AGENT.md](./prediction_markets/AGENT.md) | Event contract analysis (Kalshi) |
+| Settings | [settings/AGENT.md](./settings/AGENT.md) | Platform configuration & auth |
+
+### Agent Communication Protocol
+
+Agents communicate through a structured protocol managed by the Main Agent:
+
+```
+User Request → Main Agent
+              ↓
+      Analyze & Route
+              ↓
+   Delegate to Feature Agent(s)
+              ↓
+   Gather cross-feature data if needed
+              ↓
+   Aggregate responses
+              ↓
+   Return coordinated result → User
+```
+
+### Example Multi-Agent Workflow
+
+**User Request**: "Find the best CSP opportunity from my watchlist avoiding earnings"
+
+```yaml
+Workflow:
+  1. Main Agent receives request
+  2. TradingView Watchlists Agent → Retrieves symbols
+  3. Premium Scanner Agent → Scans for high premiums
+  4. Earnings Calendar Agent → Filters out earnings risks
+  5. Prediction Markets Agent → Adds sentiment scores
+  6. Main Agent → Ranks and returns top 5 opportunities
+```
+
+### Agent Capabilities
+
+Each `AGENT.md` file documents:
+
+- ✅ **What the agent CAN do** (specific capabilities)
+- ❌ **What the agent CANNOT do** (boundaries)
+- 🔗 **Dependencies** (other agents, APIs, databases)
+- 📡 **Communication patterns** (request/response formats)
+- 🎯 **Questions it can answer** (routing guide)
+- 🔄 **Data flow** (how information moves)
+- ⚠️ **Error handling** (failure scenarios)
+- 📊 **Performance metrics** (monitoring targets)
+
+### Change Tracking
+
+Every agent maintains awareness of changes through:
+
+- **TODO.md** - Current priorities and tasks
+- **CHANGELOG.md** - Version history and updates
+- **WISHLIST.md** - Planned future enhancements
+
+When any feature is updated:
+1. Feature agent updates its TODO.md and CHANGELOG.md
+2. Main Agent detects the change
+3. Dependent features are notified if needed
+4. Cross-feature impacts are coordinated
+
+### Benefits of the Multi-Agent System
+
+1. **Separation of Concerns**: Each feature has clear boundaries and responsibilities
+2. **Robust Context**: Agents maintain deep knowledge of their domain
+3. **Coordinated Workflows**: Complex tasks span multiple features seamlessly
+4. **Change Awareness**: All agents stay synchronized with current state
+5. **Scalability**: New features can be added as new agents
+6. **Maintainability**: Clear documentation of what each component does
+
+### Working with Agents
+
+**For Users:**
+- Ask questions naturally - the Main Agent routes to the right feature
+- Complex requests automatically coordinate multiple features
+- Get consistent, context-aware responses
+
+**For Developers:**
+- Consult the appropriate AGENT.md before making changes
+- Update TODO.md with new tasks
+- Document changes in CHANGELOG.md
+- Coordinate with Main Agent for cross-feature impacts
+
 ## Version Information
 
 - **Current Version**: 1.0.0
-- **Last Updated**: 2025-10-28
-- **Features**: 8 navigation pages
-- **Documentation Pages**: 32 (4 per feature)
+- **Last Updated**: 2025-11-01
+- **Features**: 10 navigation pages
+- **Documentation Pages**: 70 (7 per feature)
+- **Agent System**: Main Orchestrator + 10 Feature Agents
+
+---
+
+## Agent System Quick Reference
+
+### When Working on a Feature
+
+1. **Read** the feature's `AGENT.md` to understand its role
+2. **Check** the `TODO.md` for current priorities
+3. **Review** the `CHANGELOG.md` for recent changes
+4. **Consult** `WISHLIST.md` for future direction
+5. **Update** all three when making changes
+
+### When Requesting Changes
+
+1. **Identify** which feature(s) are involved
+2. **Check** if multiple agents need coordination
+3. **Verify** dependencies in AGENT.md files
+4. **Ensure** no conflicts with current TODOs
+5. **Document** impacts across features
+
+### When Adding New Features
+
+1. **Create** feature folder with all 7 documentation files
+2. **Write** comprehensive AGENT.md
+3. **Register** with Main Agent's feature registry
+4. **Document** dependencies and integration points
+5. **Update** this INDEX.md with the new feature
 
 ---
 
 **Happy Trading!**
 
 For questions or contributions, see [CONTRIBUTING.md](../CONTRIBUTING.md)
+
+For agent system questions, see [MAIN_AGENT.md](../MAIN_AGENT.md)

@@ -5,6 +5,7 @@ Improved Positions Page with:
 - TradingView chart links
 - Complete trade history with P/L calculations
 - Performance analytics by time period
+- Database caching for fast load times
 """
 
 import streamlit as st
@@ -12,6 +13,7 @@ import robin_stocks.robinhood as rh
 import pandas as pd
 from datetime import datetime, timedelta
 from collections import defaultdict
+from src.trade_history_sync import TradeHistorySyncService
 
 def show_positions_page():
     """Main positions page with all improvements"""
@@ -63,6 +65,112 @@ def show_positions_page():
         account_profile = rh.load_account_profile()
         portfolio = rh.load_portfolio_profile()
         total_equity = float(portfolio.get('equity', 0)) if portfolio else 0
+
+        # === STOCK POSITIONS ===
+        try:
+            stock_positions_raw = rh.get_open_stock_positions()
+            stock_positions_data = []
+
+            for stock_pos in stock_positions_raw:
+                quantity = float(stock_pos.get('quantity', 0))
+                if quantity == 0:
+                    continue
+
+                # Get instrument URL and extract symbol
+                instrument_url = stock_pos.get('instrument')
+                if instrument_url:
+                    instrument_data = rh.get_instrument_by_url(instrument_url)
+                    symbol = instrument_data.get('symbol', 'Unknown')
+                else:
+                    continue
+
+                # Get average buy price
+                avg_buy_price = float(stock_pos.get('average_buy_price', 0))
+
+                # Get current stock price
+                try:
+                    stock_quote = rh.get_latest_price(symbol)
+                    current_price = float(stock_quote[0]) if stock_quote else 0
+                except:
+                    current_price = 0
+
+                # Calculate values
+                cost_basis = avg_buy_price * quantity
+                current_value = current_price * quantity
+                pl = current_value - cost_basis
+                pl_pct = (pl / cost_basis * 100) if cost_basis > 0 else 0
+
+                # TradingView link
+                tv_link = f"https://www.tradingview.com/chart/?symbol={symbol}"
+
+                stock_positions_data.append({
+                    'Symbol': symbol,
+                    'Shares': int(quantity),
+                    'Avg Buy Price': avg_buy_price,
+                    'Current Price': current_price,
+                    'Cost Basis': cost_basis,
+                    'Current Value': current_value,
+                    'P/L': pl,
+                    'P/L %': pl_pct,
+                    'Chart': tv_link,
+                    'pl_raw': pl
+                })
+
+            # Display stock positions if any
+            if stock_positions_data:
+                st.markdown("### 📊 Stock Positions")
+                st.caption(f"{len(stock_positions_data)} stock position(s)")
+
+                df_stocks = pd.DataFrame(stock_positions_data)
+
+                # Format display
+                display_stocks = df_stocks.copy()
+                display_stocks['Avg Buy Price'] = display_stocks['Avg Buy Price'].apply(lambda x: f'${x:.2f}')
+                display_stocks['Current Price'] = display_stocks['Current Price'].apply(lambda x: f'${x:.2f}')
+                display_stocks['Cost Basis'] = display_stocks['Cost Basis'].apply(lambda x: f'${x:,.2f}')
+                display_stocks['Current Value'] = display_stocks['Current Value'].apply(lambda x: f'${x:,.2f}')
+
+                # Store raw P/L for coloring
+                stock_pl_vals = display_stocks['P/L'].copy()
+
+                display_stocks['P/L'] = display_stocks['P/L'].apply(lambda x: f'${x:,.2f}')
+                display_stocks['P/L %'] = display_stocks['P/L %'].apply(lambda x: f'{x:.1f}%')
+                display_stocks = display_stocks.drop(columns=['pl_raw'])
+
+                # Color coding function
+                def highlight_stock_pl(row):
+                    idx = row.name
+                    pl_val = stock_pl_vals.iloc[idx] if idx < len(stock_pl_vals) else 0
+                    styles = [''] * len(row)
+                    pl_idx = list(display_stocks.columns).index('P/L')
+                    pl_pct_idx = list(display_stocks.columns).index('P/L %')
+                    if pl_val > 0:
+                        styles[pl_idx] = 'color: #00AA00; font-weight: bold'
+                        styles[pl_pct_idx] = 'color: #00AA00; font-weight: bold'
+                    elif pl_val < 0:
+                        styles[pl_idx] = 'color: #DD0000; font-weight: bold'
+                        styles[pl_pct_idx] = 'color: #DD0000; font-weight: bold'
+                    return styles
+
+                styled_stocks = display_stocks.style.apply(highlight_stock_pl, axis=1)
+
+                st.dataframe(
+                    styled_stocks,
+                    hide_index=True,
+                    use_container_width=True,
+                    column_config={
+                        "Chart": st.column_config.LinkColumn(
+                            "Chart",
+                            help="Click to view TradingView chart",
+                            display_text="📈"
+                        )
+                    },
+                    key="stock_positions_table"
+                )
+                st.markdown("---")
+
+        except Exception as e:
+            st.warning(f"Could not load stock positions: {e}")
 
         # Get all open option positions
         positions_raw = rh.get_open_option_positions()
@@ -131,19 +239,24 @@ def show_positions_page():
                 except:
                     stock_price = 0
 
-                # Get after-hours stock price
+                # Get after-hours stock price using quotes API
+                after_hours_price = None
                 try:
-                    fundamentals = rh.get_fundamentals(symbol)
-                    if fundamentals and len(fundamentals) > 0:
-                        # Try to get after hours price, fallback to regular price
-                        after_hours = fundamentals[0].get('last_extended_hours_trade_price', None)
-                        after_hours_price = float(after_hours) if after_hours else stock_price
-                    else:
-                        after_hours_price = stock_price
+                    # Use get_quotes which includes extended hours data
+                    quote_data = rh.get_quotes(symbol)
+                    if quote_data and len(quote_data) > 0:
+                        quote = quote_data[0]
+                        # Try multiple fields for extended hours price
+                        extended_price = quote.get('last_extended_hours_trade_price')
+                        if extended_price:
+                            after_hours_price = float(extended_price)
+                            # Only use if different from regular price (threshold: $0.01)
+                            if abs(after_hours_price - stock_price) < 0.01:
+                                after_hours_price = None
                 except:
-                    after_hours_price = stock_price
+                    after_hours_price = None
 
-                # Create TradingView link
+                # Create TradingView link (will display as clickable icon)
                 tv_link = f"https://www.tradingview.com/chart/?symbol={symbol}"
 
                 positions_data.append({
@@ -159,11 +272,18 @@ def show_positions_page():
                     'Current': current_value,
                     'P/L': pl,
                     'P/L %': (pl/total_premium*100) if total_premium > 0 else 0,
-                    'Chart': tv_link,
+                    'Chart': tv_link,  # Plain URL - will be styled by column_config
                     'pl_raw': pl  # For color coding
                 })
 
             if positions_data:
+                # Get buying power
+                try:
+                    account_profile = rh.profiles.load_account_profile()
+                    buying_power = float(account_profile.get('buying_power', 0))
+                except:
+                    buying_power = 0
+
                 # Display metrics
                 total_pl = sum([p['P/L'] for p in positions_data])
                 total_premium = sum([p['Premium'] for p in positions_data])
@@ -172,10 +292,12 @@ def show_positions_page():
                 with col1:
                     st.metric("Total Account Value", f'${total_equity:,.2f}')
                 with col2:
-                    st.metric("Active Positions", len(positions_data))
+                    st.metric("Buying Power", f'${buying_power:,.2f}')
                 with col3:
-                    st.metric("Total Premium", f'${total_premium:,.2f}')
+                    st.metric("Active Positions", len(positions_data))
                 with col4:
+                    st.metric("Total Premium", f'${total_premium:,.2f}')
+                with col5:
                     pl_color = "normal" if total_pl >= 0 else "inverse"
                     st.metric(
                         "Total P/L",
@@ -183,69 +305,88 @@ def show_positions_page():
                         delta=f'{(total_pl/total_premium*100):.1f}%' if total_premium > 0 else '0%',
                         delta_color=pl_color
                     )
-                with col5:
-                    csps = len([p for p in positions_data if 'CSP' in p['Strategy']])
-                    st.metric("CSPs", csps)
 
-                # Create dataframe
-                df = pd.DataFrame(positions_data)
+                # Separate positions by strategy type
+                csp_positions = [p for p in positions_data if p['Strategy'] == 'CSP']
+                cc_positions = [p for p in positions_data if p['Strategy'] == 'CC']
+                long_call_positions = [p for p in positions_data if p['Strategy'] == 'Long Call']
+                long_put_positions = [p for p in positions_data if p['Strategy'] == 'Long Put']
 
-                # Format display columns
-                display_df = df.copy()
-                display_df['Stock Price'] = display_df['Stock Price'].apply(lambda x: f'${x:.2f}')
-                display_df['After-Hours'] = display_df['After-Hours'].apply(lambda x: f'${x:.2f}')
-                display_df['Strike'] = display_df['Strike'].apply(lambda x: f'${x:.2f}')
-                display_df['Premium'] = display_df['Premium'].apply(lambda x: f'${x:,.2f}')
-                display_df['Current'] = display_df['Current'].apply(lambda x: f'${x:,.2f}')
+                # Helper function to display a strategy table
+                def display_strategy_table(title, emoji, positions, section_key):
+                    """Display positions table for a specific strategy"""
+                    if not positions:
+                        return
 
-                # Store raw P/L values for coloring before formatting
-                pl_vals = display_df['P/L'].copy()
-                pl_pct_vals = display_df['P/L %'].copy()
+                    st.markdown("---")
+                    st.markdown(f"### {emoji} {title}")
+                    st.caption(f"{len(positions)} active position(s)")
 
-                display_df['P/L'] = display_df['P/L'].apply(lambda x: f'${x:,.2f}')
-                display_df['P/L %'] = display_df['P/L %'].apply(lambda x: f'{x:.1f}%')
+                    df = pd.DataFrame(positions)
 
-                # Drop helper column
-                display_df = display_df.drop(columns=['pl_raw'])
+                    # Format display columns
+                    display_df = df.copy()
+                    display_df['Stock Price'] = display_df['Stock Price'].apply(lambda x: f'${x:.2f}')
+                    display_df['After-Hours'] = display_df['After-Hours'].apply(lambda x: f'${x:.2f}' if x is not None else '-')
+                    display_df['Strike'] = display_df['Strike'].apply(lambda x: f'${x:.2f}')
+                    display_df['Premium'] = display_df['Premium'].apply(lambda x: f'${x:,.2f}')
+                    display_df['Current'] = display_df['Current'].apply(lambda x: f'${x:,.2f}')
 
-                # Function to apply text color
-                def highlight_pl(row):
-                    """Apply row-wise styling based on P/L value"""
-                    idx = row.name
-                    pl_val = pl_vals.iloc[idx] if idx < len(pl_vals) else 0
+                    # Store raw P/L values for coloring before formatting
+                    pl_vals = display_df['P/L'].copy()
 
-                    styles = [''] * len(row)
+                    display_df['P/L'] = display_df['P/L'].apply(lambda x: f'${x:,.2f}')
+                    display_df['P/L %'] = display_df['P/L %'].apply(lambda x: f'{x:.1f}%')
 
-                    # Find P/L and P/L % column indices
-                    pl_idx = list(display_df.columns).index('P/L')
-                    pl_pct_idx = list(display_df.columns).index('P/L %')
+                    # Drop helper column
+                    display_df = display_df.drop(columns=['pl_raw'])
 
-                    # Profit (positive P/L) = GREEN TEXT, Loss (negative P/L) = RED TEXT
-                    if pl_val > 0:
-                        styles[pl_idx] = 'color: #00AA00; font-weight: bold'  # Green text for profit
-                        styles[pl_pct_idx] = 'color: #00AA00; font-weight: bold'
-                    elif pl_val < 0:
-                        styles[pl_idx] = 'color: #DD0000; font-weight: bold'  # Red text for loss
-                        styles[pl_pct_idx] = 'color: #DD0000; font-weight: bold'
-                    # else pl_val == 0, no styling (neutral)
+                    # Function to apply text color
+                    def highlight_pl(row):
+                        """Apply row-wise styling based on P/L value"""
+                        idx = row.name
+                        pl_val = pl_vals.iloc[idx] if idx < len(pl_vals) else 0
 
-                    return styles
+                        styles = [''] * len(row)
 
-                # Apply styling
-                styled_df = display_df.style.apply(highlight_pl, axis=1)
+                        # Find P/L and P/L % column indices
+                        pl_idx = list(display_df.columns).index('P/L')
+                        pl_pct_idx = list(display_df.columns).index('P/L %')
 
-                # Display table
-                st.dataframe(
-                    styled_df,
-                    hide_index=True,
-                    use_container_width=True,
-                    column_config={
-                        "Chart": st.column_config.LinkColumn(
-                            "Chart",
-                            help="Click to view TradingView chart"
-                        )
-                    }
-                )
+                        # Profit (positive P/L) = GREEN TEXT, Loss (negative P/L) = RED TEXT
+                        if pl_val > 0:
+                            styles[pl_idx] = 'color: #00AA00; font-weight: bold'  # Green text for profit
+                            styles[pl_pct_idx] = 'color: #00AA00; font-weight: bold'
+                        elif pl_val < 0:
+                            styles[pl_idx] = 'color: #DD0000; font-weight: bold'  # Red text for loss
+                            styles[pl_pct_idx] = 'color: #DD0000; font-weight: bold'
+                        # else pl_val == 0, no styling (neutral)
+
+                        return styles
+
+                    # Apply styling
+                    styled_df = display_df.style.apply(highlight_pl, axis=1)
+
+                    # Display table
+                    st.dataframe(
+                        styled_df,
+                        hide_index=True,
+                        use_container_width=True,
+                        column_config={
+                            "Chart": st.column_config.LinkColumn(
+                                "Chart",
+                                help="Click to view TradingView chart",
+                                display_text="📈"
+                            )
+                        },
+                        key=f"positions_table_{section_key}"
+                    )
+
+                # Display each strategy section
+                display_strategy_table("Cash-Secured Puts", "💰", csp_positions, "csp")
+                display_strategy_table("Covered Calls", "📞", cc_positions, "cc")
+                display_strategy_table("Long Calls", "📈", long_call_positions, "long_calls")
+                display_strategy_table("Long Puts", "📉", long_put_positions, "long_puts")
 
             else:
                 st.info("No open option positions found in Robinhood")
@@ -258,12 +399,48 @@ def show_positions_page():
 
     # === TRADE HISTORY ===
     st.markdown("---")
-    st.markdown("### 📊 Trade History")
-    st.caption("Closed trades with P/L calculations")
+
+    col1, col2 = st.columns([3, 1])
+    with col1:
+        st.markdown("### 📊 Trade History")
+        st.caption("Closed trades with P/L calculations (loaded from database)")
+    with col2:
+        # Initialize sync service
+        sync_service = TradeHistorySyncService()
+        last_sync = sync_service.get_last_sync_time()
+
+        if last_sync:
+            st.caption(f"Last synced: {last_sync.strftime('%I:%M %p')}")
+
+        if st.button("🔄 Sync Now", key="sync_trades"):
+            with st.spinner("Syncing trades from Robinhood..."):
+                try:
+                    count = sync_service.sync_trades_from_robinhood(rh_session)
+                    st.success(f"✅ Synced {count} new trades")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Sync failed: {e}")
 
     closed_trades = []  # Initialize outside try block for use in performance analytics
     try:
-        closed_trades = get_closed_trades_with_pl(rh_session)
+        # Use fast database query instead of slow Robinhood API
+        sync_service = TradeHistorySyncService()
+        db_trades = sync_service.get_closed_trades_from_db(days_back=365)
+
+        # Convert to format expected by display code
+        closed_trades = []
+        for trade in db_trades:
+            closed_trades.append({
+                'Symbol': trade['symbol'],
+                'Strategy': 'CSP' if trade['strategy_type'] == 'cash_secured_put' else 'CC',
+                'Strike': trade['strike'],
+                'Open Premium': trade['premium_collected'],
+                'Close Cost': trade['close_price'],
+                'P/L': trade['profit_loss'],
+                'P/L %': (trade['profit_loss'] / trade['premium_collected'] * 100) if trade['premium_collected'] > 0 else 0,
+                'Days Held': trade['days_held'],
+                'Close Date': trade['close_date'].strftime('%Y-%m-%d') if trade['close_date'] else 'N/A'
+            })
 
         if closed_trades:
             # Calculate summary metrics
