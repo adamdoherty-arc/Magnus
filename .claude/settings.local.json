@@ -31,7 +31,8 @@
       "Bash(for file in c:/Code/WheelStrategy/features/*/CHANGELOG.md)",
       "Bash(head:*)",
       "Bash(done)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "Bash(python3:*)"
     ],
     "deny": [],
     "ask": []

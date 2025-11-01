@@ -1,213 +1,219 @@
-# Daily Trade Sync - Automated Setup Guide
+# Daily Trade Sync Automation Setup
 
-## Overview
+This guide helps you set up automatic daily syncing of trades from Robinhood to the Magnus database.
 
-The Daily Trade Sync service automatically synchronizes closed trades from Robinhood to your Magnus database at the end of each trading day (4:30 PM ET). This ensures:
+## Files Created
 
-- **Fast page loads** - Trade history loads from database instantly
-- **No API delays** - Avoids slow Robinhood API calls on every page view
-- **Historical data** - Maintains complete trade history in database
-- **Automatic updates** - Syncs new trades daily without manual intervention
+1. `daily_trade_sync.py` - Python script that performs the sync
+2. `daily_trade_sync.bat` - Windows batch file to execute the Python script
+3. `logs/` - Directory for sync logs
+4. `logs/trade_sync.log` - Log file with sync history
 
-## Quick Setup (Windows)
+---
 
-### Method 1: Automated Setup (Recommended)
+## Option 1: Windows Task Scheduler (Recommended)
 
-Run the PowerShell setup script as Administrator:
+### Step 1: Open Task Scheduler
+1. Press `Win + R`
+2. Type `taskschd.msc` and press Enter
+3. Task Scheduler window opens
+
+### Step 2: Create New Task
+1. In the right panel, click **"Create Task..."** (not "Create Basic Task")
+2. A "Create Task" dialog appears
+
+### Step 3: General Tab
+- **Name**: `Magnus Daily Trade Sync`
+- **Description**: `Syncs trades from Robinhood to Magnus database once per day`
+- **Security Options**:
+  - Select **"Run whether user is logged on or not"**
+  - Check **"Run with highest privileges"**
+
+### Step 4: Triggers Tab
+1. Click **"New..."**
+2. Configure trigger:
+   - **Begin the task**: `On a schedule`
+   - **Settings**: `Daily`
+   - **Start**: Choose time (recommend 2:00 AM)
+   - **Recur every**: `1 days`
+   - Check **"Enabled"**
+3. Click **OK**
+
+### Step 5: Actions Tab
+1. Click **"New..."**
+2. Configure action:
+   - **Action**: `Start a program`
+   - **Program/script**: `C:\Code\WheelStrategy\daily_trade_sync.bat`
+   - **Start in (optional)**: `C:\Code\WheelStrategy`
+3. Click **OK**
+
+### Step 6: Conditions Tab
+- **Power**:
+  - Uncheck **"Start the task only if the computer is on AC power"**
+  - Check **"Wake the computer to run this task"** (if you want it to wake from sleep)
+
+### Step 7: Settings Tab
+- Check **"Allow task to be run on demand"**
+- Check **"Run task as soon as possible after a scheduled start is missed"**
+- **If the task fails, restart every**: `15 minutes`
+- **Attempt to restart up to**: `3 times`
+
+### Step 8: Finish Setup
+1. Click **OK**
+2. Enter your Windows password if prompted
+3. Task is now created!
+
+---
+
+## Option 2: Manual Scheduling (PowerShell)
+
+Run this PowerShell command as Administrator:
 
 ```powershell
-# Right-click PowerShell and "Run as Administrator"
-cd C:\Code\WheelStrategy
-.\setup_daily_sync.ps1
+$Action = New-ScheduledTaskAction -Execute "C:\Code\WheelStrategy\daily_trade_sync.bat"
+$Trigger = New-ScheduledTaskTrigger -Daily -At 2:00AM
+$Settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -WakeToRun
+Register-ScheduledTask -TaskName "Magnus Daily Trade Sync" -Action $Action -Trigger $Trigger -Settings $Settings -Description "Syncs trades from Robinhood to Magnus database"
 ```
 
-This creates a Windows Task Scheduler task that runs daily at 4:30 PM ET.
+---
 
-### Method 2: Manual Task Creation
+## Testing the Setup
 
-1. Open Task Scheduler (`taskschd.msc`)
-2. Click "Create Task" (not "Create Basic Task")
-3. **General Tab:**
-   - Name: `Magnus_Daily_Trade_Sync`
-   - Description: `Syncs closed trades from Robinhood to database`
-   - Run whether user is logged on or not
-   - Do not run with highest privileges
-4. **Triggers Tab:**
-   - New → Daily
-   - Start time: 4:30 PM
-   - Recur every: 1 day
-5. **Actions Tab:**
-   - New → Start a program
-   - Program: `python` (or full path to python.exe)
-   - Arguments: `daily_trade_sync.py`
-   - Start in: `C:\Code\WheelStrategy`
-6. **Settings Tab:**
-   - ✅ Allow task to be run on demand
-   - ✅ Run task as soon as possible after a scheduled start is missed
-   - ✅ Start the task only if the network is available
+### Test 1: Run Manually
+1. Double-click `daily_trade_sync.bat`
+2. Watch the console output
+3. Check `logs/trade_sync.log` for results
 
-## Testing
+### Test 2: Run from Task Scheduler
+1. Open Task Scheduler (`Win + R` → `taskschd.msc`)
+2. Find "Magnus Daily Trade Sync" in the list
+3. Right-click → **Run**
+4. Check `logs/trade_sync.log` for results
 
-### Test the sync manually:
+---
 
-```bash
-cd C:\Code\WheelStrategy
-python daily_trade_sync.py
+## Viewing Logs
+
+### View Latest Log
+```cmd
+type C:\Code\WheelStrategy\logs\trade_sync.log
 ```
 
-You should see output like:
-
-```
-============================================================
-Starting daily trade sync
-Timestamp: 2025-11-01 04:30:00 PM
-============================================================
-🔐 Logging into Robinhood...
-✅ Login successful
-📅 Last sync: 2025-10-31 04:30:15 PM
-🔄 Syncing trades from Robinhood to database...
-✅ Successfully synced 3 new closed trades
-📊 Total closed trades in last 30 days: 42
-💰 30-day P/L: $1,247.50
-🔒 Logged out of Robinhood
-============================================================
-✅ Daily sync completed successfully
-============================================================
+### View in Real-Time (tail equivalent)
+```powershell
+Get-Content C:\Code\WheelStrategy\logs\trade_sync.log -Tail 50 -Wait
 ```
 
-## Logs
-
-Logs are stored in `logs/` directory:
-- Filename format: `trade_sync_YYYYMMDD.log`
-- One log file per day
-- Includes timestamps, sync status, and error details
-
-View today's log:
-```bash
-cat logs/trade_sync_$(date +%Y%m%d).log
-```
+---
 
 ## Troubleshooting
 
-### Task not running
-
+### Issue: Task doesn't run
+**Solution**: Check Task Scheduler history
 1. Open Task Scheduler
-2. Find "Magnus_Daily_Trade_Sync"
-3. Right-click → "Run" to test manually
-4. Check "Last Run Result" column:
-   - `0x0` = Success
-   - Other codes = Error (check logs)
+2. Click **"View"** → **"Show All Running Tasks"**
+3. Check **"History"** tab for errors
 
-### Missing credentials
-
-Ensure `.env` file contains:
-```
-RH_USERNAME=your_robinhood_email
-RH_PASSWORD=your_robinhood_password
+### Issue: Python not found
+**Solution**: Use full Python path in batch file
+```batch
+"C:\Users\YourUsername\AppData\Local\Programs\Python\Python312\python.exe" daily_trade_sync.py
 ```
 
-### Database connection errors
-
-Ensure database credentials in `.env`:
+### Issue: Database connection fails
+**Solution**: Check `.env` file has correct database credentials
 ```
-DB_NAME=your_db_name
-DB_USER=your_db_user
-DB_PASSWORD=your_db_password
 DB_HOST=localhost
 DB_PORT=5432
+DB_NAME=magnus
+DB_USER=postgres
+DB_PASSWORD=postgres123!
 ```
 
-### Python not found
-
-If Task Scheduler can't find Python:
-1. Open Task and edit the Action
-2. Use full path to python.exe:
-   - Example: `C:\Python311\python.exe`
-   - Find your path: `where python`
-
-## Schedule Configuration
-
-Default schedule: **Daily at 4:30 PM ET**
-
-This is 30 minutes after market close (4:00 PM ET), allowing time for:
-- Final trades to settle
-- Robinhood to update order status
-- All closing prices to finalize
-
-### Change sync time:
-
-Option 1: Edit in Task Scheduler
-- Open Task Scheduler
-- Right-click task → Properties
-- Triggers tab → Edit trigger
-- Change time
-
-Option 2: Re-run setup script
-- Edit time in `setup_daily_sync.ps1` (line with `-At "4:30 PM"`)
-- Run script again
-
-## Manual Sync
-
-You can manually sync trades anytime:
-
-1. **From command line:**
-   ```bash
-   python daily_trade_sync.py
-   ```
-
-2. **From Positions page:**
-   - Click "🔄 Sync Now" button
-   - Located in Trade History section header
-
-3. **From Task Scheduler:**
-   - Right-click task → Run
-
-## Sync Service Files
-
-- `daily_trade_sync.py` - Main sync script
-- `src/trade_history_sync.py` - Sync service class
-- `setup_daily_sync.ps1` - Windows setup script
-- `logs/` - Daily sync logs
-
-## Database Table
-
-Trades are stored in the `trade_history` table:
-
-```sql
--- View all closed trades
-SELECT * FROM trade_history WHERE status = 'closed' ORDER BY close_date DESC;
-
--- View today's synced trades
-SELECT * FROM trade_history WHERE DATE(updated_at) = CURRENT_DATE;
-
--- 30-day performance
-SELECT
-    COUNT(*) as trades,
-    SUM(profit_loss) as total_pl,
-    AVG(profit_loss) as avg_pl
-FROM trade_history
-WHERE close_date >= CURRENT_DATE - INTERVAL '30 days'
-AND status = 'closed';
+### Issue: Robinhood login fails
+**Solution**: Check Robinhood credentials in `.env`
+```
+ROBINHOOD_USERNAME=your_email@example.com
+ROBINHOOD_PASSWORD=your_password
 ```
 
-## Performance Benefits
+---
 
-**Before (Robinhood API):**
-- Trade History load time: 5-10 seconds
-- Every page load calls API
-- Rate limited by Robinhood
+## Monitoring Sync Status
 
-**After (Database):**
-- Trade History load time: <0.1 seconds
-- Instant page loads
-- No API rate limits
-- Historical data preserved
+### From Positions Page
+- The Positions page shows **"Last synced: [time]"** in the Trade History section
+- Click **"Sync Now"** button to manually trigger sync anytime
+
+### From Logs
+- All sync attempts are logged to `logs/trade_sync.log`
+- Each entry shows:
+  - Timestamp
+  - Number of trades synced
+  - Success/failure status
+  - Any errors
+
+---
+
+## Customization
+
+### Change Sync Time
+Edit the trigger in Task Scheduler:
+1. Right-click task → **Properties**
+2. Go to **Triggers** tab
+3. Edit trigger and change time
+4. Click **OK**
+
+### Change Sync Frequency
+To sync more often:
+1. Edit trigger in Task Scheduler
+2. Change from `Daily` to `Weekly` or create multiple triggers
+
+### Disable Auto-Sync
+1. Open Task Scheduler
+2. Right-click "Magnus Daily Trade Sync"
+3. Select **"Disable"**
+
+---
+
+## Uninstalling
+
+To remove the scheduled task:
+
+```powershell
+Unregister-ScheduledTask -TaskName "Magnus Daily Trade Sync" -Confirm:$false
+```
+
+Or use Task Scheduler:
+1. Open Task Scheduler
+2. Find "Magnus Daily Trade Sync"
+3. Right-click → **Delete**
+
+---
+
+## Summary
+
+✅ **What happens daily**:
+1. At 2:00 AM (or your chosen time), Windows runs `daily_trade_sync.bat`
+2. Script logs into Robinhood
+3. Fetches all closed trades
+4. Syncs new trades to Magnus database
+5. Logs results to `logs/trade_sync.log`
+6. UI automatically shows updated data
+
+✅ **Benefits**:
+- No manual syncing needed
+- Always see latest closed trades
+- Fast page loads (data from database, not API)
+- Historical tracking of sync operations
+
+---
 
 ## Support
 
-For issues:
-1. Check logs in `logs/` directory
-2. Test manual sync: `python daily_trade_sync.py`
-3. Verify database connection
-4. Verify Robinhood credentials
-5. Check Task Scheduler "Last Run Result"
+If you encounter issues:
+1. Check `logs/trade_sync.log` for error messages
+2. Test running `daily_trade_sync.bat` manually
+3. Verify database connection and credentials
+4. Ensure Robinhood credentials are correct in `.env`

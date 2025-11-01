@@ -874,6 +874,16 @@ def show_positions_page():
         # Convert to format expected by display code
         closed_trades = []
         for trade in db_trades:
+            # Convert close_date to timezone-aware timestamp for performance analytics
+            from datetime import timezone
+            if trade['close_date']:
+                if trade['close_date'].tzinfo is None:
+                    close_timestamp = trade['close_date'].replace(tzinfo=timezone.utc)
+                else:
+                    close_timestamp = trade['close_date']
+            else:
+                close_timestamp = datetime.now(timezone.utc)
+
             closed_trades.append({
                 'Symbol': trade['symbol'],
                 'Strategy': 'CSP' if trade['strategy_type'] == 'cash_secured_put' else 'CC',
@@ -883,8 +893,31 @@ def show_positions_page():
                 'P/L': trade['profit_loss'],
                 'P/L %': (trade['profit_loss'] / trade['premium_collected'] * 100) if trade['premium_collected'] > 0 else 0,
                 'Days Held': trade['days_held'],
-                'Close Date': trade['close_date'].strftime('%Y-%m-%d') if trade['close_date'] else 'N/A'
+                'Close Date': trade['close_date'].strftime('%Y-%m-%d') if trade['close_date'] else 'N/A',
+                'close_timestamp': close_timestamp  # For performance analytics filtering
             })
+
+        # Fetch current stock prices for after-hours display
+        if closed_trades:
+            import yfinance as yf
+            unique_symbols = list(set([t['Symbol'] for t in closed_trades]))
+            current_prices = {}
+
+            with st.spinner("Fetching current stock prices..."):
+                for symbol in unique_symbols:
+                    try:
+                        ticker = yf.Ticker(symbol)
+                        hist = ticker.history(period='1d')
+                        if not hist.empty:
+                            current_prices[symbol] = hist['Close'].iloc[-1]
+                        else:
+                            current_prices[symbol] = None
+                    except:
+                        current_prices[symbol] = None
+
+            # Add current prices to trades
+            for trade in closed_trades:
+                trade['Current Price'] = current_prices.get(trade['Symbol'], None)
 
         if closed_trades:
             # Calculate summary metrics
@@ -914,7 +947,7 @@ def show_positions_page():
             )
 
             # Format display columns
-            display_cols = ['Close Date', 'Symbol', 'Strategy', 'Strike',
+            display_cols = ['Close Date', 'Symbol', 'Strategy', 'Strike', 'Current Price',
                           'Open Premium', 'Close Cost', 'P/L', 'P/L %', 'Days Held', 'TradingView']
 
             # Store raw P/L values before formatting
@@ -922,6 +955,7 @@ def show_positions_page():
 
             # Format numeric columns
             df_display = df_history[display_cols].copy()
+            df_display['Current Price'] = df_display['Current Price'].apply(lambda x: f'${x:.2f}' if x and pd.notna(x) else '-')
             df_display['Open Premium'] = df_display['Open Premium'].apply(lambda x: f'${x:,.2f}')
             df_display['Close Cost'] = df_display['Close Cost'].apply(lambda x: f'${x:,.2f}')
             df_display['P/L'] = df_display['P/L'].apply(lambda x: f'${x:,.2f}')
