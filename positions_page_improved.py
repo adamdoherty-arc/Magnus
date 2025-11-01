@@ -157,7 +157,7 @@ def show_positions_page():
                 st.dataframe(
                     styled_stocks,
                     hide_index=True,
-                    use_container_width=True,
+                    width='stretch',
                     column_config={
                         "Chart": st.column_config.LinkColumn(
                             "Chart",
@@ -371,7 +371,7 @@ def show_positions_page():
                     st.dataframe(
                         styled_df,
                         hide_index=True,
-                        use_container_width=True,
+                        width='stretch',
                         column_config={
                             "Chart": st.column_config.LinkColumn(
                                 "Chart",
@@ -512,7 +512,7 @@ def show_positions_page():
             st.dataframe(
                 styled_history,
                 hide_index=True,
-                use_container_width=True,
+                width='stretch',
                 column_config={
                     "TradingView": st.column_config.LinkColumn(
                         "Chart",
