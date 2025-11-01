@@ -1,0 +1,141 @@
+Polygon API HTTP error for AAPL: 429 Client Error: Too Many Requests for url: https://api.polygon.io/v2/reference/news?ticker=AAPL&limit=10&apiKey=peRAMicTnZi6GEdxratGhkujvvSgzwmn
+
+======================================================================
+NEWS SERVICE INTEGRATION TEST SUITE
+======================================================================
+Start time: 2025-11-01 15:12:26
+
+======================================================================
+TEST 1: Finnhub API
+======================================================================
+
+Fetching news for AAPL from Finnhub...
+API Key configured: True
+API Key (first 10 chars): c39rsbqad3...
+
+Success! Retrieved 10 articles
+
+First 3 articles:
+
+1. Meta Platforms: The Most Undervalued Magnificent 7 Stock
+   Source: SeekingAlpha
+   Published: 2025-11-01 10:06:58
+   URL: https://finnhub.io/api/news?id=c8d05e7d4173bdb136d25a2700156d3f274673e650b1f6b53f2e0e73da0e8a8a
+   Summary: Meta Platforms shows strong ad growth, Family of Apps engagement, and high ROIC with long-term value...
+
+2. Dividend Champion, Contender, And Challenger Highlights: Week Of November 2
+   Source: SeekingAlpha
+   Published: 2025-11-01 01:21:19
+   URL: https://finnhub.io/api/news?id=ec0d276a80e08ab952f7328fbf288cfd9113664130a413a009485abe884e7623
+   Summary: Get the latest weekly dividend summary for Dividend Champions, Contenders, and Challengers. See chan...
+
+3. Markets Weekly Outlook - BoE Meeting In Focus, U.S. Government Shutdown Continues
+   Source: SeekingAlpha
+   Published: 2025-11-01 00:55:00
+   URL: https://finnhub.io/api/news?id=3c78d8a3226ee4cec8a313d03ceab629550093eced2c54754fe717685e376e7e
+   Summary: The US and China have agreed on some key points of a potential trade deal averting what markets fear...
+
+======================================================================
+TEST 2: Polygon API
+======================================================================
+
+Fetching news for AAPL from Polygon...
+API Key configured: True
+API Key (first 10 chars): peRAMicTnZ...
+
+Success! Retrieved 10 articles
+
+First 3 articles:
+
+1. Berkshire's Cash Reaches $382 Billion
+   Source: The Motley Fool
+   Published: 2025-11-01 13:21:08
+   URL: https://www.fool.com/investing/2025/11/01/berkshires-cash-reaches-382-billion/?source=iedfolrf0000001
+   Summary: Berkshire Hathaway reported strong Q3 2025 financial results, with operating income rising 34% to $1...
+
+2. Magnificent 7's Reign Rolls On, Powell Puts Chill On Rate-Cut Hopes: This Week In Markets
+   Source: Benzinga
+   Published: 2025-10-31 20:00:33
+   URL: https://www.benzinga.com/markets/market-summary/25/10/48573378/magnificent-seven-nvda-nvidia-5-trillion-amazon-apple-alphabet-earnings-fed-chair-jerome-p?utm_source=benzinga_taxonomy&utm_medium=rss_feed_free&utm_content=taxonomy_rss&utm_campaign=channel
+   Summary: Tech giants continue to dominate market performance, with the Magnificent Seven stocks reaching a co...
+
+3. S&P 500 Faces a Week of Price Gaps Amid Tech Earnings and Fed Cut
+   Source: Investing.com
+   Published: 2025-10-31 19:31:00
+   URL: https://www.investing.com/analysis/sp-500-faces-a-week-of-price-gaps-amid-tech-earnings-and-fed-cut-200669466
+   Summary: The S&P 500 experienced volatile trading with daily price gaps, influenced by the Federal Reserve's ...
+
+======================================================================
+TEST 3: Combined News (Finnhub + Polygon) with Deduplication
+======================================================================
+
+Fetching combined news for MSFT...
+
+Success! Retrieved 15 unique articles (deduplicated)
+
+First 5 articles:
+
+1. The One Growth Stock Set to Triple Over the Next 2 Years
+   Source: The Motley Fool
+   Published: 2025-11-01 12:19:00
+   URL: https://www.fool.com/investing/2025/11/01/one-growth-stock-s...
+
+2. Alphabet: Don't Chase Now, Even If You Missed The Ride
+   Source: SeekingAlpha
+   Published: 2025-11-01 10:35:11
+   URL: https://finnhub.io/api/news?id=387391f9aab04b724d332be8cdc66...
+
+3. Big Tech Goes Into Overdrive (Again)
+   Source: SeekingAlpha
+   Published: 2025-11-01 03:55:00
+   URL: https://finnhub.io/api/news?id=3109afb6f95cca3ea4af2eb654861...
+
+4. Magnificent 7's Reign Rolls On, Powell Puts Chill On Rate-Cut Hopes: This Week In Markets
+   Source: Benzinga
+   Published: 2025-10-31 20:00:33
+   URL: https://www.benzinga.com/markets/market-summary/25/10/485733...
+
+5. S&P 500 Faces a Week of Price Gaps Amid Tech Earnings and Fed Cut
+   Source: Investing.com
+   Published: 2025-10-31 19:31:00
+   URL: https://www.investing.com/analysis/sp-500-faces-a-week-of-pr...
+
+======================================================================
+TEST 4: Multiple Symbols Test
+======================================================================
+
+Fetching news for AAPL...
+  Success! Retrieved 15 articles
+
+Fetching news for GOOGL...
+  Success! Retrieved 15 articles
+
+Fetching news for TSLA...
+  Success! Retrieved 15 articles
+
+======================================================================
+TEST 5: Deduplication Verification
+======================================================================
+
+Fetching from Finnhub...
+  Finnhub: 10 articles
+Fetching from Polygon...
+  Polygon: 0 articles
+
+Combined (before dedup): 10 articles
+Unique headlines: 10
+
+No duplicates found between sources
+
+======================================================================
+TEST SUMMARY
+======================================================================
+Finnhub API                    PASSED
+Polygon API                    PASSED
+Combined News                  PASSED
+Multiple Symbols               PASSED
+Deduplication                  PASSED
+
+Total: 5/5 tests passed
+
+All tests PASSED! News integration is working correctly.
