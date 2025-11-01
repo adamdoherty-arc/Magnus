@@ -30,7 +30,8 @@
       "Bash(git log:*)",
       "Bash(for file in c:/Code/WheelStrategy/features/*/CHANGELOG.md)",
       "Bash(head:*)",
-      "Bash(done)"
+      "Bash(done)",
+      "Bash(cat:*)"
     ],
     "deny": [],
     "ask": []
