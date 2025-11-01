@@ -15,6 +15,7 @@ from datetime import datetime, timedelta
 from collections import defaultdict
 from src.trade_history_sync import TradeHistorySyncService
 from src.ai_research_service import get_research_service
+from src.theta_forecast_display import display_theta_forecasts
 
 
 def render_star_rating(rating: float) -> str:
@@ -51,6 +52,111 @@ def get_action_color(action: str) -> str:
         "STRONG_SELL": "#DD0000"
     }
     return action_colors.get(action, "#888888")
+
+
+def generate_external_links(symbol: str) -> dict:
+    """Generate external research links for a symbol"""
+    return {
+        'Company Info': {
+            'Yahoo Finance': f"https://finance.yahoo.com/quote/{symbol}",
+            'TradingView': f"https://www.tradingview.com/symbols/{symbol}",
+            'Finviz': f"https://finviz.com/quote.ashx?t={symbol}",
+            'MarketWatch': f"https://www.marketwatch.com/investing/stock/{symbol}"
+        },
+        'Research': {
+            'Seeking Alpha': f"https://seekingalpha.com/symbol/{symbol}",
+            'SEC Filings': f"https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK={symbol}",
+            'Earnings Whispers': f"https://www.earningswhispers.com/stocks/{symbol}"
+        },
+        'Options': {
+            'Options Chain': f"https://finance.yahoo.com/quote/{symbol}/options",
+            'Barchart': f"https://www.barchart.com/stocks/quotes/{symbol}/options"
+        },
+        'News': {
+            'Google News': f"https://news.google.com/search?q={symbol}+stock",
+            'Benzinga': f"https://www.benzinga.com/quote/{symbol}"
+        }
+    }
+
+
+def display_consolidated_ai_research(stock_positions_data, csp_positions, cc_positions, long_call_positions, long_put_positions):
+    """Display AI Research for all unique symbols across all position types"""
+    # Collect all unique symbols
+    all_symbols = set()
+
+    # Add symbols from stock positions
+    for pos in stock_positions_data:
+        all_symbols.add(pos['symbol_raw'])
+
+    # Add symbols from options positions
+    for pos in csp_positions:
+        all_symbols.add(pos['symbol_raw'])
+    for pos in cc_positions:
+        all_symbols.add(pos['symbol_raw'])
+    for pos in long_call_positions:
+        all_symbols.add(pos['symbol_raw'])
+    for pos in long_put_positions:
+        all_symbols.add(pos['symbol_raw'])
+
+    all_symbols = sorted(list(all_symbols))  # Sort alphabetically
+
+    if not all_symbols:
+        return
+
+    st.markdown("---")
+    st.markdown("### 🤖 AI Research for All Positions")
+    st.caption(f"Analyzing {len(all_symbols)} unique symbol(s)")
+
+    # Display buttons in rows of 5
+    num_symbols = len(all_symbols)
+    num_cols = min(num_symbols, 5)
+
+    # Create buttons in rows
+    for i in range(0, num_symbols, 5):
+        batch = all_symbols[i:i+5]
+        cols = st.columns(len(batch))
+        for idx, symbol in enumerate(batch):
+            with cols[idx]:
+                if st.button(f"🤖 {symbol}", key=f"ai_research_{symbol}"):
+                    st.session_state[f'show_research_{symbol}'] = True
+
+    # Display research expanders
+    for symbol in all_symbols:
+        if st.session_state.get(f'show_research_{symbol}', False):
+            with st.expander(f"🤖 AI Research: {symbol}", expanded=True):
+                display_ai_research(symbol)
+
+    # Quick Links section
+    st.markdown("---")
+    st.markdown("### 🔗 Quick Research Links")
+    st.caption("Access external research tools and data sources")
+
+    selected_symbol = st.selectbox("Select symbol for links:", all_symbols, key="external_links_symbol_selector")
+
+    if selected_symbol:
+        links = generate_external_links(selected_symbol)
+
+        tabs = st.tabs(["📊 Company Info", "📚 Research", "📈 Options", "📰 News"])
+
+        with tabs[0]:
+            st.markdown("**Company Information & Charts**")
+            for name, url in links['Company Info'].items():
+                st.markdown(f"- [{name}]({url})")
+
+        with tabs[1]:
+            st.markdown("**Research & Filings**")
+            for name, url in links['Research'].items():
+                st.markdown(f"- [{name}]({url})")
+
+        with tabs[2]:
+            st.markdown("**Options Analysis**")
+            for name, url in links['Options'].items():
+                st.markdown(f"- [{name}]({url})")
+
+        with tabs[3]:
+            st.markdown("**News & Social Sentiment**")
+            for name, url in links['News'].items():
+                st.markdown(f"- [{name}]({url})")
 
 
 def display_ai_research(symbol: str, position_type: str = None):
@@ -240,6 +346,73 @@ def display_ai_research(symbol: str, position_type: str = None):
             st.caption("Please try again or contact support if the issue persists")
 
 
+
+def display_news_section(symbols):
+    """
+    Display news section for all position symbols
+
+    Args:
+        symbols: List of stock ticker symbols to fetch news for
+    """
+    from src.news_service import NewsService
+
+    st.markdown("---")
+    st.markdown("### 📰 Latest Market News")
+
+    if not symbols:
+        st.info("No symbols available for news")
+        return
+
+    # Symbol selector
+    selected_symbol = st.selectbox(
+        "Select symbol for news:",
+        options=symbols,
+        key="news_symbol_selector"
+    )
+
+    if selected_symbol:
+        news_service = NewsService()
+
+        with st.spinner(f"Loading news for {selected_symbol}..."):
+            news_articles = news_service.get_combined_news(selected_symbol)
+
+        if news_articles:
+            st.caption(f"Found {len(news_articles)} recent articles from Finnhub and Polygon APIs")
+
+            for article in news_articles:
+                # Calculate time ago
+                from datetime import timezone
+                try:
+                    # Use UTC now for comparison
+                    if article.published_at.tzinfo:
+                        time_diff = datetime.now(timezone.utc) - article.published_at
+                    else:
+                        time_diff = datetime.now(timezone.utc) - article.published_at.replace(tzinfo=timezone.utc)
+                except Exception as e:
+                    time_diff = datetime.now(timezone.utc) - article.published_at
+
+                if time_diff.days > 0:
+                    time_ago = f"{time_diff.days} day{'s' if time_diff.days > 1 else ''} ago"
+                elif time_diff.seconds // 3600 > 0:
+                    hours = time_diff.seconds // 3600
+                    time_ago = f"{hours} hour{'s' if hours > 1 else ''} ago"
+                else:
+                    minutes = time_diff.seconds // 60
+                    time_ago = f"{minutes} minute{'s' if minutes > 1 else ''} ago"
+
+                # Display article
+                with st.expander(f"📄 {article.headline} ({time_ago})", expanded=False):
+                    col1, col2 = st.columns([3, 1])
+                    with col1:
+                        st.caption(f"**Source:** {article.source}")
+                        if article.summary:
+                            st.write(article.summary)
+                    with col2:
+                        st.link_button("Read Full Article", article.url, use_container_width=True)
+        else:
+            st.info(f"No recent news found for {selected_symbol}")
+
+
 def show_positions_page():
     """Main positions page with all improvements"""
 
@@ -284,6 +457,13 @@ def show_positions_page():
 
     # === ACTIVE POSITIONS ===
     st.markdown("### 🎯 Your Current Option Positions")
+
+    # Initialize position lists at function scope for consolidated AI Research
+    stock_positions_data = []
+    csp_positions = []
+    cc_positions = []
+    long_call_positions = []
+    long_put_positions = []
 
     try:
         # Get total account value
@@ -393,22 +573,6 @@ def show_positions_page():
                     },
                     key="stock_positions_table"
                 )
-
-                # AI Research buttons for each stock position
-                st.markdown("**AI Research:**")
-                cols = st.columns(len(stock_positions_data))
-                for idx, (col, position) in enumerate(zip(cols, stock_positions_data)):
-                    with col:
-                        symbol = position['symbol_raw']
-                        if st.button(f"🤖 {symbol}", key=f"stock_ai_{symbol}_{idx}"):
-                            st.session_state[f'show_research_stock_{symbol}'] = True
-
-                # Display research in expanders
-                for position in stock_positions_data:
-                    symbol = position['symbol_raw']
-                    if st.session_state.get(f'show_research_stock_{symbol}', False):
-                        with st.expander(f"🤖 AI Research: {symbol}", expanded=True):
-                            display_ai_research(symbol, position_type="long_stock")
 
                 st.markdown("---")
 
@@ -626,36 +790,14 @@ def show_positions_page():
                         key=f"positions_table_{section_key}"
                     )
 
-                    # AI Research buttons
-                    st.markdown("**AI Research:**")
-                    cols = st.columns(len(positions))
-                    for idx, (col, position) in enumerate(zip(cols, positions)):
-                        with col:
-                            symbol = position['symbol_raw']
-                            if st.button(f"🤖 {symbol}", key=f"{section_key}_ai_{symbol}_{idx}"):
-                                st.session_state[f'show_research_{section_key}_{symbol}'] = True
-
-                    # Display research in expanders
-                    for position in positions:
-                        symbol = position['symbol_raw']
-                        if st.session_state.get(f'show_research_{section_key}_{symbol}', False):
-                            # Determine position type for context-aware advice
-                            strategy_type_map = {
-                                'CSP': 'cash_secured_put',
-                                'CC': 'covered_call',
-                                'Long Call': 'long_call',
-                                'Long Put': 'long_put'
-                            }
-                            position_type = strategy_type_map.get(position.get('Strategy', ''), None)
-
-                            with st.expander(f"🤖 AI Research: {symbol}", expanded=True):
-                                display_ai_research(symbol, position_type=position_type)
-
                 # Display each strategy section
                 display_strategy_table("Cash-Secured Puts", "💰", csp_positions, "csp")
                 display_strategy_table("Covered Calls", "📞", cc_positions, "cc")
                 display_strategy_table("Long Calls", "📈", long_call_positions, "long_calls")
                 display_strategy_table("Long Puts", "📉", long_put_positions, "long_puts")
+
+                # Display Theta Decay Forecasts for CSP positions
+                display_theta_forecasts(csp_positions)
 
             else:
                 st.info("No open option positions found in Robinhood")
@@ -665,6 +807,39 @@ def show_positions_page():
 
     except Exception as e:
         st.error(f"Error loading positions: {e}")
+
+    # === CONSOLIDATED AI RESEARCH & QUICK LINKS ===
+    # Display consolidated AI Research for all positions
+    try:
+        display_consolidated_ai_research(
+            stock_positions_data,
+            csp_positions,
+            cc_positions,
+            long_call_positions,
+            long_put_positions
+        )
+    except Exception as e:
+        st.warning(f"Could not load AI Research: {e}")
+
+    # === NEWS SECTION ===
+    # Collect all unique symbols for news display
+    all_news_symbols = set()
+    for pos in stock_positions_data:
+        all_news_symbols.add(pos['symbol_raw'])
+    for pos in csp_positions:
+        all_news_symbols.add(pos['symbol_raw'])
+    for pos in cc_positions:
+        all_news_symbols.add(pos['symbol_raw'])
+    for pos in long_call_positions:
+        all_news_symbols.add(pos['symbol_raw'])
+    for pos in long_put_positions:
+        all_news_symbols.add(pos['symbol_raw'])
+
+    if all_news_symbols:
+        try:
+            display_news_section(sorted(list(all_news_symbols)))
+        except Exception as e:
+            st.warning(f"Could not load news section: {e}")
 
     # === TRADE HISTORY ===
     st.markdown("---")
