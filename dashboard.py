@@ -109,6 +109,8 @@ if st.sidebar.button("🎲 Prediction Markets", use_container_width=True):
     st.session_state.page = "Prediction Markets"
 if st.sidebar.button("⚙️ Settings", use_container_width=True):
     st.session_state.page = "Settings"
+if st.sidebar.button("🔧 Enhancement Agent", use_container_width=True):
+    st.session_state.page = "Enhancement Agent"
 
 page = st.session_state.page
 
@@ -1773,6 +1775,10 @@ elif page == "Settings":
 
     if st.button("💾 Save Settings", type="primary"):
         st.success("Settings saved successfully!")
+
+elif page == "Enhancement Agent":
+    from enhancement_agent_page import show_enhancement_agent
+    show_enhancement_agent()
 
 # Footer
 st.markdown("---")
