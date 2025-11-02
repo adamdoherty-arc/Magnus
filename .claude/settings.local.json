@@ -32,7 +32,15 @@
       "Bash(head:*)",
       "Bash(done)",
       "Bash(cat:*)",
-      "Bash(python3:*)"
+      "Bash(python3:*)",
+      "Bash(git reset:*)",
+      "Bash(netstat:*)",
+      "Bash(findstr:*)",
+      "Bash(tasklist:*)",
+      "Bash(wmic process:*)",
+      "Bash(timeout /t 5)",
+      "Bash(echo:*)",
+      "Bash(awk:*)"
     ],
     "deny": [],
     "ask": []

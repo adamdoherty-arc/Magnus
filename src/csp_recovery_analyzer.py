@@ -31,7 +31,7 @@ class CSPRecoveryAnalyzer:
         Analyze current losing CSP positions
 
         Args:
-            positions: List of current option positions
+            positions: List of current option positions (already filtered for losing positions)
 
         Returns:
             List of analyzed losing positions with metrics
@@ -39,36 +39,48 @@ class CSPRecoveryAnalyzer:
         losing_positions = []
 
         for position in positions:
+            # Positions passed in are already identified as losing based on P/L
+            # We just need to check if they are puts and short
             if position.get('option_type', '').lower() == 'put' and position.get('position_type') == 'short':
                 # Get current stock price
                 current_price = self._get_current_price(position['symbol'])
                 strike_price = float(position.get('strike_price', 0))
 
-                # Check if position is losing (stock below strike)
-                if current_price < strike_price:
-                    loss_amount = (strike_price - current_price) * 100 * abs(position.get('quantity', 1))
-                    loss_percentage = ((strike_price - current_price) / strike_price) * 100
+                # Position is already identified as losing - calculate loss details
+                # Use the actual loss from position data if available
+                if position.get('current_loss') is not None:
+                    loss_amount = position.get('current_loss')
+                    loss_percentage = position.get('loss_percentage', 0)
+                else:
+                    # Calculate based on stock price vs strike
+                    if current_price < strike_price:
+                        loss_amount = (strike_price - current_price) * 100 * abs(position.get('quantity', 1))
+                        loss_percentage = ((strike_price - current_price) / strike_price) * 100
+                    else:
+                        # Stock above strike but position losing due to premium increase
+                        loss_amount = position.get('current_loss', 0)
+                        loss_percentage = position.get('loss_percentage', 0)
 
-                    position_analysis = {
-                        'symbol': position['symbol'],
-                        'current_strike': strike_price,
-                        'current_price': current_price,
-                        'expiration': position.get('expiration_date'),
-                        'premium_collected': float(position.get('average_price', 0)) * 100,
-                        'current_loss': loss_amount,
-                        'loss_percentage': loss_percentage,
-                        'days_to_expiry': self._calculate_days_to_expiry(position.get('expiration_date')),
-                        'quantity': abs(position.get('quantity', 1))
-                    }
+                position_analysis = {
+                    'symbol': position['symbol'],
+                    'current_strike': strike_price,
+                    'current_price': current_price,
+                    'expiration': position.get('expiration_date'),
+                    'premium_collected': float(position.get('average_price', 0)) * 100 if position.get('average_price') else position.get('premium_collected', 0),
+                    'current_loss': loss_amount,
+                    'loss_percentage': loss_percentage,
+                    'days_to_expiry': self._calculate_days_to_expiry(position.get('expiration_date')),
+                    'quantity': abs(position.get('quantity', 1))
+                }
 
-                    # Add technical levels
-                    support_levels = self._calculate_support_levels(position['symbol'])
-                    position_analysis['support_levels'] = support_levels
+                # Add technical levels
+                support_levels = self._calculate_support_levels(position['symbol'])
+                position_analysis['support_levels'] = support_levels
 
-                    # Add IV rank
-                    position_analysis['iv_rank'] = self._calculate_iv_rank(position['symbol'])
+                # Add IV rank
+                position_analysis['iv_rank'] = self._calculate_iv_rank(position['symbol'])
 
-                    losing_positions.append(position_analysis)
+                losing_positions.append(position_analysis)
 
         return losing_positions
 

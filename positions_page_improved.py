@@ -579,10 +579,10 @@ def show_positions_page():
             db_trades = sync_service.get_closed_trades_from_db(days_back=365)
 
             # Convert to format expected by display code
+            from datetime import timezone
             closed_trades = []
             for trade in db_trades:
                 # Convert close_date to timezone-aware timestamp for performance analytics
-                from datetime import timezone
                 if trade['close_date']:
                     if trade['close_date'].tzinfo is None:
                         close_timestamp = trade['close_date'].replace(tzinfo=timezone.utc)
