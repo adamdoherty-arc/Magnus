@@ -11,6 +11,7 @@ Improved Positions Page with:
 import streamlit as st
 import robin_stocks.robinhood as rh
 import pandas as pd
+import logging
 from datetime import datetime, timedelta
 from collections import defaultdict
 from src.trade_history_sync import TradeHistorySyncService
@@ -21,6 +22,8 @@ from src.components.ai_research_widget import (
 )
 from src.yfinance_utils import safe_get_history, safe_get_current_price
 from src.recovery_strategies_tab import display_recovery_strategies_tab
+
+logger = logging.getLogger(__name__)
 
 
 def display_news_section(symbols):
@@ -492,7 +495,7 @@ def show_positions_page():
                                                      'Delta', 'Monthly %', 'Annual %', 'IV', 'Breakeven',
                                                      'Bid', 'Ask', 'Volume', 'OI']],
                                     hide_index=True,
-                                    use_container_width=True,
+                                    width='stretch',
                                     column_config={
                                         "Symbol": st.column_config.TextColumn("Symbol", width="small"),
                                         "Stock Price": st.column_config.NumberColumn("Stock $", format="$%.2f"),

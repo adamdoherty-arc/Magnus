@@ -663,15 +663,27 @@ class OptionRollEvaluator:
     def _calculate_prob_otm(self, spot: float, strike: float,
                            volatility: float, days: int) -> float:
         """Calculate probability option stays OTM"""
+        # Guard against invalid inputs
         if days <= 0:
             return 0 if spot <= strike else 1
 
-        time_to_exp = days / 365
-        d2 = (np.log(spot / strike) +
-              (self.risk_free_rate - 0.5 * volatility**2) * time_to_exp) / \
-             (volatility * np.sqrt(time_to_exp))
+        if spot <= 0 or strike <= 0:
+            return 0.5  # Neutral probability for invalid prices
 
-        return float(norm.cdf(d2))
+        if volatility <= 0:
+            # Deterministic case: no volatility
+            return 0 if spot <= strike else 1
+
+        try:
+            time_to_exp = days / 365
+            d2 = (np.log(spot / strike) +
+                  (self.risk_free_rate - 0.5 * volatility**2) * time_to_exp) / \
+                 (volatility * np.sqrt(time_to_exp))
+
+            return float(norm.cdf(d2))
+        except (ValueError, ZeroDivisionError, FloatingPointError):
+            # Return neutral probability if calculation fails
+            return 0.5
 
     def _analyze_covered_call_potential(self, symbol: str, cost_basis: float) -> Dict:
         """Analyze potential covered call income after assignment"""
