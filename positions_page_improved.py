@@ -32,61 +32,58 @@ def display_news_section(symbols):
     """
     from src.news_service import NewsService
 
-    st.markdown("---")
-    st.markdown("### 📰 Latest Market News")
-
     if not symbols:
-        st.info("No symbols available for news")
         return
 
-    # Symbol selector
-    selected_symbol = st.selectbox(
-        "Select symbol for news:",
-        options=symbols,
-        key="news_symbol_selector"
-    )
+    with st.expander("📰 Latest Market News", expanded=False):
+        # Symbol selector
+        selected_symbol = st.selectbox(
+            "Select symbol for news:",
+            options=symbols,
+            key="news_symbol_selector"
+        )
 
-    if selected_symbol:
-        news_service = NewsService()
+        if selected_symbol:
+            news_service = NewsService()
 
-        with st.spinner(f"Loading news for {selected_symbol}..."):
-            news_articles = news_service.get_combined_news(selected_symbol)
+            with st.spinner(f"Loading news for {selected_symbol}..."):
+                news_articles = news_service.get_combined_news(selected_symbol)
 
-        if news_articles:
-            st.caption(f"Found {len(news_articles)} recent articles from Finnhub and Polygon APIs")
+            if news_articles:
+                st.caption(f"Found {len(news_articles)} recent articles from Finnhub and Polygon APIs")
 
-            for article in news_articles:
-                # Calculate time ago
-                from datetime import timezone
-                try:
-                    # Use UTC now for comparison
-                    if article.published_at.tzinfo:
+                for article in news_articles:
+                    # Calculate time ago
+                    from datetime import timezone
+                    try:
+                        # Use UTC now for comparison
+                        if article.published_at.tzinfo:
+                            time_diff = datetime.now(timezone.utc) - article.published_at
+                        else:
+                            time_diff = datetime.now(timezone.utc) - article.published_at.replace(tzinfo=timezone.utc)
+                    except Exception as e:
                         time_diff = datetime.now(timezone.utc) - article.published_at
+
+                    if time_diff.days > 0:
+                        time_ago = f"{time_diff.days} day{'s' if time_diff.days > 1 else ''} ago"
+                    elif time_diff.seconds // 3600 > 0:
+                        hours = time_diff.seconds // 3600
+                        time_ago = f"{hours} hour{'s' if hours > 1 else ''} ago"
                     else:
-                        time_diff = datetime.now(timezone.utc) - article.published_at.replace(tzinfo=timezone.utc)
-                except Exception as e:
-                    time_diff = datetime.now(timezone.utc) - article.published_at
+                        minutes = time_diff.seconds // 60
+                        time_ago = f"{minutes} minute{'s' if minutes > 1 else ''} ago"
 
-                if time_diff.days > 0:
-                    time_ago = f"{time_diff.days} day{'s' if time_diff.days > 1 else ''} ago"
-                elif time_diff.seconds // 3600 > 0:
-                    hours = time_diff.seconds // 3600
-                    time_ago = f"{hours} hour{'s' if hours > 1 else ''} ago"
-                else:
-                    minutes = time_diff.seconds // 60
-                    time_ago = f"{minutes} minute{'s' if minutes > 1 else ''} ago"
-
-                # Display article
-                with st.expander(f"📄 {article.headline} ({time_ago})", expanded=False):
-                    col1, col2 = st.columns([3, 1])
-                    with col1:
-                        st.caption(f"**Source:** {article.source}")
-                        if article.summary:
-                            st.write(article.summary)
-                    with col2:
-                        st.link_button("Read Full Article", article.url, width='stretch')
-        else:
-            st.info(f"No recent news found for {selected_symbol}")
+                    # Display article
+                    with st.expander(f"📄 {article.headline} ({time_ago})", expanded=False):
+                        col1, col2 = st.columns([3, 1])
+                        with col1:
+                            st.caption(f"**Source:** {article.source}")
+                            if article.summary:
+                                st.write(article.summary)
+                        with col2:
+                            st.link_button("Read Full Article", article.url, width='stretch')
+            else:
+                st.info(f"No recent news found for {selected_symbol}")
 
 
 def show_positions_page():
@@ -118,8 +115,6 @@ def show_positions_page():
             f'<meta http-equiv="refresh" content="{freq_map[refresh_freq]}">',
             unsafe_allow_html=True
         )
-
-    st.markdown("---")
 
     # === LOGIN TO ROBINHOOD (once for entire page) ===
     rh_session = None
@@ -200,57 +195,53 @@ def show_positions_page():
 
             # Display stock positions if any
             if stock_positions_data:
-                st.markdown("### 📊 Stock Positions")
-                st.caption(f"{len(stock_positions_data)} stock position(s)")
+                with st.expander(f"📊 Stock Positions ({len(stock_positions_data)})", expanded=False):
+                    df_stocks = pd.DataFrame(stock_positions_data)
 
-                df_stocks = pd.DataFrame(stock_positions_data)
+                    # Format display
+                    display_stocks = df_stocks.copy()
+                    display_stocks['Avg Buy Price'] = display_stocks['Avg Buy Price'].apply(lambda x: f'${x:.2f}')
+                    display_stocks['Current Price'] = display_stocks['Current Price'].apply(lambda x: f'${x:.2f}')
+                    display_stocks['Cost Basis'] = display_stocks['Cost Basis'].apply(lambda x: f'${x:,.2f}')
+                    display_stocks['Current Value'] = display_stocks['Current Value'].apply(lambda x: f'${x:,.2f}')
 
-                # Format display
-                display_stocks = df_stocks.copy()
-                display_stocks['Avg Buy Price'] = display_stocks['Avg Buy Price'].apply(lambda x: f'${x:.2f}')
-                display_stocks['Current Price'] = display_stocks['Current Price'].apply(lambda x: f'${x:.2f}')
-                display_stocks['Cost Basis'] = display_stocks['Cost Basis'].apply(lambda x: f'${x:,.2f}')
-                display_stocks['Current Value'] = display_stocks['Current Value'].apply(lambda x: f'${x:,.2f}')
+                    # Store raw P/L for coloring
+                    stock_pl_vals = display_stocks['P/L'].copy()
 
-                # Store raw P/L for coloring
-                stock_pl_vals = display_stocks['P/L'].copy()
+                    display_stocks['P/L'] = display_stocks['P/L'].apply(lambda x: f'${x:,.2f}')
+                    display_stocks['P/L %'] = display_stocks['P/L %'].apply(lambda x: f'{x:.1f}%')
+                    display_stocks = display_stocks.drop(columns=['pl_raw', 'symbol_raw'])
 
-                display_stocks['P/L'] = display_stocks['P/L'].apply(lambda x: f'${x:,.2f}')
-                display_stocks['P/L %'] = display_stocks['P/L %'].apply(lambda x: f'{x:.1f}%')
-                display_stocks = display_stocks.drop(columns=['pl_raw', 'symbol_raw'])
+                    # Color coding function
+                    def highlight_stock_pl(row):
+                        idx = row.name
+                        pl_val = stock_pl_vals.iloc[idx] if idx < len(stock_pl_vals) else 0
+                        styles = [''] * len(row)
+                        pl_idx = list(display_stocks.columns).index('P/L')
+                        pl_pct_idx = list(display_stocks.columns).index('P/L %')
+                        if pl_val > 0:
+                            styles[pl_idx] = 'color: #00AA00; font-weight: bold'
+                            styles[pl_pct_idx] = 'color: #00AA00; font-weight: bold'
+                        elif pl_val < 0:
+                            styles[pl_idx] = 'color: #DD0000; font-weight: bold'
+                            styles[pl_pct_idx] = 'color: #DD0000; font-weight: bold'
+                        return styles
 
-                # Color coding function
-                def highlight_stock_pl(row):
-                    idx = row.name
-                    pl_val = stock_pl_vals.iloc[idx] if idx < len(stock_pl_vals) else 0
-                    styles = [''] * len(row)
-                    pl_idx = list(display_stocks.columns).index('P/L')
-                    pl_pct_idx = list(display_stocks.columns).index('P/L %')
-                    if pl_val > 0:
-                        styles[pl_idx] = 'color: #00AA00; font-weight: bold'
-                        styles[pl_pct_idx] = 'color: #00AA00; font-weight: bold'
-                    elif pl_val < 0:
-                        styles[pl_idx] = 'color: #DD0000; font-weight: bold'
-                        styles[pl_pct_idx] = 'color: #DD0000; font-weight: bold'
-                    return styles
+                    styled_stocks = display_stocks.style.apply(highlight_stock_pl, axis=1)
 
-                styled_stocks = display_stocks.style.apply(highlight_stock_pl, axis=1)
-
-                st.dataframe(
-                    styled_stocks,
-                    hide_index=True,
-                    width='stretch',
-                    column_config={
-                        "Chart": st.column_config.LinkColumn(
-                            "Chart",
-                            help="Click to view TradingView chart",
-                            display_text="📈"
-                        )
-                    },
-                    key="stock_positions_table"
-                )
-
-                st.markdown("---")
+                    st.dataframe(
+                        styled_stocks,
+                        hide_index=True,
+                        width='stretch',
+                        column_config={
+                            "Chart": st.column_config.LinkColumn(
+                                "Chart",
+                                help="Click to view TradingView chart",
+                                display_text="📈"
+                            )
+                        },
+                        key="stock_positions_table"
+                    )
 
         except Exception as e:
             st.warning(f"Could not load stock positions: {e}")
@@ -402,69 +393,66 @@ def show_positions_page():
                     if not positions:
                         return
 
-                    st.markdown("---")
-                    st.markdown(f"### {emoji} {title}")
-                    st.caption(f"{len(positions)} active position(s)")
+                    with st.expander(f"{emoji} {title} ({len(positions)})", expanded=False):
+                        df = pd.DataFrame(positions)
 
-                    df = pd.DataFrame(positions)
+                        # Format display columns
+                        display_df = df.copy()
+                        display_df['Stock Price'] = display_df['Stock Price'].apply(lambda x: f'${x:.2f}')
+                        display_df['After-Hours'] = display_df['After-Hours'].apply(lambda x: f'${x:.2f}' if x is not None else '-')
+                        display_df['Strike'] = display_df['Strike'].apply(lambda x: f'${x:.2f}')
+                        display_df['Premium'] = display_df['Premium'].apply(lambda x: f'${x:,.2f}')
+                        display_df['Current'] = display_df['Current'].apply(lambda x: f'${x:,.2f}')
 
-                    # Format display columns
-                    display_df = df.copy()
-                    display_df['Stock Price'] = display_df['Stock Price'].apply(lambda x: f'${x:.2f}')
-                    display_df['After-Hours'] = display_df['After-Hours'].apply(lambda x: f'${x:.2f}' if x is not None else '-')
-                    display_df['Strike'] = display_df['Strike'].apply(lambda x: f'${x:.2f}')
-                    display_df['Premium'] = display_df['Premium'].apply(lambda x: f'${x:,.2f}')
-                    display_df['Current'] = display_df['Current'].apply(lambda x: f'${x:,.2f}')
+                        # Store raw P/L values for coloring before formatting
+                        pl_vals = display_df['P/L'].copy()
 
-                    # Store raw P/L values for coloring before formatting
-                    pl_vals = display_df['P/L'].copy()
+                        display_df['P/L'] = display_df['P/L'].apply(lambda x: f'${x:,.2f}')
+                        display_df['P/L %'] = display_df['P/L %'].apply(lambda x: f'{x:.1f}%')
 
-                    display_df['P/L'] = display_df['P/L'].apply(lambda x: f'${x:,.2f}')
-                    display_df['P/L %'] = display_df['P/L %'].apply(lambda x: f'{x:.1f}%')
+                        # Drop helper columns
+                        display_df = display_df.drop(columns=['pl_raw', 'symbol_raw'])
 
-                    # Drop helper columns
-                    display_df = display_df.drop(columns=['pl_raw', 'symbol_raw'])
+                        # Function to apply text color
+                        def highlight_pl(row):
+                            """Apply row-wise styling based on P/L value"""
+                            idx = row.name
+                            pl_val = pl_vals.iloc[idx] if idx < len(pl_vals) else 0
 
-                    # Function to apply text color
-                    def highlight_pl(row):
-                        """Apply row-wise styling based on P/L value"""
-                        idx = row.name
-                        pl_val = pl_vals.iloc[idx] if idx < len(pl_vals) else 0
+                            styles = [''] * len(row)
 
-                        styles = [''] * len(row)
+                            # Find P/L and P/L % column indices
+                            pl_idx = list(display_df.columns).index('P/L')
+                            pl_pct_idx = list(display_df.columns).index('P/L %')
 
-                        # Find P/L and P/L % column indices
-                        pl_idx = list(display_df.columns).index('P/L')
-                        pl_pct_idx = list(display_df.columns).index('P/L %')
+                            # Profit (positive P/L) = GREEN TEXT, Loss (negative P/L) = RED TEXT
+                            if pl_val > 0:
+                                styles[pl_idx] = 'color: #00AA00; font-weight: bold'  # Green text for profit
+                                styles[pl_pct_idx] = 'color: #00AA00; font-weight: bold'
+                            elif pl_val < 0:
+                                styles[pl_idx] = 'color: #DD0000; font-weight: bold'  # Red text for loss
+                                styles[pl_pct_idx] = 'color: #DD0000; font-weight: bold'
+                            # else pl_val == 0, no styling (neutral)
 
-                        # Profit (positive P/L) = GREEN TEXT, Loss (negative P/L) = RED TEXT
-                        if pl_val > 0:
-                            styles[pl_idx] = 'color: #00AA00; font-weight: bold'  # Green text for profit
-                            styles[pl_pct_idx] = 'color: #00AA00; font-weight: bold'
-                        elif pl_val < 0:
-                            styles[pl_idx] = 'color: #DD0000; font-weight: bold'  # Red text for loss
-                            styles[pl_pct_idx] = 'color: #DD0000; font-weight: bold'
-                        # else pl_val == 0, no styling (neutral)
+                            return styles
 
-                        return styles
+                        # Apply styling
+                        styled_df = display_df.style.apply(highlight_pl, axis=1)
 
-                    # Apply styling
-                    styled_df = display_df.style.apply(highlight_pl, axis=1)
-
-                    # Display table
-                    st.dataframe(
-                        styled_df,
-                        hide_index=True,
-                        width='stretch',
-                        column_config={
-                            "Chart": st.column_config.LinkColumn(
-                                "Chart",
-                                help="Click to view TradingView chart",
-                                display_text="📈"
-                            )
-                        },
-                        key=f"positions_table_{section_key}"
-                    )
+                        # Display table
+                        st.dataframe(
+                            styled_df,
+                            hide_index=True,
+                            width='stretch',
+                            column_config={
+                                "Chart": st.column_config.LinkColumn(
+                                    "Chart",
+                                    help="Click to view TradingView chart",
+                                    display_text="📈"
+                                )
+                            },
+                            key=f"positions_table_{section_key}"
+                        )
 
                 # Display each strategy section
                 display_strategy_table("Cash-Secured Puts", "💰", csp_positions, "csp")
@@ -481,25 +469,31 @@ def show_positions_page():
                 for pos in csp_positions:
                     if pos.get('pl_raw', 0) < 0:
                         # Add additional data needed for recovery analysis
+                        pos['symbol'] = pos.get('Symbol', pos.get('symbol_raw', ''))  # Fix: add lowercase 'symbol' key
                         pos['option_type'] = 'put'
                         pos['position_type'] = 'short'
                         pos['current_price'] = pos.get('Current Price', 0)
                         if isinstance(pos['current_price'], str):
                             pos['current_price'] = float(pos['current_price'].replace('$', '').replace(',', ''))
+                        pos['strike_price'] = pos.get('Strike', 0)  # Fix: use 'strike_price' not 'current_strike'
                         pos['current_strike'] = pos.get('Strike', 0)
                         if isinstance(pos['current_strike'], str):
                             pos['current_strike'] = float(pos['current_strike'].replace('$', '').replace(',', ''))
+                        if isinstance(pos['strike_price'], str):
+                            pos['strike_price'] = float(pos['strike_price'].replace('$', '').replace(',', ''))
                         pos['current_loss'] = abs(pos.get('pl_raw', 0))
                         pos['loss_percentage'] = abs(pos.get('P/L %', 0))
                         if isinstance(pos['loss_percentage'], str):
                             pos['loss_percentage'] = float(pos['loss_percentage'].replace('%', ''))
                         pos['days_to_expiry'] = pos.get('DTE', 0)
+                        pos['expiration_date'] = pos.get('Expiration', '')  # Fix: use 'expiration_date' not 'expiration'
                         pos['expiration'] = pos.get('Expiration', '')
-                        pos['premium_collected'] = 0  # Would need to get from order history
+                        pos['quantity'] = abs(pos.get('Contracts', 1))  # Fix: add quantity
+                        pos['average_price'] = abs(pos.get('Premium', 0)) / 100 if pos.get('Premium', 0) else 0  # Fix: add average_price
+                        pos['premium_collected'] = abs(pos.get('Premium', 0))
                         losing_csp_positions.append(pos)
 
                 if losing_csp_positions:
-                    st.markdown("---")
                     with st.expander("🎯 Recovery Strategies", expanded=False):
                         display_recovery_strategies_tab(losing_csp_positions, rh_session)
 
@@ -554,8 +548,6 @@ def show_positions_page():
             st.warning(f"Could not load news section: {e}")
 
     # === TRADE HISTORY ===
-    st.markdown("---")
-
     col1, col2 = st.columns([3, 1])
     with col1:
         st.markdown("### 📊 Trade History")
@@ -711,51 +703,50 @@ def show_positions_page():
         st.error(f"Error loading trade history: {e}")
 
     # === PERFORMANCE ANALYTICS ===
-    st.markdown("---")
-    st.markdown("### 📈 Performance Analytics")
-    st.caption("Profit breakdown by time period")
+    with st.expander("📈 Performance Analytics", expanded=False):
+        st.caption("Profit breakdown by time period")
 
-    try:
-        if closed_trades:
-            performance_data = calculate_performance_by_period(closed_trades)
+        try:
+            if closed_trades:
+                performance_data = calculate_performance_by_period(closed_trades)
 
-            df_perf = pd.DataFrame(performance_data)
+                df_perf = pd.DataFrame(performance_data)
 
-            # Apply color coding to Total P/L column
-            def color_perf_pl(val):
-                """Apply text color to P/L cells"""
-                try:
-                    if '$' in str(val):
-                        num_val = float(str(val).replace('$', '').replace(',', ''))
-                    else:
-                        num_val = float(val)
+                # Apply color coding to Total P/L column
+                def color_perf_pl(val):
+                    """Apply text color to P/L cells"""
+                    try:
+                        if '$' in str(val):
+                            num_val = float(str(val).replace('$', '').replace(',', ''))
+                        else:
+                            num_val = float(val)
 
-                    if num_val > 0:
-                        return 'color: #00AA00; font-weight: bold'  # Green text for profit
-                    elif num_val < 0:
-                        return 'color: #DD0000; font-weight: bold'  # Red text for loss
-                    else:
-                        return 'font-weight: bold'  # Neutral for zero
-                except:
-                    return ''
+                        if num_val > 0:
+                            return 'color: #00AA00; font-weight: bold'  # Green text for profit
+                        elif num_val < 0:
+                            return 'color: #DD0000; font-weight: bold'  # Red text for loss
+                        else:
+                            return 'font-weight: bold'  # Neutral for zero
+                    except:
+                        return ''
 
-            styled_perf = df_perf.style.map(
-                color_perf_pl,
-                subset=['Total P/L']
-            )
+                styled_perf = df_perf.style.map(
+                    color_perf_pl,
+                    subset=['Total P/L']
+                )
 
-            # Display styled table
-            st.dataframe(
-                styled_perf,
-                hide_index=True,
-                width='stretch'
-            )
+                # Display styled table
+                st.dataframe(
+                    styled_perf,
+                    hide_index=True,
+                    width='stretch'
+                )
 
-        else:
-            st.info("No performance data available yet")
+            else:
+                st.info("No performance data available yet")
 
-    except Exception as e:
-        st.error(f"Error calculating performance: {e}")
+        except Exception as e:
+            st.error(f"Error calculating performance: {e}")
 
 
 def get_closed_trades_with_pl(rh_session):
