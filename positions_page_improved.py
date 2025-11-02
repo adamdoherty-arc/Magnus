@@ -522,7 +522,27 @@ def show_positions_page():
 
                 # Display Theta Decay Forecasts for CSP positions
                 if csp_positions:
-                    with st.expander("📉 Theta Decay Forecasts", expanded=False):
+                    # Create title with info icon
+                    col_title, col_info = st.columns([6, 1])
+                    with col_title:
+                        expander_open = st.expander("📉 Theta Decay Forecasts", expanded=False)
+                    with col_info:
+                        st.markdown("""
+                            <div title="Theta Decay shows how much premium you'll earn each day as time passes.
+
+• Daily Theta: Premium earned per day
+• 7-Day Forecast: Expected premium over next week
+• 30-Day Forecast: Total premium to expiration
+• Cumulative: Running total of earned premium
+
+How to use:
+1. Expand to see daily forecasts
+2. Compare theta across positions
+3. Identify positions earning the most per day
+4. Plan when to close or roll based on remaining premium" style="cursor: help; font-size: 20px;">ℹ️</div>
+                        """, unsafe_allow_html=True)
+
+                    with expander_open:
                         display_theta_forecasts(csp_positions)
 
                 # === RECOVERY STRATEGIES TAB ===
