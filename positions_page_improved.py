@@ -82,7 +82,7 @@ def display_news_section(symbols):
                         if article.summary:
                             st.write(article.summary)
                     with col2:
-                        st.link_button("Read Full Article", article.url, use_container_width=True)
+                        st.link_button("Read Full Article", article.url, width='stretch')
         else:
             st.info(f"No recent news found for {selected_symbol}")
 
@@ -716,7 +716,7 @@ def show_positions_page():
                 except:
                     return ''
 
-            styled_perf = df_perf.style.applymap(
+            styled_perf = df_perf.style.map(
                 color_perf_pl,
                 subset=['Total P/L']
             )
@@ -725,7 +725,7 @@ def show_positions_page():
             st.dataframe(
                 styled_perf,
                 hide_index=True,
-                use_container_width=True
+                width='stretch'
             )
 
         else:

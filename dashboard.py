@@ -89,28 +89,28 @@ if "page" not in st.session_state:
     st.session_state.page = "Dashboard"
 
 # Navigation buttons
-if st.sidebar.button("📈 Dashboard", use_container_width=True):
+if st.sidebar.button("📈 Dashboard", width='stretch'):
     st.session_state.page = "Dashboard"
-if st.sidebar.button("🎯 Opportunities", use_container_width=True):
+if st.sidebar.button("🎯 Opportunities", width='stretch'):
     st.session_state.page = "Opportunities"
-if st.sidebar.button("💼 Positions", use_container_width=True):
+if st.sidebar.button("💼 Positions", width='stretch'):
     st.session_state.page = "Positions"
-if st.sidebar.button("🔍 Premium Scanner", use_container_width=True):
+if st.sidebar.button("🔍 Premium Scanner", width='stretch'):
     st.session_state.page = "Premium Scanner"
-if st.sidebar.button("📊 TradingView Watchlists", use_container_width=True):
+if st.sidebar.button("📊 TradingView Watchlists", width='stretch'):
     st.session_state.page = "TradingView Watchlists"
-if st.sidebar.button("🗄️ Database Scan", use_container_width=True):
+if st.sidebar.button("🗄️ Database Scan", width='stretch'):
     st.session_state.page = "Database Scan"
-if st.sidebar.button("📅 Earnings Calendar", use_container_width=True):
+if st.sidebar.button("📅 Earnings Calendar", width='stretch'):
     st.session_state.page = "Earnings Calendar"
 # Calendar Spreads moved to TradingView Watchlists page
-# if st.sidebar.button("📆 Calendar Spreads", use_container_width=True):
+# if st.sidebar.button("📆 Calendar Spreads", width='stretch'):
 #     st.session_state.page = "Calendar Spreads"
-if st.sidebar.button("🎲 Prediction Markets", use_container_width=True):
+if st.sidebar.button("🎲 Prediction Markets", width='stretch'):
     st.session_state.page = "Prediction Markets"
-if st.sidebar.button("⚙️ Settings", use_container_width=True):
+if st.sidebar.button("⚙️ Settings", width='stretch'):
     st.session_state.page = "Settings"
-if st.sidebar.button("🔧 Enhancement Agent", use_container_width=True):
+if st.sidebar.button("🔧 Enhancement Agent", width='stretch'):
     st.session_state.page = "Enhancement Agent"
 
 page = st.session_state.page
@@ -356,7 +356,7 @@ elif page == "Opportunities":
     # Scan button
     col1, col2, col3 = st.columns([1, 1, 3])
     with col1:
-        scan_btn = st.button("🔍 Scan Now", type="primary", use_container_width=True)
+        scan_btn = st.button("🔍 Scan Now", type="primary", width='stretch')
     with col2:
         auto_scan = st.checkbox("Auto-scan", value=False)
     
@@ -792,7 +792,7 @@ elif page == "Premium Scanner":
         min_premium_pct = st.number_input("Min Premium %", value=1.0, min_value=0.5, max_value=5.0, step=0.5)
         dte_target = st.selectbox("Target Days to Expiration", [7, 14, 21, 30, 45], index=3)
 
-        scan_button = st.button("🔍 Scan for Premiums", type="primary", use_container_width=True)
+        scan_button = st.button("🔍 Scan for Premiums", type="primary", width='stretch')
 
     with col2:
         if scan_button:
@@ -894,7 +894,7 @@ elif page == "Premium Scanner":
 
                 st.dataframe(
                     display_df[final_cols],
-                    use_container_width=True,
+                    width='stretch',
                     hide_index=True,
                     height=400
                 )
@@ -982,7 +982,7 @@ elif page == "TradingView Watchlists":
         # Refresh button
         col1, col2, col3 = st.columns([2, 2, 2])
         with col1:
-            if st.button("🔄 Refresh Watchlists", use_container_width=True):
+            if st.button("🔄 Refresh Watchlists", width='stretch'):
                 with st.spinner("Loading watchlists from database..."):
                     # Load all watchlists from database
                     watchlists = tv_manager.get_all_symbols_dict()
@@ -997,8 +997,7 @@ elif page == "TradingView Watchlists":
                     st.rerun()
 
         with col2:
-            if st.button("📥 Manual Import", use_container_width=True):
-                st.info("Use the 'Import Watchlist' tab to add new symbols")
+            pass  # Manual Import button removed - use Import Watchlist tab instead
 
         with col3:
             if 'last_sync' in st.session_state:
@@ -1035,7 +1034,7 @@ elif page == "TradingView Watchlists":
                     with col_sync1:
                         st.metric("Stocks in Watchlist", len(stock_symbols))
                     with col_sync2:
-                        if st.button("🔄 Sync Prices & Premiums", type="primary", use_container_width=True):
+                        if st.button("🔄 Sync Prices & Premiums", type="primary", width='stretch'):
                             st.info("⚡ Background sync started! Data will update automatically...")
                             # Start background sync (non-blocking)
                             import subprocess
@@ -1125,7 +1124,7 @@ elif page == "TradingView Watchlists":
                         st.dataframe(
                             df,
                             hide_index=True,
-                            use_container_width=True,
+                            width='stretch',
                             column_config={
                                 "Symbol": st.column_config.TextColumn("Symbol", width="small"),
                                 "Stock Price": st.column_config.NumberColumn("Stock $", format="$%.2f"),
@@ -1162,7 +1161,7 @@ elif page == "TradingView Watchlists":
 
         col1, col2 = st.columns(2)
         with col1:
-            import_button = st.button("💾 Save & Analyze Watchlist", type="primary", use_container_width=True)
+            import_button = st.button("💾 Save & Analyze Watchlist", type="primary", width='stretch')
         with col2:
             # Load existing watchlist
             tv_integration = TradingViewDBManager()
@@ -1205,7 +1204,7 @@ elif page == "TradingView Watchlists":
             st.caption(f"Symbols: {', '.join(symbols[:20])}{'...' if len(symbols) > 20 else ''}")
 
             # Analyze button
-            if st.button("📊 Analyze All Stocks & Premiums", type="primary", use_container_width=True):
+            if st.button("📊 Analyze All Stocks & Premiums", type="primary", width='stretch'):
                 with st.spinner(f"Getting real-time data for {len(symbols)} stocks..."):
 
                     # Get comprehensive data with options
@@ -1262,11 +1261,11 @@ elif page == "TradingView Watchlists":
                 st.caption("🟢 Green = Up today | 🔴 Red = Down today | Premiums shown for ~5% OTM puts")
 
                 # Apply styling and display
-                styled_df = df.style.applymap(highlight_changes, subset=[col for col in df.columns if '% Change' in col])
+                styled_df = df.style.map(highlight_changes, subset=[col for col in df.columns if '% Change' in col])
 
                 st.dataframe(
                     styled_df,
-                    use_container_width=True,
+                    width='stretch',
                     hide_index=True,
                     height=600
                 )
@@ -1573,7 +1572,7 @@ elif page == "TradingView Watchlists":
                                 st.dataframe(
                                     display_df,
                                     hide_index=True,
-                                    use_container_width=True,
+                                    width='stretch',
                                     height=600
                                 )
 
@@ -1700,7 +1699,7 @@ elif page == "Risk Analysis":
         )
         
         fig.update_layout(height=300, showlegend=False)
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
     
     with col2:
         st.subheader("⚠️ Risk Alerts")
@@ -1741,8 +1740,15 @@ elif page == "Database Scan":
 
     scanner = DatabaseScanner()
 
-    # Create tabs
-    tab1, tab2, tab3, tab4 = st.tabs(["📊 Database Overview", "➕ Add Stocks", "🔍 Scan Premiums", "📈 Analytics"])
+    # Create tabs - NOW WITH PREMIUM SCANNER, CALENDAR SPREADS & AI RESEARCH
+    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
+        "📊 Database Overview",
+        "➕ Add Stocks",
+        "🔍 Premium Scanner",  # NEW - Enhanced premium scanning
+        "📆 Calendar Spreads",  # NEW - Calendar spread opportunities
+        "🤖 AI Research",  # NEW - AI-powered analysis
+        "📈 Analytics"
+    ])
 
     with tab1:
         st.subheader("Database Overview")
@@ -1768,7 +1774,7 @@ elif page == "Database Scan":
                     if 'avg_volume' in df.columns:
                         df['avg_volume'] = df['avg_volume'].apply(lambda x: f"{x/1e6:.2f}M" if x > 0 else "N/A")
 
-                    st.dataframe(df[['symbol', 'name', 'sector', 'current_price', 'market_cap', 'avg_volume']], use_container_width=True)
+                    st.dataframe(df[['symbol', 'name', 'sector', 'current_price', 'market_cap', 'avg_volume']], width='stretch')
 
                 # Update prices button
                 if st.button("🔄 Update All Prices"):
@@ -1818,11 +1824,11 @@ elif page == "Database Scan":
                     st.error("Please enter at least one symbol")
 
     with tab3:
-        st.subheader("💰 All Database Stocks with Options")
-        st.caption("Shows all 1,205 stocks from database - filter and sort to find best premiums")
+        st.subheader("🔍 Premium Scanner")
+        st.caption("Advanced premium scanning for all database stocks - filter and sort to find best opportunities")
 
         # Info section
-        st.info("💡 Showing all stocks from database that have options data. Use TradingView Watchlists → Auto-Sync to add more stocks.")
+        st.info("💡 Scanning all stocks from database that have options data. Use TradingView Watchlists → Auto-Sync to add more stocks.")
 
         # Filters
         col_f1, col_f2, col_f3, col_f4 = st.columns(4)
@@ -1903,7 +1909,7 @@ elif page == "Database Scan":
             st.dataframe(
                 df,
                 hide_index=True,
-                use_container_width=True,
+                width='stretch',
                 column_config={
                     "Symbol": st.column_config.TextColumn("Symbol", width="small"),
                     "Stock Price": st.column_config.NumberColumn("Stock $", format="$%.2f"),
@@ -1925,8 +1931,273 @@ elif page == "Database Scan":
             st.warning(f"No options found for {dte_filter}-day expiration with current filters")
             st.info("Only 89 of 1,205 stocks have options data synced. Use the TradingView Watchlists → Auto-Sync to sync more stocks.")
 
+        # AI Research Integration for Premium Scanner results
+        if rows:
+            st.markdown("---")
+            from src.components.ai_research_widget import display_consolidated_ai_research_section
+            symbols = df['Symbol'].unique().tolist()[:20]  # Limit to top 20 for performance
+            display_consolidated_ai_research_section(symbols, key_prefix="db_premium")
+
     with tab4:
-        st.subheader("Database Analytics")
+        st.subheader("📆 Calendar Spread Opportunities")
+        st.caption("Find calendar spreads for stocks in your database")
+
+        # Info banner
+        with st.expander("ℹ️ What are Calendar Spreads?"):
+            st.markdown("""
+            **Calendar Spreads** (also called time spreads or horizontal spreads) involve:
+            - **Selling** a near-term option (30-45 days)
+            - **Buying** a longer-term option (60-90 days)
+            - **Same strike price** and option type
+
+            ### How You Profit:
+            - **Time Decay**: Short option decays faster than long option
+            - **Theta Differential**: Earn the difference in decay rates
+            - **Best When**: Stock stays near strike price at short expiration
+
+            ### Risk Profile:
+            - **Max Loss**: Net premium paid (limited risk)
+            - **Max Profit**: Depends on long option value when short expires
+            - **Ideal Conditions**: Low IV (<30%), range-bound markets
+
+            ### Our AI Scoring (0-100):
+            - Theta differential (30%)
+            - IV level (25%)
+            - Moneyness/ATM proximity (20%)
+            - Timing (15%)
+            - Liquidity (10%)
+            """)
+
+        # Login to Robinhood if needed
+        if not st.session_state.get('rh_calendar_logged_in'):
+            with st.spinner("Connecting to Robinhood..."):
+                try:
+                    import robin_stocks.robinhood as rh
+                    rh.login('brulecapital@gmail.com', 'FortKnox')
+                    st.session_state['rh_calendar_logged_in'] = True
+                except Exception as e:
+                    st.error(f"Failed to connect to Robinhood: {e}")
+                    st.info("Calendar Spreads require Robinhood connection for options data.")
+
+        if st.session_state.get('rh_calendar_logged_in'):
+            # Get stocks from database
+            from src.tradingview_db_manager import TradingViewDBManager
+            tv_manager = TradingViewDBManager()
+            conn = tv_manager.get_connection()
+            cur = conn.cursor()
+
+            # Get distinct symbols with options data
+            cur.execute("""
+                SELECT DISTINCT symbol
+                FROM stock_premiums
+                WHERE premium > 0
+                ORDER BY symbol
+                LIMIT 100
+            """)
+            stock_symbols = [row[0] for row in cur.fetchall()]
+            cur.close()
+            conn.close()
+
+            if not stock_symbols:
+                st.warning("No stocks with options data found in database. Please sync data first.")
+            else:
+                st.info(f"Found {len(stock_symbols)} stocks with options data in database")
+
+                # Configuration
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    max_symbols = st.number_input(
+                        "Max Symbols to Analyze",
+                        min_value=5,
+                        max_value=100,
+                        value=20,
+                        help="Limit analysis to avoid timeouts",
+                        key="db_calendar_max_symbols"
+                    )
+
+                with col2:
+                    min_score = st.slider(
+                        "Minimum AI Score",
+                        min_value=0,
+                        max_value=100,
+                        value=60,
+                        help="Only show spreads with score >= this value",
+                        key="db_calendar_min_score"
+                    )
+
+                with col3:
+                    spread_type = st.selectbox(
+                        "Spread Type",
+                        ["Both", "Call Calendars Only", "Put Calendars Only"],
+                        key="db_calendar_spread_type"
+                    )
+
+                # Analyze button
+                if st.button("🔍 Find Calendar Spreads", type="primary", key="db_find_calendar_spreads_btn"):
+                    st.markdown("---")
+                    st.markdown("### 🎯 Analysis Results")
+
+                    # Progress tracking
+                    progress_bar = st.progress(0)
+                    status_text = st.empty()
+
+                    all_opportunities = []
+                    symbols_to_analyze = stock_symbols[:max_symbols]
+
+                    # Import analyzer
+                    from src.calendar_spread_analyzer import CalendarSpreadAnalyzer
+                    analyzer = CalendarSpreadAnalyzer()
+
+                    for idx, symbol in enumerate(symbols_to_analyze):
+                        status_text.text(f"Analyzing {symbol}... ({idx + 1}/{len(symbols_to_analyze)})")
+                        progress_bar.progress((idx + 1) / len(symbols_to_analyze))
+
+                        try:
+                            # Get stock price
+                            import robin_stocks.robinhood as rh
+                            quote = rh.get_latest_price(symbol)
+                            if not quote or not quote[0]:
+                                continue
+
+                            stock_price = float(quote[0])
+
+                            # Analyze for calendar spreads
+                            opportunities = analyzer.analyze_symbol(symbol, stock_price)
+
+                            # Filter by score and type
+                            for opp in opportunities:
+                                if opp['score'] >= min_score:
+                                    if spread_type == "Both":
+                                        all_opportunities.append(opp)
+                                    elif spread_type == "Call Calendars Only" and "Call" in opp['type']:
+                                        all_opportunities.append(opp)
+                                    elif spread_type == "Put Calendars Only" and "Put" in opp['type']:
+                                        all_opportunities.append(opp)
+
+                        except Exception as e:
+                            st.warning(f"Error analyzing {symbol}: {e}")
+                            continue
+
+                    progress_bar.empty()
+                    status_text.empty()
+
+                    if not all_opportunities:
+                        st.info("No calendar spread opportunities found matching your criteria. Try lowering the minimum score or analyzing more symbols.")
+                    else:
+                        # Sort by score
+                        all_opportunities.sort(key=lambda x: x['score'], reverse=True)
+
+                        # Cache in session state
+                        st.session_state['db_calendar_opportunities'] = all_opportunities
+
+                # Display results if available
+                if st.session_state.get('db_calendar_opportunities'):
+                    opportunities = st.session_state['db_calendar_opportunities']
+
+                    if opportunities:
+                        # Display summary metrics
+                        st.markdown("### 📈 Summary")
+                        col1, col2, col3, col4 = st.columns(4)
+
+                        with col1:
+                            st.metric("Opportunities Found", len(opportunities))
+                        with col2:
+                            avg_score = sum(o['score'] for o in opportunities) / len(opportunities)
+                            st.metric("Avg AI Score", f"{avg_score:.1f}")
+                        with col3:
+                            avg_profit_pot = sum(o['profit_potential'] for o in opportunities) / len(opportunities)
+                            st.metric("Avg Profit Potential", f"{avg_profit_pot:.0f}%")
+                        with col4:
+                            avg_iv = sum(o['avg_iv'] for o in opportunities) / len(opportunities)
+                            st.metric("Avg IV", f"{avg_iv:.1f}%")
+
+                        # Build DataFrame
+                        import pandas as pd
+                        df_cal = pd.DataFrame(opportunities)
+
+                        # Display main table
+                        st.markdown("### 📋 Calendar Spread Opportunities")
+                        st.caption("Click column headers to sort. Spreads are ranked by AI score.")
+
+                        # Format for display
+                        display_df = df_cal[[
+                            'symbol', 'type', 'score', 'recommendation',
+                            'strike', 'stock_price',
+                            'short_dte', 'long_dte',
+                            'net_debit', 'max_loss', 'max_profit_estimate', 'profit_potential',
+                            'avg_iv', 'theta_differential'
+                        ]].copy()
+
+                        display_df.columns = [
+                            'Symbol', 'Type', 'AI Score', 'Recommendation',
+                            'Strike', 'Stock Price',
+                            'Short DTE', 'Long DTE',
+                            'Net Debit', 'Max Loss', 'Est Max Profit', 'Profit %',
+                            'Avg IV %', 'Theta Diff'
+                        ]
+
+                        # Format numbers
+                        display_df['Strike'] = display_df['Strike'].apply(lambda x: f"${x:.2f}")
+                        display_df['Stock Price'] = display_df['Stock Price'].apply(lambda x: f"${x:.2f}")
+                        display_df['Net Debit'] = display_df['Net Debit'].apply(lambda x: f"${x:.0f}")
+                        display_df['Max Loss'] = display_df['Max Loss'].apply(lambda x: f"${x:.0f}")
+                        display_df['Est Max Profit'] = display_df['Est Max Profit'].apply(lambda x: f"${x:.0f}")
+                        display_df['Profit %'] = display_df['Profit %'].apply(lambda x: f"{x:.0f}%")
+                        display_df['Avg IV %'] = display_df['Avg IV %'].apply(lambda x: f"{x:.1f}%")
+                        display_df['Theta Diff'] = display_df['Theta Diff'].apply(lambda x: f"{x:.4f}")
+
+                        st.dataframe(
+                            display_df,
+                            hide_index=True,
+                            width='stretch',
+                            height=600
+                        )
+
+                        # AI Research for top calendar spread opportunities
+                        st.markdown("---")
+                        from src.components.ai_research_widget import display_consolidated_ai_research_section
+                        top_symbols = [opp['symbol'] for opp in opportunities[:10]]
+                        display_consolidated_ai_research_section(top_symbols, key_prefix="db_calendar")
+
+    with tab5:
+        st.subheader("🤖 AI Research for Database Stocks")
+        st.caption("Get AI-powered analysis for any stock in your database")
+
+        # Get stocks from database
+        from src.tradingview_db_manager import TradingViewDBManager
+        tv_manager = TradingViewDBManager()
+        conn = tv_manager.get_connection()
+        cur = conn.cursor()
+
+        # Get all distinct symbols
+        cur.execute("SELECT DISTINCT ticker FROM stocks ORDER BY ticker LIMIT 500")
+        all_symbols = [row[0] for row in cur.fetchall()]
+        cur.close()
+        conn.close()
+
+        if not all_symbols:
+            st.warning("No stocks found in database. Please add stocks first.")
+        else:
+            st.info(f"📊 {len(all_symbols)} stocks available for AI analysis")
+
+            # Multi-select for symbols
+            selected_symbols = st.multiselect(
+                "Select symbols for AI analysis:",
+                options=all_symbols,
+                default=[],
+                key="db_ai_symbols",
+                help="Select up to 20 symbols for detailed AI research"
+            )
+
+            if selected_symbols:
+                if len(selected_symbols) > 20:
+                    st.warning("⚠️ Please select 20 or fewer symbols for optimal performance")
+                else:
+                    from src.components.ai_research_widget import display_consolidated_ai_research_section
+                    display_consolidated_ai_research_section(selected_symbols, key_prefix="db_ai")
+
+    with tab6:
+        st.subheader("📈 Database Analytics")
 
         if scanner.connect():
             stocks = scanner.get_all_stocks()
