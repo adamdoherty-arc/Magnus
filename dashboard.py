@@ -110,6 +110,8 @@ if st.sidebar.button("📅 Earnings Calendar", width='stretch'):
 # Calendar Spreads moved to TradingView Watchlists page
 # if st.sidebar.button("📆 Calendar Spreads", width='stretch'):
 #     st.session_state.page = "Calendar Spreads"
+if st.sidebar.button("📱 Xtrades Watchlists", width='stretch'):
+    st.session_state.page = "Xtrades Watchlists"
 if st.sidebar.button("🎲 Prediction Markets", width='stretch'):
     st.session_state.page = "Prediction Markets"
 if st.sidebar.button("⚙️ Settings", width='stretch'):
@@ -1264,41 +1266,110 @@ elif page == "Database Scan":
         st.subheader("Database Overview")
 
         if scanner.connect():
-            # Create tables if needed
-            scanner.create_tables()
+            try:
+                # Create tables if needed
+                scanner.create_tables()
 
-            # Get all stocks
-            stocks = scanner.get_all_stocks()
+                # Get all stocks
+                stocks = scanner.get_all_stocks()
 
-            if stocks:
-                st.success(f"📊 Found {len(stocks)} stocks in database")
+                if stocks and len(stocks) > 0:
+                    st.success(f"📊 Found {len(stocks)} stocks in database")
 
-                # Display stocks table
-                df = pd.DataFrame(stocks)
-                if not df.empty:
-                    # Format columns
-                    if 'current_price' in df.columns:
-                        df['current_price'] = df['current_price'].apply(lambda x: f"${x:.2f}" if x else "$0.00")
-                    if 'market_cap' in df.columns:
-                        df['market_cap'] = df['market_cap'].apply(lambda x: f"${x/1e9:.2f}B" if x > 1e9 else f"${x/1e6:.2f}M" if x > 0 else "N/A")
-                    if 'avg_volume' in df.columns:
-                        df['avg_volume'] = df['avg_volume'].apply(lambda x: f"{x/1e6:.2f}M" if x > 0 else "N/A")
+                    # Show summary metrics
+                    col1, col2, col3, col4 = st.columns(4)
 
-                    st.dataframe(df[['symbol', 'name', 'sector', 'current_price', 'market_cap', 'avg_volume']], width='stretch')
+                    with col1:
+                        st.metric("Total Stocks", len(stocks))
 
-                # Update prices button
-                if st.button("🔄 Update All Prices"):
-                    with st.spinner("Updating prices..."):
-                        updated = scanner.update_stock_prices()
-                        st.success(f"Updated {updated} stock prices")
-                        st.rerun()
-            else:
-                st.warning("No stocks in database yet")
-                st.info("👉 Go to 'Add Stocks' tab to add symbols to the database")
+                    with col2:
+                        # Count stocks by sector
+                        df_temp = pd.DataFrame(stocks)
+                        sectors = df_temp['sector'].nunique() if 'sector' in df_temp.columns else 0
+                        st.metric("Unique Sectors", sectors)
 
-            scanner.disconnect()
+                    with col3:
+                        # Count stocks with prices
+                        if 'current_price' in df_temp.columns:
+                            stocks_with_prices = len(df_temp[df_temp['current_price'] > 0])
+                            st.metric("With Prices", stocks_with_prices)
+                        else:
+                            st.metric("With Prices", "N/A")
+
+                    with col4:
+                        # Average price
+                        if 'current_price' in df_temp.columns:
+                            avg_price = df_temp[df_temp['current_price'] > 0]['current_price'].mean()
+                            st.metric("Avg Price", f"${avg_price:.2f}" if avg_price > 0 else "N/A")
+                        else:
+                            st.metric("Avg Price", "N/A")
+
+                    st.markdown("---")
+
+                    # Display stocks table
+                    df = pd.DataFrame(stocks)
+                    if not df.empty:
+                        # Create a display dataframe with proper column selection
+                        display_columns = []
+                        if 'symbol' in df.columns:
+                            display_columns.append('symbol')
+                        if 'name' in df.columns:
+                            display_columns.append('name')
+                        if 'sector' in df.columns:
+                            display_columns.append('sector')
+                        if 'current_price' in df.columns:
+                            display_columns.append('current_price')
+                            # Format price column
+                            df['current_price'] = df['current_price'].apply(
+                                lambda x: f"${x:.2f}" if x and x > 0 else "$0.00"
+                            )
+                        if 'market_cap' in df.columns:
+                            display_columns.append('market_cap')
+                            # Format market cap
+                            df['market_cap'] = df['market_cap'].apply(
+                                lambda x: f"${x/1e9:.2f}B" if x and x > 1e9 else f"${x/1e6:.2f}M" if x and x > 0 else "N/A"
+                            )
+                        if 'avg_volume' in df.columns:
+                            display_columns.append('avg_volume')
+                            # Format volume
+                            df['avg_volume'] = df['avg_volume'].apply(
+                                lambda x: f"{x/1e6:.2f}M" if x and x > 0 else "N/A"
+                            )
+
+                        if display_columns:
+                            st.dataframe(df[display_columns], width='stretch', height=400)
+                        else:
+                            st.warning("No displayable columns found in stocks data")
+                            st.json(stocks[0] if stocks else {})
+
+                    # Update prices button
+                    st.markdown("---")
+                    col_btn1, col_btn2 = st.columns(2)
+                    with col_btn1:
+                        if st.button("🔄 Update All Prices", type="primary"):
+                            with st.spinner("Updating prices..."):
+                                updated = scanner.update_stock_prices()
+                                st.success(f"Updated {updated} stock prices")
+                                st.rerun()
+                    with col_btn2:
+                        if st.button("🔄 Refresh View"):
+                            st.rerun()
+                else:
+                    st.warning("No stocks in database yet")
+                    st.info("👉 Go to 'Add Stocks' tab to add symbols to the database")
+
+            except Exception as e:
+                st.error(f"Error loading database overview: {str(e)}")
+                st.info("This may be due to database schema mismatch. Please check the database configuration.")
+                import traceback
+                with st.expander("Show Error Details"):
+                    st.code(traceback.format_exc())
+
+            finally:
+                scanner.disconnect()
         else:
             st.error("Failed to connect to database")
+            st.info("Please check database configuration in .env file")
 
     with tab2:
         st.subheader("Add Stocks to Database")
@@ -1763,6 +1834,10 @@ elif page == "Earnings Calendar":
 # elif page == "Calendar Spreads":
 #     from calendar_spreads_page import show_calendar_spreads
 #     show_calendar_spreads()
+
+elif page == "Xtrades Watchlists":
+    from xtrades_watchlists_page import show_xtrades_page
+    show_xtrades_page()
 
 elif page == "Prediction Markets":
     from prediction_markets_page import show_prediction_markets

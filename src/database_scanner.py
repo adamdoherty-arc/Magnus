@@ -28,7 +28,7 @@ class DatabaseScanner:
         self.db_config = {
             'host': os.getenv('DB_HOST', 'localhost'),
             'port': os.getenv('DB_PORT', '5432'),
-            'database': os.getenv('DB_NAME', 'wheel_strategy'),
+            'database': os.getenv('DB_NAME', 'magnus'),  # Fixed: was 'wheel_strategy', should be 'magnus'
             'user': os.getenv('DB_USER', 'postgres'),
             'password': os.getenv('DB_PASSWORD', 'postgres123!')
         }
@@ -160,15 +160,16 @@ class DatabaseScanner:
                 avg_volume = 0
 
             # Insert or update stock
+            # Note: Database uses 'ticker' and 'price' column names
             self.cursor.execute("""
-                INSERT INTO stocks (symbol, name, sector, industry, market_cap, current_price, avg_volume)
+                INSERT INTO stocks (ticker, name, sector, industry, market_cap, price, avg_volume)
                 VALUES (%s, %s, %s, %s, %s, %s, %s)
-                ON CONFLICT (symbol) DO UPDATE SET
+                ON CONFLICT (ticker) DO UPDATE SET
                     name = EXCLUDED.name,
                     sector = EXCLUDED.sector,
                     industry = EXCLUDED.industry,
                     market_cap = EXCLUDED.market_cap,
-                    current_price = EXCLUDED.current_price,
+                    price = EXCLUDED.price,
                     avg_volume = EXCLUDED.avg_volume,
                     last_updated = NOW()
             """, (symbol.upper(), name, sector, industry, market_cap, current_price, avg_volume))
@@ -193,9 +194,22 @@ class DatabaseScanner:
     def get_all_stocks(self) -> List[Dict]:
         """Get all stocks from database"""
         try:
+            # Map database columns to expected schema
+            # Database uses 'ticker' but code expects 'symbol'
+            # Database uses 'price' but code expects 'current_price'
             self.cursor.execute("""
-                SELECT * FROM stocks
-                ORDER BY symbol
+                SELECT
+                    id,
+                    ticker as symbol,
+                    name,
+                    sector,
+                    industry,
+                    market_cap,
+                    COALESCE(price, 0) as current_price,
+                    COALESCE(avg_volume, 0) as avg_volume,
+                    last_updated
+                FROM stocks
+                ORDER BY ticker
             """)
             return self.cursor.fetchall()
         except Exception as e:
@@ -208,11 +222,25 @@ class DatabaseScanner:
                                sector: Optional[str] = None) -> List[Dict]:
         """Get stocks matching specific criteria"""
         try:
-            query = "SELECT * FROM stocks WHERE 1=1"
+            # Map database columns to expected schema
+            query = """
+                SELECT
+                    id,
+                    ticker as symbol,
+                    name,
+                    sector,
+                    industry,
+                    market_cap,
+                    COALESCE(price, 0) as current_price,
+                    COALESCE(avg_volume, 0) as avg_volume,
+                    last_updated
+                FROM stocks
+                WHERE 1=1
+            """
             params = []
 
             if max_price:
-                query += " AND current_price <= %s"
+                query += " AND price <= %s"
                 params.append(max_price)
 
             if min_volume:
@@ -223,7 +251,7 @@ class DatabaseScanner:
                 query += " AND sector = %s"
                 params.append(sector)
 
-            query += " ORDER BY symbol"
+            query += " ORDER BY ticker"
 
             self.cursor.execute(query, params)
             return self.cursor.fetchall()
@@ -252,8 +280,8 @@ class DatabaseScanner:
                 if current_price and current_price > 0:
                     self.cursor.execute("""
                         UPDATE stocks
-                        SET current_price = %s, last_updated = NOW()
-                        WHERE symbol = %s
+                        SET price = %s, last_updated = NOW()
+                        WHERE ticker = %s
                     """, (current_price, symbol))
                     updated += 1
                 else:
