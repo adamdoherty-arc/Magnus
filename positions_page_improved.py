@@ -523,8 +523,8 @@ def show_positions_page():
                 all_symbols.extend([p.get('symbol_raw') for p in positions_list])
 
         if all_symbols:
-            display_consolidated_ai_research_section(all_symbols, key_prefix="positions")
-            display_quick_links_section(all_symbols, key_prefix="positions")
+            display_consolidated_ai_research_section(all_symbols, key_prefix="positions", use_expander=True, expanded=False)
+            display_quick_links_section(all_symbols, key_prefix="positions", use_expander=True, expanded=False)
 
     except Exception as e:
         st.warning(f"Could not load AI Research: {e}")
@@ -550,159 +550,160 @@ def show_positions_page():
             st.warning(f"Could not load news section: {e}")
 
     # === TRADE HISTORY ===
-    col1, col2 = st.columns([3, 1])
-    with col1:
-        st.markdown("### 📊 Trade History")
-        st.caption("Closed trades with P/L calculations (loaded from database)")
-    with col2:
-        # Initialize sync service
-        sync_service = TradeHistorySyncService()
-        last_sync = sync_service.get_last_sync_time()
+    # Initialize sync service to get count for expander title
+    sync_service_temp = TradeHistorySyncService()
+    db_trades_temp = sync_service_temp.get_closed_trades_from_db(days_back=365)
+    trade_count = len(db_trades_temp) if db_trades_temp else 0
+    last_sync_temp = sync_service_temp.get_last_sync_time()
+    sync_info = f" - Last sync: {last_sync_temp.strftime('%I:%M %p')}" if last_sync_temp else ""
 
-        if last_sync:
-            st.caption(f"Last synced: {last_sync.strftime('%I:%M %p')}")
+    closed_trades = []  # Initialize outside for use in performance analytics
 
-        if st.button("🔄 Sync Now", key="sync_trades"):
-            with st.spinner("Syncing trades from Robinhood..."):
-                try:
-                    count = sync_service.sync_trades_from_robinhood(rh_session)
-                    st.success(f"✅ Synced {count} new trades")
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Sync failed: {e}")
+    with st.expander(f"📊 Trade History ({trade_count} trades{sync_info})", expanded=False):
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            st.caption("Closed trades with P/L calculations (loaded from database)")
+        with col2:
+            if st.button("🔄 Sync Now", key="sync_trades"):
+                with st.spinner("Syncing trades from Robinhood..."):
+                    try:
+                        count = sync_service_temp.sync_trades_from_robinhood(rh_session)
+                        st.success(f"✅ Synced {count} new trades")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Sync failed: {e}")
 
-    closed_trades = []  # Initialize outside try block for use in performance analytics
-    try:
-        # Use fast database query instead of slow Robinhood API
-        sync_service = TradeHistorySyncService()
-        db_trades = sync_service.get_closed_trades_from_db(days_back=365)
+        try:
+            # Use fast database query instead of slow Robinhood API
+            sync_service = TradeHistorySyncService()
+            db_trades = sync_service.get_closed_trades_from_db(days_back=365)
 
-        # Convert to format expected by display code
-        closed_trades = []
-        for trade in db_trades:
-            # Convert close_date to timezone-aware timestamp for performance analytics
-            from datetime import timezone
-            if trade['close_date']:
-                if trade['close_date'].tzinfo is None:
-                    close_timestamp = trade['close_date'].replace(tzinfo=timezone.utc)
+            # Convert to format expected by display code
+            closed_trades = []
+            for trade in db_trades:
+                # Convert close_date to timezone-aware timestamp for performance analytics
+                from datetime import timezone
+                if trade['close_date']:
+                    if trade['close_date'].tzinfo is None:
+                        close_timestamp = trade['close_date'].replace(tzinfo=timezone.utc)
+                    else:
+                        close_timestamp = trade['close_date']
                 else:
-                    close_timestamp = trade['close_date']
+                    close_timestamp = datetime.now(timezone.utc)
+
+                closed_trades.append({
+                    'Symbol': trade['symbol'],
+                    'Strategy': 'CSP' if trade['strategy_type'] == 'cash_secured_put' else 'CC',
+                    'Strike': trade['strike'],
+                    'Open Premium': trade['premium_collected'],
+                    'Close Cost': trade['close_price'],
+                    'P/L': trade['profit_loss'],
+                    'P/L %': (trade['profit_loss'] / trade['premium_collected'] * 100) if trade['premium_collected'] > 0 else 0,
+                    'Days Held': trade['days_held'],
+                    'Close Date': trade['close_date'].strftime('%Y-%m-%d') if trade['close_date'] else 'N/A',
+                    'close_timestamp': close_timestamp  # For performance analytics filtering
+                })
+
+            # Fetch current stock prices for after-hours display
+            if closed_trades:
+                unique_symbols = list(set([t['Symbol'] for t in closed_trades]))
+                current_prices = {}
+
+                with st.spinner("Fetching current stock prices..."):
+                    for symbol in unique_symbols:
+                        # Use safe wrapper to handle delisted symbols gracefully
+                        price = safe_get_current_price(symbol, suppress_warnings=True)
+                        current_prices[symbol] = price
+
+                # Add current prices to trades
+                for trade in closed_trades:
+                    trade['Current Price'] = current_prices.get(trade['Symbol'], None)
+
+            if closed_trades:
+                # Calculate summary metrics
+                total_pl = sum([t['P/L'] for t in closed_trades])
+                winning_trades = [t for t in closed_trades if t['P/L'] > 0]
+                win_rate = (len(winning_trades) / len(closed_trades) * 100) if closed_trades else 0
+                avg_pl = total_pl / len(closed_trades) if closed_trades else 0
+
+                # Display summary
+                col1, col2, col3, col4 = st.columns(4)
+                with col1:
+                    st.metric("Total Closed", len(closed_trades))
+                with col2:
+                    pl_color = "normal" if total_pl >= 0 else "inverse"
+                    st.metric("Total P/L", f'${total_pl:,.2f}', delta_color=pl_color)
+                with col3:
+                    st.metric("Win Rate", f'{win_rate:.1f}%')
+                with col4:
+                    st.metric("Avg P/L", f'${avg_pl:.2f}')
+
+                # Display trades table with color coding
+                df_history = pd.DataFrame(closed_trades[:50])  # Show last 50
+
+                # Add TradingView links
+                df_history['TradingView'] = df_history['Symbol'].apply(
+                    lambda x: f"https://www.tradingview.com/chart/?symbol={x}"
+                )
+
+                # Format display columns
+                display_cols = ['Close Date', 'Symbol', 'Strategy', 'Strike', 'Current Price',
+                              'Open Premium', 'Close Cost', 'P/L', 'P/L %', 'Days Held', 'TradingView']
+
+                # Store raw P/L values before formatting
+                pl_raw_vals = df_history['P/L'].copy()
+
+                # Format numeric columns
+                df_display = df_history[display_cols].copy()
+                df_display['Current Price'] = df_display['Current Price'].apply(lambda x: f'${x:.2f}' if x and pd.notna(x) else '-')
+                df_display['Open Premium'] = df_display['Open Premium'].apply(lambda x: f'${x:,.2f}')
+                df_display['Close Cost'] = df_display['Close Cost'].apply(lambda x: f'${x:,.2f}')
+                df_display['P/L'] = df_display['P/L'].apply(lambda x: f'${x:,.2f}')
+                df_display['P/L %'] = df_display['P/L %'].apply(lambda x: f'{x:.1f}%')
+
+                # Function to apply row-wise styling
+                def highlight_history_pl(row):
+                    """Apply row-wise styling based on P/L value"""
+                    idx = row.name
+                    pl_val = pl_raw_vals.iloc[idx] if idx < len(pl_raw_vals) else 0
+
+                    styles = [''] * len(row)
+
+                    # Find P/L and P/L % column indices
+                    pl_idx = list(df_display.columns).index('P/L')
+                    pl_pct_idx = list(df_display.columns).index('P/L %')
+
+                    # Profit (positive P/L) = GREEN TEXT, Loss (negative P/L) = RED TEXT
+                    if pl_val > 0:
+                        styles[pl_idx] = 'color: #00AA00; font-weight: bold'  # Green text for profit
+                        styles[pl_pct_idx] = 'color: #00AA00; font-weight: bold'
+                    elif pl_val < 0:
+                        styles[pl_idx] = 'color: #DD0000; font-weight: bold'  # Red text for loss
+                        styles[pl_pct_idx] = 'color: #DD0000; font-weight: bold'
+                    # else pl_val == 0, no styling (neutral)
+
+                    return styles
+
+                # Apply styling
+                styled_history = df_display.style.apply(highlight_history_pl, axis=1)
+
+                st.dataframe(
+                    styled_history,
+                    hide_index=True,
+                    width='stretch',
+                    column_config={
+                        "TradingView": st.column_config.LinkColumn(
+                            "Chart",
+                            display_text="📈"
+                        )
+                    }
+                )
+
             else:
-                close_timestamp = datetime.now(timezone.utc)
+                st.info("No closed trades found")
 
-            closed_trades.append({
-                'Symbol': trade['symbol'],
-                'Strategy': 'CSP' if trade['strategy_type'] == 'cash_secured_put' else 'CC',
-                'Strike': trade['strike'],
-                'Open Premium': trade['premium_collected'],
-                'Close Cost': trade['close_price'],
-                'P/L': trade['profit_loss'],
-                'P/L %': (trade['profit_loss'] / trade['premium_collected'] * 100) if trade['premium_collected'] > 0 else 0,
-                'Days Held': trade['days_held'],
-                'Close Date': trade['close_date'].strftime('%Y-%m-%d') if trade['close_date'] else 'N/A',
-                'close_timestamp': close_timestamp  # For performance analytics filtering
-            })
-
-        # Fetch current stock prices for after-hours display
-        if closed_trades:
-            unique_symbols = list(set([t['Symbol'] for t in closed_trades]))
-            current_prices = {}
-
-            with st.spinner("Fetching current stock prices..."):
-                for symbol in unique_symbols:
-                    # Use safe wrapper to handle delisted symbols gracefully
-                    price = safe_get_current_price(symbol, suppress_warnings=True)
-                    current_prices[symbol] = price
-
-            # Add current prices to trades
-            for trade in closed_trades:
-                trade['Current Price'] = current_prices.get(trade['Symbol'], None)
-
-        if closed_trades:
-            # Calculate summary metrics
-            total_pl = sum([t['P/L'] for t in closed_trades])
-            winning_trades = [t for t in closed_trades if t['P/L'] > 0]
-            win_rate = (len(winning_trades) / len(closed_trades) * 100) if closed_trades else 0
-            avg_pl = total_pl / len(closed_trades) if closed_trades else 0
-
-            # Display summary
-            col1, col2, col3, col4 = st.columns(4)
-            with col1:
-                st.metric("Total Closed", len(closed_trades))
-            with col2:
-                pl_color = "normal" if total_pl >= 0 else "inverse"
-                st.metric("Total P/L", f'${total_pl:,.2f}', delta_color=pl_color)
-            with col3:
-                st.metric("Win Rate", f'{win_rate:.1f}%')
-            with col4:
-                st.metric("Avg P/L", f'${avg_pl:.2f}')
-
-            # Display trades table with color coding
-            df_history = pd.DataFrame(closed_trades[:50])  # Show last 50
-
-            # Add TradingView links
-            df_history['TradingView'] = df_history['Symbol'].apply(
-                lambda x: f"https://www.tradingview.com/chart/?symbol={x}"
-            )
-
-            # Format display columns
-            display_cols = ['Close Date', 'Symbol', 'Strategy', 'Strike', 'Current Price',
-                          'Open Premium', 'Close Cost', 'P/L', 'P/L %', 'Days Held', 'TradingView']
-
-            # Store raw P/L values before formatting
-            pl_raw_vals = df_history['P/L'].copy()
-
-            # Format numeric columns
-            df_display = df_history[display_cols].copy()
-            df_display['Current Price'] = df_display['Current Price'].apply(lambda x: f'${x:.2f}' if x and pd.notna(x) else '-')
-            df_display['Open Premium'] = df_display['Open Premium'].apply(lambda x: f'${x:,.2f}')
-            df_display['Close Cost'] = df_display['Close Cost'].apply(lambda x: f'${x:,.2f}')
-            df_display['P/L'] = df_display['P/L'].apply(lambda x: f'${x:,.2f}')
-            df_display['P/L %'] = df_display['P/L %'].apply(lambda x: f'{x:.1f}%')
-
-            # Function to apply row-wise styling
-            def highlight_history_pl(row):
-                """Apply row-wise styling based on P/L value"""
-                idx = row.name
-                pl_val = pl_raw_vals.iloc[idx] if idx < len(pl_raw_vals) else 0
-
-                styles = [''] * len(row)
-
-                # Find P/L and P/L % column indices
-                pl_idx = list(df_display.columns).index('P/L')
-                pl_pct_idx = list(df_display.columns).index('P/L %')
-
-                # Profit (positive P/L) = GREEN TEXT, Loss (negative P/L) = RED TEXT
-                if pl_val > 0:
-                    styles[pl_idx] = 'color: #00AA00; font-weight: bold'  # Green text for profit
-                    styles[pl_pct_idx] = 'color: #00AA00; font-weight: bold'
-                elif pl_val < 0:
-                    styles[pl_idx] = 'color: #DD0000; font-weight: bold'  # Red text for loss
-                    styles[pl_pct_idx] = 'color: #DD0000; font-weight: bold'
-                # else pl_val == 0, no styling (neutral)
-
-                return styles
-
-            # Apply styling
-            styled_history = df_display.style.apply(highlight_history_pl, axis=1)
-
-            st.dataframe(
-                styled_history,
-                hide_index=True,
-                width='stretch',
-                column_config={
-                    "TradingView": st.column_config.LinkColumn(
-                        "Chart",
-                        display_text="📈"
-                    )
-                }
-            )
-
-        else:
-            st.info("No closed trades found")
-
-    except Exception as e:
-        st.error(f"Error loading trade history: {e}")
+        except Exception as e:
+            st.error(f"Error loading trade history: {e}")
 
     # === PERFORMANCE ANALYTICS ===
     with st.expander("📈 Performance Analytics", expanded=False):

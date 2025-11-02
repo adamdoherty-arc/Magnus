@@ -271,20 +271,22 @@ def display_ai_research_expander(symbol: str, key_prefix: str = "", position_typ
             display_ai_research_analysis(symbol, position_type)
 
 
-def display_consolidated_ai_research_section(symbols: list, key_prefix: str = ""):
+def display_consolidated_ai_research_section(symbols: list, key_prefix: str = "", use_expander: bool = False, expanded: bool = True):
     """
     Display consolidated AI Research section for multiple symbols
 
     Args:
         symbols: List of stock tickers (will be deduplicated)
         key_prefix: Unique prefix for this section (e.g., 'positions', 'watchlist', 'strategies')
+        use_expander: Whether to wrap in an expander (default: False for backward compatibility)
+        expanded: Whether expander is expanded by default (default: True)
 
     Usage:
         # In any page
         from src.components.ai_research_widget import display_consolidated_ai_research_section
 
         symbols = ['AAPL', 'MSFT', 'GOOGL']
-        display_consolidated_ai_research_section(symbols, key_prefix="my_page")
+        display_consolidated_ai_research_section(symbols, key_prefix="my_page", use_expander=True, expanded=False)
     """
     if not symbols:
         return
@@ -292,25 +294,32 @@ def display_consolidated_ai_research_section(symbols: list, key_prefix: str = ""
     # Deduplicate and sort
     unique_symbols = sorted(list(set(symbols)))
 
-    st.markdown("---")
-    st.markdown("### 🤖 AI Research for All Positions")
-    st.caption(f"Analyzing {len(unique_symbols)} unique symbol(s)")
+    def render_content():
+        st.caption(f"Analyzing {len(unique_symbols)} unique symbol(s)")
 
-    # Display buttons in rows of 5
-    num_rows = (len(unique_symbols) + 4) // 5
-    for row in range(num_rows):
-        start_idx = row * 5
-        end_idx = min(start_idx + 5, len(unique_symbols))
-        row_symbols = unique_symbols[start_idx:end_idx]
+        # Display buttons in rows of 5
+        num_rows = (len(unique_symbols) + 4) // 5
+        for row in range(num_rows):
+            start_idx = row * 5
+            end_idx = min(start_idx + 5, len(unique_symbols))
+            row_symbols = unique_symbols[start_idx:end_idx]
 
-        cols = st.columns(len(row_symbols))
-        for idx, symbol in enumerate(row_symbols):
-            with cols[idx]:
-                display_ai_research_button(symbol, key_prefix)
+            cols = st.columns(5)
+            for idx, symbol in enumerate(row_symbols):
+                with cols[idx]:
+                    display_ai_research_button(symbol, key_prefix)
 
-    # Display research expanders
-    for symbol in unique_symbols:
-        display_ai_research_expander(symbol, key_prefix)
+        # Display research expanders
+        for symbol in unique_symbols:
+            display_ai_research_expander(symbol, key_prefix)
+
+    if use_expander:
+        with st.expander(f"🤖 AI Research for All Positions ({len(unique_symbols)})", expanded=expanded):
+            render_content()
+    else:
+        st.markdown("---")
+        st.markdown("### 🤖 AI Research for All Positions")
+        render_content()
 
 
 def generate_external_links(symbol: str) -> dict:
@@ -338,50 +347,59 @@ def generate_external_links(symbol: str) -> dict:
     }
 
 
-def display_quick_links_section(symbols: list, key_prefix: str = ""):
+def display_quick_links_section(symbols: list, key_prefix: str = "", use_expander: bool = False, expanded: bool = True):
     """
     Display Quick Research Links section
 
     Args:
         symbols: List of stock tickers
         key_prefix: Unique prefix for widget keys
+        use_expander: Whether to wrap in an expander (default: False for backward compatibility)
+        expanded: Whether expander is expanded by default (default: True)
     """
     if not symbols:
         return
 
     unique_symbols = sorted(list(set(symbols)))
 
-    st.markdown("---")
-    st.markdown("### 🔗 Quick Research Links")
-    st.caption("Access external research tools and data sources")
+    def render_content():
+        st.caption("Access external research tools and data sources")
 
-    selected_symbol = st.selectbox(
-        "Select symbol for links:",
-        options=unique_symbols,
-        key=f"{key_prefix}_links_selector"
-    )
+        selected_symbol = st.selectbox(
+            "Select symbol for links:",
+            options=unique_symbols,
+            key=f"{key_prefix}_links_selector"
+        )
 
-    if selected_symbol:
-        links = generate_external_links(selected_symbol)
+        if selected_symbol:
+            links = generate_external_links(selected_symbol)
 
-        tabs = st.tabs(["📊 Company Info", "📚 Research", "📈 Options", "📰 News"])
+            tabs = st.tabs(["📊 Company Info", "📚 Research", "📈 Options", "📰 News"])
 
-        with tabs[0]:
-            st.markdown("**Company Information & Charts**")
-            for name, url in links['Company Info'].items():
-                st.markdown(f"- [{name}]({url})")
+            with tabs[0]:
+                st.markdown("**Company Information & Charts**")
+                for name, url in links['Company Info'].items():
+                    st.link_button(name, url, width='stretch')
 
-        with tabs[1]:
-            st.markdown("**Research & Filings**")
-            for name, url in links['Research'].items():
-                st.markdown(f"- [{name}]({url})")
+            with tabs[1]:
+                st.markdown("**Research & Analysis**")
+                for name, url in links['Research'].items():
+                    st.link_button(name, url, width='stretch')
 
-        with tabs[2]:
-            st.markdown("**Options Analysis**")
-            for name, url in links['Options'].items():
-                st.markdown(f"- [{name}]({url})")
+            with tabs[2]:
+                st.markdown("**Options Data**")
+                for name, url in links['Options'].items():
+                    st.link_button(name, url, width='stretch')
 
-        with tabs[3]:
-            st.markdown("**News & Social Sentiment**")
-            for name, url in links['News'].items():
-                st.markdown(f"- [{name}]({url})")
+            with tabs[3]:
+                st.markdown("**Latest News**")
+                for name, url in links['News'].items():
+                    st.link_button(name, url, width='stretch')
+
+    if use_expander:
+        with st.expander(f"🔗 Quick Research Links ({len(unique_symbols)} symbols)", expanded=expanded):
+            render_content()
+    else:
+        st.markdown("---")
+        st.markdown("### 🔗 Quick Research Links")
+        render_content()
