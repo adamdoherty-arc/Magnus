@@ -8,6 +8,15 @@ from datetime import datetime, timedelta
 from typing import List, Dict, Optional, Any
 import yfinance as yf
 from dotenv import load_dotenv
+from src.yfinance_utils import (
+    safe_get_ticker,
+    safe_get_history,
+    safe_get_current_price,
+    safe_get_info,
+    safe_get_options_expirations,
+    safe_get_option_chain,
+    is_symbol_delisted
+)
 
 # Load environment variables
 load_dotenv()
@@ -120,10 +129,20 @@ class DatabaseScanner:
     def add_stock(self, symbol: str, fetch_data: bool = True) -> bool:
         """Add a stock to the database"""
         try:
+            symbol = symbol.upper()
+
             if fetch_data:
-                # Fetch stock data from yfinance
-                ticker = yf.Ticker(symbol.upper())
-                info = ticker.info
+                # Check if symbol is delisted
+                if is_symbol_delisted(symbol):
+                    print(f"Symbol {symbol} is known to be delisted - skipping")
+                    return False
+
+                # Fetch stock data using safe wrapper
+                info = safe_get_info(symbol, suppress_warnings=False)
+
+                if not info:
+                    print(f"Could not fetch data for {symbol} - may be delisted")
+                    return False
 
                 name = info.get('longName', symbol)
                 sector = info.get('sector', 'Unknown')
@@ -220,17 +239,25 @@ class DatabaseScanner:
 
         for stock in stocks:
             try:
-                ticker = yf.Ticker(stock['symbol'])
-                info = ticker.info
-                current_price = info.get('currentPrice') or info.get('regularMarketPrice', 0)
+                symbol = stock['symbol']
 
-                if current_price > 0:
+                # Skip delisted symbols
+                if is_symbol_delisted(symbol):
+                    print(f"Skipping delisted symbol {symbol}")
+                    continue
+
+                # Use safe wrapper to get current price
+                current_price = safe_get_current_price(symbol, suppress_warnings=True)
+
+                if current_price and current_price > 0:
                     self.cursor.execute("""
                         UPDATE stocks
                         SET current_price = %s, last_updated = NOW()
                         WHERE symbol = %s
-                    """, (current_price, stock['symbol']))
+                    """, (current_price, symbol))
                     updated += 1
+                else:
+                    print(f"Could not get valid price for {symbol} - may be delisted")
 
             except Exception as e:
                 print(f"Error updating {stock['symbol']}: {e}")
@@ -277,8 +304,12 @@ class DatabaseScanner:
                 if current_price <= 0:
                     continue
 
-                ticker = yf.Ticker(symbol)
-                expirations = ticker.options
+                # Skip delisted symbols
+                if is_symbol_delisted(symbol):
+                    continue
+
+                # Use safe wrappers for yfinance calls
+                expirations = safe_get_options_expirations(symbol, suppress_warnings=True)
 
                 if not expirations:
                     continue
@@ -296,7 +327,9 @@ class DatabaseScanner:
                         best_expiry = exp
 
                 if best_expiry:
-                    opt_chain = ticker.option_chain(best_expiry)
+                    opt_chain = safe_get_option_chain(symbol, best_expiry, suppress_warnings=True)
+                    if not opt_chain:
+                        continue
                     puts = opt_chain.puts
 
                     # Find 5% OTM put

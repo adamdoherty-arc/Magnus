@@ -43,7 +43,7 @@ def display_calendar_spreads_table(opportunities: List[CalendarSpreadOpportunity
     st.dataframe(
         df,
         hide_index=True,
-        use_container_width=True,
+        width='stretch',
         column_config={
             "Rank": st.column_config.NumberColumn("Rank", width="small", help="Ranking by opportunity score"),
             "Symbol": st.column_config.TextColumn("Symbol", width="small"),

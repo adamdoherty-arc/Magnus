@@ -19,6 +19,7 @@ from src.components.ai_research_widget import (
     display_consolidated_ai_research_section,
     display_quick_links_section
 )
+from src.yfinance_utils import safe_get_history, safe_get_current_price
 
 
 def display_news_section(symbols):
@@ -581,21 +582,14 @@ def show_positions_page():
 
         # Fetch current stock prices for after-hours display
         if closed_trades:
-            import yfinance as yf
             unique_symbols = list(set([t['Symbol'] for t in closed_trades]))
             current_prices = {}
 
             with st.spinner("Fetching current stock prices..."):
                 for symbol in unique_symbols:
-                    try:
-                        ticker = yf.Ticker(symbol)
-                        hist = ticker.history(period='1d')
-                        if not hist.empty:
-                            current_prices[symbol] = hist['Close'].iloc[-1]
-                        else:
-                            current_prices[symbol] = None
-                    except:
-                        current_prices[symbol] = None
+                    # Use safe wrapper to handle delisted symbols gracefully
+                    price = safe_get_current_price(symbol, suppress_warnings=True)
+                    current_prices[symbol] = price
 
             # Add current prices to trades
             for trade in closed_trades:

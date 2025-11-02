@@ -31,7 +31,7 @@ def show_earnings_calendar():
         with col1:
             st.info("Click the button to automatically create the earnings database tables")
         with col2:
-            if st.button("🔧 Initialize Database", type="primary", use_container_width=True):
+            if st.button("🔧 Initialize Database", type="primary", width='stretch'):
                 with st.spinner("Creating earnings tables..."):
                     try:
                         # Create earnings_events table
@@ -88,7 +88,7 @@ def show_earnings_calendar():
         st.metric("📊 Earnings Events", f"{count:,}")
 
     with col_s2:
-        if st.button("🔄 Sync Earnings", type="primary", use_container_width=True):
+        if st.button("🔄 Sync Earnings", type="primary", width='stretch'):
             sync_earnings_from_robinhood(conn, cur)
 
     with col_s3:
@@ -291,7 +291,7 @@ def display_earnings_table(conn, cur):
         st.dataframe(
             df,
             hide_index=True,
-            use_container_width=True,
+            width='stretch',
             column_config={
                 "Symbol": st.column_config.TextColumn("Symbol", width="small"),
                 "Date": st.column_config.TextColumn("Date", width="medium"),

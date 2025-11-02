@@ -174,11 +174,11 @@ def display_market_card(market):
         col1, col2 = st.columns(2)
         with col1:
             robinhood_url = f"https://robinhood.com/markets/events/{ticker}"
-            st.link_button("📱 View on Robinhood", robinhood_url, use_container_width=True)
+            st.link_button("📱 View on Robinhood", robinhood_url, width='stretch')
 
         with col2:
             kalshi_url = f"https://kalshi.com/markets/{ticker}"
-            st.link_button("📈 View on Kalshi", kalshi_url, use_container_width=True)
+            st.link_button("📈 View on Kalshi", kalshi_url, width='stretch')
 
         # Market details
         with st.expander("📋 Market Details"):

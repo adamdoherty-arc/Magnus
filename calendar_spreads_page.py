@@ -207,7 +207,7 @@ def show_calendar_spreads():
         st.dataframe(
             display_df,
             hide_index=True,
-            use_container_width=True,
+            width='stretch',
             height=600
         )
 
@@ -303,7 +303,7 @@ Net Debit: ${opp['net_debit']:.2f}
             showlegend=False,
             height=400
         )
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
 
 
 if __name__ == "__main__":

@@ -233,7 +233,7 @@ def show_enhancement_agent():
         st.dataframe(
             df_overview,
             hide_index=True,
-            use_container_width=True,
+            width='stretch',
             column_config={
                 "Health Score": st.column_config.ProgressColumn(
                     "Health Score",
@@ -359,7 +359,7 @@ def show_enhancement_agent():
             if filter_feature:
                 df_todos = df_todos[df_todos['Feature'].isin(filter_feature)]
 
-            st.dataframe(df_todos, hide_index=True, use_container_width=True)
+            st.dataframe(df_todos, hide_index=True, width='stretch')
 
             # Summary
             remaining = len([t for t in all_todos if t['Completed'] == '⬜'])

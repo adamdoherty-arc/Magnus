@@ -149,7 +149,7 @@ else:
 
     st.dataframe(
         display_df[key_cols],
-        use_container_width=True,
+        width='stretch',
         height=600,
         hide_index=True
     )
@@ -158,7 +158,7 @@ else:
     with st.expander("📊 View All Columns (Including Bid/Ask/Volume/OI)"):
         st.dataframe(
             display_df,
-            use_container_width=True,
+            width='stretch',
             height=600,
             hide_index=True
         )
@@ -176,7 +176,7 @@ else:
     st.markdown("### ⭐ Top 10 Best Opportunities")
 
     top_10 = display_df.head(10)[key_cols]
-    st.dataframe(top_10, use_container_width=True, hide_index=True)
+    st.dataframe(top_10, width='stretch', hide_index=True)
 
     # Near perfect delta opportunities
     st.markdown("### 🎯 Near Perfect 30 Delta (-0.25 to -0.35)")
@@ -194,7 +194,7 @@ else:
 
         st.dataframe(
             perfect_display[key_cols].head(20),
-            use_container_width=True,
+            width='stretch',
             height=400,
             hide_index=True
         )

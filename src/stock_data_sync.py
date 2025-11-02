@@ -7,6 +7,15 @@ import os
 from dotenv import load_dotenv
 import logging
 import time
+from src.yfinance_utils import (
+    safe_get_ticker,
+    safe_get_history,
+    safe_get_current_price,
+    safe_get_info,
+    safe_get_options_expirations,
+    safe_get_option_chain,
+    is_symbol_delisted
+)
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -90,12 +99,17 @@ class StockDataSync:
     def sync_stock_data(self, symbol: str) -> bool:
         """Sync market data for a single stock"""
         try:
-            ticker = yf.Ticker(symbol)
-            info = ticker.info
-            hist = ticker.history(period="5d")
+            # Check if symbol is delisted before attempting
+            if is_symbol_delisted(symbol):
+                logger.info(f"Skipping delisted symbol {symbol}")
+                return False
 
-            if hist.empty:
-                logger.warning(f"No data for {symbol}")
+            # Use safe wrappers to handle errors gracefully
+            info = safe_get_info(symbol, suppress_warnings=False)
+            hist = safe_get_history(symbol, period="5d", suppress_warnings=False)
+
+            if not info or hist is None or hist.empty:
+                logger.warning(f"No data available for {symbol} - may be delisted")
                 return False
 
             current_price = hist['Close'].iloc[-1]
@@ -161,11 +175,20 @@ class StockDataSync:
     def sync_premiums(self, symbol: str, target_dte: int = 45) -> bool:
         """Sync premium data for a stock"""
         try:
-            ticker = yf.Ticker(symbol)
-            current_price = ticker.history(period="1d")['Close'].iloc[-1]
+            # Check if symbol is delisted before attempting
+            if is_symbol_delisted(symbol):
+                logger.info(f"Skipping delisted symbol {symbol}")
+                return False
 
-            expirations = ticker.options
+            # Use safe wrappers
+            current_price = safe_get_current_price(symbol, suppress_warnings=False)
+            if not current_price:
+                logger.warning(f"Could not get current price for {symbol}")
+                return False
+
+            expirations = safe_get_options_expirations(symbol, suppress_warnings=False)
             if not expirations:
+                logger.info(f"No options available for {symbol}")
                 return False
 
             # Find expiration closest to target DTE
@@ -174,10 +197,14 @@ class StockDataSync:
                 (datetime.strptime(x, '%Y-%m-%d') - target_date).days
             ))
 
-            options = ticker.option_chain(closest_exp)
-            puts = options.puts
+            options = safe_get_option_chain(symbol, closest_exp, suppress_warnings=False)
+            if not options:
+                logger.warning(f"Could not get option chain for {symbol} expiring {closest_exp}")
+                return False
 
+            puts = options.puts
             if puts.empty:
+                logger.info(f"No put options found for {symbol}")
                 return False
 
             exp_date = datetime.strptime(closest_exp, '%Y-%m-%d')

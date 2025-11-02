@@ -161,7 +161,7 @@ def display_theta_forecasts(csp_positions: list):
         )
     )
 
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width='stretch')
 
     # Data table
     df = calculator.create_forecast_dataframe(forecast)
@@ -181,7 +181,7 @@ def display_theta_forecasts(csp_positions: list):
         df_display = df.copy()
 
     with st.expander("📊 View Daily Forecast Table", expanded=False):
-        st.dataframe(df_display, hide_index=True, use_container_width=True)
+        st.dataframe(df_display, hide_index=True, width='stretch')
 
         # Export button for full data
         csv = df.to_csv(index=False)

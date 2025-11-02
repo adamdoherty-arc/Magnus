@@ -236,7 +236,7 @@ else:
     event = st.dataframe(
         display_df,
         hide_index=True,
-        use_container_width=True,
+        width='stretch',
         on_select="rerun",
         selection_mode="single-row",
         column_config={
@@ -316,7 +316,7 @@ else:
                 st.dataframe(
                     dte_df[['Strike', 'Premium', 'Bid', 'Ask', 'Delta', 'IV', 'Volume', 'OI', 'Monthly %']],
                     hide_index=True,
-                    use_container_width=True
+                    width='stretch'
                 )
         else:
             st.info(f"No option data found for {symbol}. Try syncing data.")
