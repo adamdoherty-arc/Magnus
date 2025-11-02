@@ -460,6 +460,66 @@ def show_positions_page():
                 display_strategy_table("Long Calls", "📈", long_call_positions, "long_calls")
                 display_strategy_table("Long Puts", "📉", long_put_positions, "long_puts")
 
+                # Display Next CSP Opportunities (30-day, ~0.3 delta)
+                if csp_positions:
+                    from src.csp_opportunities_finder import CSPOpportunitiesFinder
+
+                    with st.expander("🎯 Next CSP Opportunities (30 Days, Delta ~0.3)", expanded=False):
+                        st.caption("Next optimal CSP trades for your current position symbols")
+
+                        try:
+                            finder = CSPOpportunitiesFinder()
+                            opportunities_df = finder.find_opportunities_for_current_positions(csp_positions)
+
+                            if not opportunities_df.empty:
+                                # Show summary metrics
+                                metrics = finder.get_summary_metrics(opportunities_df)
+                                col1, col2, col3, col4 = st.columns(4)
+
+                                with col1:
+                                    st.metric("Opportunities", metrics['total_opportunities'])
+                                with col2:
+                                    st.metric("Avg Premium", f"${metrics['avg_premium']:.2f}")
+                                with col3:
+                                    st.metric("Avg Monthly %", f"{metrics['avg_monthly_return']:.2f}%")
+                                with col4:
+                                    st.metric("Total Premium", f"${metrics['total_premium']:.2f}")
+
+                                # Display opportunities table (TradingView watchlist style)
+                                st.markdown("#### 📊 30-Day CSP Opportunities (Click headers to sort)")
+                                st.dataframe(
+                                    opportunities_df[['Symbol', 'Stock Price', 'Strike', 'DTE', 'Premium',
+                                                     'Delta', 'Monthly %', 'Annual %', 'IV', 'Breakeven',
+                                                     'Bid', 'Ask', 'Volume', 'OI']],
+                                    hide_index=True,
+                                    use_container_width=True,
+                                    column_config={
+                                        "Symbol": st.column_config.TextColumn("Symbol", width="small"),
+                                        "Stock Price": st.column_config.NumberColumn("Stock $", format="$%.2f"),
+                                        "Strike": st.column_config.NumberColumn("Strike", format="$%.2f"),
+                                        "DTE": st.column_config.NumberColumn("DTE"),
+                                        "Premium": st.column_config.NumberColumn("Premium", format="$%.2f"),
+                                        "Delta": st.column_config.NumberColumn("Delta", format="%.3f"),
+                                        "Monthly %": st.column_config.NumberColumn("Monthly %", format="%.2f%%"),
+                                        "Annual %": st.column_config.NumberColumn("Annual %", format="%.1f%%"),
+                                        "IV": st.column_config.NumberColumn("IV %", format="%.1f%%"),
+                                        "Breakeven": st.column_config.NumberColumn("Breakeven", format="$%.2f"),
+                                        "Bid": st.column_config.NumberColumn("Bid", format="$%.2f"),
+                                        "Ask": st.column_config.NumberColumn("Ask", format="$%.2f"),
+                                        "Volume": st.column_config.NumberColumn("Vol"),
+                                        "OI": st.column_config.NumberColumn("OI")
+                                    }
+                                )
+
+                                st.caption("💡 Tip: Click any symbol to open in Robinhood options chain")
+                            else:
+                                st.info("⏳ No 30-day opportunities found. Options data may need syncing for these symbols.")
+                                st.caption("Add these symbols to a TradingView watchlist and sync to get options data.")
+
+                        except Exception as e:
+                            st.error(f"Error loading CSP opportunities: {e}")
+                            logger.error(f"CSP opportunities error: {e}")
+
                 # Display Theta Decay Forecasts for CSP positions
                 if csp_positions:
                     with st.expander("📉 Theta Decay Forecasts", expanded=False):
