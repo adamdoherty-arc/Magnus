@@ -15,6 +15,14 @@ from datetime import datetime, timedelta
 import yfinance as yf
 from scipy.stats import norm
 import logging
+import os
+
+# Try to import Robinhood - optional dependency
+try:
+    import robin_stocks.robinhood as rh
+    ROBINHOOD_AVAILABLE = True
+except ImportError:
+    ROBINHOOD_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +34,113 @@ class OptionRollEvaluator:
         self.risk_free_rate = 0.045
         self.trading_days = 252
         self.commission_per_contract = 0.65  # Typical broker commission
+        self.rh_logged_in = False
+
+    def _login_robinhood(self) -> bool:
+        """Login to Robinhood if not already logged in"""
+        if not ROBINHOOD_AVAILABLE:
+            return False
+
+        if self.rh_logged_in:
+            return True
+
+        try:
+            username = os.getenv('ROBINHOOD_USERNAME')
+            password = os.getenv('ROBINHOOD_PASSWORD')
+
+            if not username or not password:
+                logger.debug("Robinhood credentials not found")
+                return False
+
+            rh.authentication.login(
+                username=username,
+                password=password,
+                expiresIn=86400,
+                store_session=True
+            )
+            self.rh_logged_in = True
+            logger.info("Logged into Robinhood successfully")
+            return True
+
+        except Exception as e:
+            logger.error(f"Robinhood login failed: {e}")
+            return False
+
+    def _get_robinhood_options_chain(self, symbol: str, expiration: str, option_type: str = 'put') -> pd.DataFrame:
+        """
+        Get options chain from Robinhood as fallback when Yahoo Finance fails
+
+        Args:
+            symbol: Stock ticker
+            expiration: Expiration date in YYYY-MM-DD format
+            option_type: 'put' or 'call'
+
+        Returns:
+            DataFrame with options chain data compatible with yfinance format
+        """
+        if not self._login_robinhood():
+            return pd.DataFrame()
+
+        try:
+            # Get options for this expiration from Robinhood
+            options = rh.options.find_options_by_expiration(
+                symbol,
+                expiration,
+                optionType=option_type
+            )
+
+            if not options:
+                return pd.DataFrame()
+
+            # Convert to DataFrame with yfinance-compatible column names
+            data = []
+            for opt in options:
+                try:
+                    # Get market data for this option
+                    instrument_url = opt.get('url', '')
+                    market_data = rh.options.get_option_market_data_by_id(opt.get('id', ''))
+
+                    if not market_data:
+                        continue
+
+                    data.append({
+                        'strike': float(opt.get('strike_price', 0)),
+                        'bid': float(market_data[0].get('bid_price', 0)) if market_data else 0,
+                        'ask': float(market_data[0].get('ask_price', 0)) if market_data else 0,
+                        'lastPrice': float(market_data[0].get('last_trade_price', 0)) if market_data else 0,
+                        'volume': int(market_data[0].get('volume', 0)) if market_data else 0,
+                        'openInterest': int(market_data[0].get('open_interest', 0)) if market_data else 0,
+                        'impliedVolatility': float(market_data[0].get('implied_volatility', 0)) if market_data else 0
+                    })
+                except Exception as e:
+                    logger.debug(f"Error processing option: {e}")
+                    continue
+
+            if not data:
+                return pd.DataFrame()
+
+            df = pd.DataFrame(data)
+            # Sort by strike
+            df = df.sort_values('strike')
+            return df
+
+        except Exception as e:
+            logger.error(f"Error getting Robinhood options chain for {symbol}: {e}")
+            return pd.DataFrame()
+
+    def _get_robinhood_expiration_dates(self, symbol: str) -> List[str]:
+        """Get available expiration dates from Robinhood"""
+        if not self._login_robinhood():
+            return []
+
+        try:
+            chains = rh.options.get_chains(symbol)
+            if chains and 'expiration_dates' in chains:
+                return chains['expiration_dates']
+            return []
+        except Exception as e:
+            logger.error(f"Error getting Robinhood expirations for {symbol}: {e}")
+            return []
 
     def evaluate_roll_down(self, position: Dict) -> Dict:
         """
@@ -352,19 +467,37 @@ class OptionRollEvaluator:
         }
 
         # Calculate assignment metrics
-        shares_to_receive = 100  # Per contract
-        cost_basis = current_strike - (premium_collected / 100)  # Per share basis
-        current_loss = (cost_basis - current_price) * shares_to_receive
-        loss_percentage = ((cost_basis - current_price) / cost_basis) * 100
+        shares_to_receive = 100  # Per contract per quantity
+        quantity = abs(position.get('quantity', 1))
+
+        # Premium collected is total for position, convert to per-share
+        # If premium_collected is already in dollars (not cents), use it directly
+        if premium_collected > 100:
+            # Premium in dollars total - convert to per share
+            premium_per_share = premium_collected / (100 * quantity)
+        else:
+            # Premium likely already per share or per contract
+            premium_per_share = premium_collected / 100 if premium_collected > 1 else premium_collected
+
+        # True cost basis = strike - premium received per share
+        cost_basis = current_strike - premium_per_share
+
+        # Paper loss is current unrealized loss on shares at current market price
+        # But we already have a position with existing loss - don't double count
+        current_unrealized_loss_per_share = max(0, cost_basis - current_price)
+        total_unrealized_loss = current_unrealized_loss_per_share * shares_to_receive * quantity
+
+        loss_percentage = (current_unrealized_loss_per_share / cost_basis * 100) if cost_basis > 0 else 0
 
         evaluation.update({
-            'shares_to_receive': shares_to_receive,
+            'shares_to_receive': shares_to_receive * quantity,
             'cost_basis_per_share': cost_basis,
-            'total_cost': cost_basis * shares_to_receive,
-            'current_market_value': current_price * shares_to_receive,
-            'immediate_loss': current_loss,
+            'premium_per_share': premium_per_share,
+            'total_cost': cost_basis * shares_to_receive * quantity,
+            'current_market_value': current_price * shares_to_receive * quantity,
+            'immediate_loss': total_unrealized_loss,
             'loss_percentage': loss_percentage,
-            'capital_required': current_strike * 100,
+            'capital_required': current_strike * shares_to_receive * quantity,
             'wheel_opportunity': True  # Can sell covered calls after assignment
         })
 
