@@ -94,8 +94,6 @@ if "page" not in st.session_state:
 # Navigation buttons
 if st.sidebar.button("📈 Dashboard", width='stretch'):
     st.session_state.page = "Dashboard"
-if st.sidebar.button("🎯 Opportunities", width='stretch'):
-    st.session_state.page = "Opportunities"
 if st.sidebar.button("💼 Positions", width='stretch'):
     st.session_state.page = "Positions"
 # Premium Scanner removed - functionality integrated into TradingView Watchlists and Database Scan
@@ -355,81 +353,7 @@ if page == "Dashboard":
     else:
         st.info("Connect to Robinhood to track historical performance")
 
-elif page == "Opportunities":
-    st.title("🎯 Trading Opportunities")
-    
-    # Scan button
-    col1, col2, col3 = st.columns([1, 1, 3])
-    with col1:
-        scan_btn = st.button("🔍 Scan Now", type="primary", width='stretch')
-    with col2:
-        auto_scan = st.checkbox("Auto-scan", value=False)
-    
-    if scan_btn or auto_scan:
-        with st.spinner("Scanning for opportunities..."):
-            # Run async scan
-            async def scan():
-                opportunities = await market_agent.scan_opportunities(watchlist[:10])
-                return opportunities
-            
-            opportunities = asyncio.run(scan())
-            
-            if opportunities:
-                st.success(f"Found {len(opportunities)} opportunities!")
-                
-                # Tabs for different opportunity types
-                tab1, tab2 = st.tabs(["Cash-Secured Puts", "Covered Calls"])
-                
-                with tab1:
-                    st.subheader("💵 Cash-Secured Put Opportunities")
-                    
-                    # Create DataFrame for display
-                    put_data = []
-                    for opp in opportunities[:5]:
-                        put_data.append({
-                            'Symbol': opp['symbol'],
-                            'Current Price': f"${opp['current_price']:.2f}",
-                            'Strike': f"${opp['current_price'] * 0.95:.2f}",
-                            'Premium': f"${opp['current_price'] * 0.01:.2f}",
-                            'Yield': f"{1.2:.1f}%",
-                            'DTE': 30,
-                            'Score': f"{opp['score']:.0f}/100",
-                            'Action': 'Trade'
-                        })
-                    
-                    df = pd.DataFrame(put_data)
-                    
-                    # Display with action buttons
-                    for idx, row in df.iterrows():
-                        col1, col2, col3, col4, col5, col6, col7, col8 = st.columns([1.5, 1.5, 1, 1, 1, 1, 1, 1])
-                        
-                        with col1:
-                            st.write(f"**{row['Symbol']}**")
-                        with col2:
-                            st.write(row['Current Price'])
-                        with col3:
-                            st.write(row['Strike'])
-                        with col4:
-                            st.write(row['Premium'])
-                        with col5:
-                            st.write(row['Yield'])
-                        with col6:
-                            st.write(f"{row['DTE']}d")
-                        with col7:
-                            if float(row['Score'].split('/')[0]) > 80:
-                                st.success(row['Score'])
-                            elif float(row['Score'].split('/')[0]) > 60:
-                                st.warning(row['Score'])
-                            else:
-                                st.info(row['Score'])
-                        with col8:
-                            st.button("💸 Trade", key=f"trade_{idx}")
-                
-                with tab2:
-                    st.subheader("📈 Covered Call Opportunities")
-                    st.info("You need stock holdings to sell covered calls")
-            else:
-                st.warning("No opportunities found. Try adjusting your criteria.")
+# Opportunities feature removed - premium analysis integrated into TradingView Watchlists and Database Scan
 
 elif page == "Positions":
     # Use improved Positions page with all enhancements
@@ -1877,8 +1801,8 @@ elif page == "Settings":
         st.selectbox("Alert Frequency", ["Real-time", "Every 5 min", "Every 15 min", "Hourly"])
         st.multiselect(
             "Alert Types",
-            ["New Opportunities", "Price Movements", "Assignment Warnings", "Risk Alerts"],
-            default=["New Opportunities", "Assignment Warnings"]
+            ["Price Movements", "Assignment Warnings", "Risk Alerts"],
+            default=["Assignment Warnings", "Risk Alerts"]
         )
     
     st.markdown("---")
