@@ -388,12 +388,12 @@ def show_positions_page():
                 long_put_positions = [p for p in positions_data if p['Strategy'] == 'Long Put']
 
                 # Helper function to display a strategy table
-                def display_strategy_table(title, emoji, positions, section_key):
+                def display_strategy_table(title, emoji, positions, section_key, expanded=False):
                     """Display positions table for a specific strategy"""
                     if not positions:
                         return
 
-                    with st.expander(f"{emoji} {title} ({len(positions)})", expanded=False):
+                    with st.expander(f"{emoji} {title} ({len(positions)})", expanded=expanded):
                         df = pd.DataFrame(positions)
 
                         # Format display columns
@@ -455,13 +455,15 @@ def show_positions_page():
                         )
 
                 # Display each strategy section
-                display_strategy_table("Cash-Secured Puts", "💰", csp_positions, "csp")
+                display_strategy_table("Cash-Secured Puts", "💰", csp_positions, "csp", expanded=True)
                 display_strategy_table("Covered Calls", "📞", cc_positions, "cc")
                 display_strategy_table("Long Calls", "📈", long_call_positions, "long_calls")
                 display_strategy_table("Long Puts", "📉", long_put_positions, "long_puts")
 
                 # Display Theta Decay Forecasts for CSP positions
-                display_theta_forecasts(csp_positions)
+                if csp_positions:
+                    with st.expander("📉 Theta Decay Forecasts", expanded=False):
+                        display_theta_forecasts(csp_positions)
 
                 # === RECOVERY STRATEGIES TAB ===
                 # Check if there are any losing CSP positions
