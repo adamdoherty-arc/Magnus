@@ -20,6 +20,7 @@ from src.components.ai_research_widget import (
     display_quick_links_section
 )
 from src.yfinance_utils import safe_get_history, safe_get_current_price
+from src.recovery_strategies_tab import display_recovery_strategies_tab
 
 
 def display_news_section(symbols):
@@ -473,6 +474,34 @@ def show_positions_page():
 
                 # Display Theta Decay Forecasts for CSP positions
                 display_theta_forecasts(csp_positions)
+
+                # === RECOVERY STRATEGIES TAB ===
+                # Check if there are any losing CSP positions
+                losing_csp_positions = []
+                for pos in csp_positions:
+                    if pos.get('pl_raw', 0) < 0:
+                        # Add additional data needed for recovery analysis
+                        pos['option_type'] = 'put'
+                        pos['position_type'] = 'short'
+                        pos['current_price'] = pos.get('Current Price', 0)
+                        if isinstance(pos['current_price'], str):
+                            pos['current_price'] = float(pos['current_price'].replace('$', '').replace(',', ''))
+                        pos['current_strike'] = pos.get('Strike', 0)
+                        if isinstance(pos['current_strike'], str):
+                            pos['current_strike'] = float(pos['current_strike'].replace('$', '').replace(',', ''))
+                        pos['current_loss'] = abs(pos.get('pl_raw', 0))
+                        pos['loss_percentage'] = abs(pos.get('P/L %', 0))
+                        if isinstance(pos['loss_percentage'], str):
+                            pos['loss_percentage'] = float(pos['loss_percentage'].replace('%', ''))
+                        pos['days_to_expiry'] = pos.get('DTE', 0)
+                        pos['expiration'] = pos.get('Expiration', '')
+                        pos['premium_collected'] = 0  # Would need to get from order history
+                        losing_csp_positions.append(pos)
+
+                if losing_csp_positions:
+                    st.markdown("---")
+                    with st.expander("🎯 Recovery Strategies", expanded=False):
+                        display_recovery_strategies_tab(losing_csp_positions, rh_session)
 
             else:
                 st.info("No open option positions found in Robinhood")

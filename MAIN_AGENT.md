@@ -31,6 +31,8 @@ The Main Agent is the **primary orchestrator** for the Magnus Trading Platform. 
 
 The Main Agent can delegate to the following specialized feature agents:
 
+### Core Feature Agents
+
 | Feature | Agent File | Responsible For |
 |---------|-----------|-----------------|
 | Dashboard | `features/dashboard/AGENT.md` | Portfolio overview, forecasts, performance |
@@ -43,6 +45,58 @@ The Main Agent can delegate to the following specialized feature agents:
 | Calendar Spreads | `features/calendar_spreads/AGENT.md` | Calendar spread opportunities |
 | Prediction Markets | `features/prediction_markets/AGENT.md` | Market predictions and sentiment |
 | Settings | `features/settings/AGENT.md` | Platform configuration |
+| Xtrades Watchlists | `features/xtrades/AGENT.md` | Discord trader monitoring |
+
+### Specialized Technical Agents
+
+| Specialty | Agent File | Responsible For |
+|-----------|-----------|-----------------|
+| AI Engineering | `.claude/agents/ai-engineer.md` | LLM integration, RAG systems, AI features |
+| Backend Architecture | `.claude/agents/backend-architect.md` | System design, API architecture |
+| Frontend Development | `.claude/agents/frontend-developer.md` | UI/UX, Streamlit components |
+| Python Development | `.claude/agents/python-pro.md` | Advanced Python patterns, optimization |
+| Data Science | `.claude/agents/data-scientist.md` | Analytics, statistical modeling |
+| Data Engineering | `.claude/agents/data-engineer.md` | ETL pipelines, data infrastructure |
+| Database Optimization | `.claude/agents/database-optimizer.md` | Query optimization, indexing |
+| PostgreSQL | `.claude/agents/postgres-pro.md` | Advanced PostgreSQL features |
+| ML Engineering | `.claude/agents/ml-engineer.md` | Model deployment, ML pipelines |
+| Quant Analysis | Built-in | Options pricing, Greeks, probability modeling |
+| Performance Engineering | `.claude/agents/performance-engineer.md` | Profiling, optimization, caching |
+| Cloud Architecture | `.claude/agents/cloud-architect.md` | AWS/Azure/GCP infrastructure |
+| Deployment | `.claude/agents/deployment-engineer.md` | CI/CD, containers, orchestration |
+| DevOps/Incident Response | `.claude/agents/devops-incident-responder.md` | Production issues, monitoring |
+| GraphQL | `.claude/agents/graphql-architect.md` | GraphQL schema design |
+| TypeScript | `.claude/agents/typescript-pro.md` | Advanced TypeScript patterns |
+| React | `.claude/agents/react-pro.md` | React components, state management |
+| Next.js | `.claude/agents/nextjs-pro.md` | Next.js applications |
+| UI Design | `.claude/agents/ui-designer.md` | Interface design, design systems |
+| UX Design | `.claude/agents/ux-designer.md` | User experience, user research |
+| Prompt Engineering | `.claude/agents/prompt-engineer.md` | LLM prompt optimization |
+| QA Testing | `.claude/agents/qa-tester.md` | Test automation, quality assurance |
+| Code Review | `.claude/agents/code-reviewer.md` | Code quality, best practices |
+| Architecture Review | `.claude/agents/architect.md` | System architecture validation |
+| Bug Analysis | `.claude/agents/bug-root-cause-analyzer.md` | Root cause analysis |
+| Full Stack | `.claude/agents/full-stack-developer.md` | End-to-end feature development |
+
+### Specification & Planning Agents
+
+| Specialty | Agent File | Responsible For |
+|-----------|-----------|-----------------|
+| Requirements Validation | `.claude/agents/spec-requirements-validator.md` | Validate feature requirements |
+| Design Validation | `.claude/agents/spec-design-validator.md` | Validate system design |
+| Design Research | `.claude/agents/spec-design-web-researcher.md` | Research design patterns |
+| Task Validation | `.claude/agents/spec-task-validator.md` | Validate task definitions |
+| Task Execution | `.claude/agents/spec-task-executor.md` | Execute planned tasks |
+| Implementation Review | `.claude/agents/spec-task-implementation-reviewer.md` | Review implementations |
+| Integration Testing | `.claude/agents/spec-integration-tester.md` | Test integrations |
+| Completion Review | `.claude/agents/spec-completion-reviewer.md` | Verify completion criteria |
+| Dependency Analysis | `.claude/agents/spec-dependency-analyzer.md` | Analyze dependencies |
+| Test Generation | `.claude/agents/spec-test-generator.md` | Generate test cases |
+| Documentation | `.claude/agents/spec-documentation-generator.md` | Generate documentation |
+| Performance Analysis | `.claude/agents/spec-performance-analyzer.md` | Analyze performance |
+| Duplication Detection | `.claude/agents/spec-duplication-detector.md` | Find code duplication |
+| Breaking Change Detection | `.claude/agents/spec-breaking-change-detector.md` | Detect breaking changes |
+| Steering Document Updates | `.claude/agents/steering-document-updater.md` | Update project plans |
 
 ## Communication Protocol
 
