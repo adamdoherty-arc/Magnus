@@ -165,9 +165,20 @@ class OptionRollEvaluator:
         }
 
         try:
-            ticker = yf.Ticker(symbol)
-            option_chain = ticker.option_chain(expiration)
-            puts = option_chain.puts
+            # Try Yahoo Finance first
+            try:
+                ticker = yf.Ticker(symbol)
+                option_chain = ticker.option_chain(expiration)
+                puts = option_chain.puts
+            except Exception as yf_error:
+                # Fallback to Robinhood if Yahoo fails
+                logger.debug(f"Yahoo Finance failed for {symbol}, trying Robinhood: {yf_error}")
+                puts = self._get_robinhood_options_chain(symbol, expiration, 'put')
+
+                if puts.empty:
+                    evaluation['feasible'] = False
+                    evaluation['reason'] = f'No options data available from Yahoo or Robinhood'
+                    return evaluation
 
             # Find strikes below current but above spot price
             target_strikes = puts[(puts['strike'] < current_strike) &
@@ -241,8 +252,19 @@ class OptionRollEvaluator:
         }
 
         try:
-            ticker = yf.Ticker(symbol)
-            exp_dates = ticker.options
+            # Try Yahoo Finance first
+            try:
+                ticker = yf.Ticker(symbol)
+                exp_dates = ticker.options
+            except Exception as yf_error:
+                # Fallback to Robinhood if Yahoo fails
+                logger.debug(f"Yahoo Finance failed for {symbol}, trying Robinhood: {yf_error}")
+                exp_dates = self._get_robinhood_expiration_dates(symbol)
+
+                if not exp_dates:
+                    evaluation['feasible'] = False
+                    evaluation['reason'] = 'No options data available from Yahoo or Robinhood'
+                    return evaluation
 
             # Find next available expiration dates
             future_expirations = [exp for exp in exp_dates
@@ -259,8 +281,18 @@ class OptionRollEvaluator:
             best_score = -float('inf')
 
             for exp_date in future_expirations[:3]:
-                option_chain = ticker.option_chain(exp_date)
-                puts = option_chain.puts
+                # Try Yahoo Finance first, fallback to Robinhood
+                try:
+                    if 'ticker' in locals():
+                        option_chain = ticker.option_chain(exp_date)
+                        puts = option_chain.puts
+                    else:
+                        raise Exception("Using Robinhood")
+                except:
+                    puts = self._get_robinhood_options_chain(symbol, exp_date, 'put')
+
+                if puts.empty:
+                    continue
 
                 # Find same strike in new expiration
                 same_strike = puts[puts['strike'] == current_strike]
@@ -352,8 +384,19 @@ class OptionRollEvaluator:
         }
 
         try:
-            ticker = yf.Ticker(symbol)
-            exp_dates = ticker.options
+            # Try Yahoo Finance first
+            try:
+                ticker = yf.Ticker(symbol)
+                exp_dates = ticker.options
+            except Exception as yf_error:
+                # Fallback to Robinhood if Yahoo fails
+                logger.debug(f"Yahoo Finance failed for {symbol}, trying Robinhood: {yf_error}")
+                exp_dates = self._get_robinhood_expiration_dates(symbol)
+
+                if not exp_dates:
+                    evaluation['feasible'] = False
+                    evaluation['reason'] = 'No options data available from Yahoo or Robinhood'
+                    return evaluation
 
             # Find future expiration dates
             future_expirations = [exp for exp in exp_dates
@@ -370,8 +413,18 @@ class OptionRollEvaluator:
             best_score = -float('inf')
 
             for exp_date in future_expirations[:3]:
-                option_chain = ticker.option_chain(exp_date)
-                puts = option_chain.puts
+                # Try Yahoo Finance first, fallback to Robinhood
+                try:
+                    if 'ticker' in locals():
+                        option_chain = ticker.option_chain(exp_date)
+                        puts = option_chain.puts
+                    else:
+                        raise Exception("Using Robinhood")
+                except:
+                    puts = self._get_robinhood_options_chain(symbol, exp_date, 'put')
+
+                if puts.empty:
+                    continue
 
                 # Find strikes below current but reasonable
                 target_strikes = puts[(puts['strike'] < current_strike) &
