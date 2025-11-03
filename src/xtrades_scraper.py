@@ -137,8 +137,9 @@ class XtradesScraper:
         options.add_argument('--no-sandbox')
         options.add_argument('--disable-dev-shm-usage')
         options.add_argument('--disable-blink-features=AutomationControlled')
-        options.add_experimental_option("excludeSwitches", ["enable-automation"])
-        options.add_experimental_option('useAutomationExtension', False)
+        # Commented out - incompatible with some Chrome versions
+        # options.add_experimental_option("excludeSwitches", ["enable-automation"])
+        # options.add_experimental_option('useAutomationExtension', False)
 
         # User agent
         options.add_argument(
@@ -153,7 +154,7 @@ class XtradesScraper:
 
         # Initialize driver
         try:
-            self.driver = uc.Chrome(options=options, version_main=None)
+            self.driver = uc.Chrome(options=options, use_subprocess=True, version_main=None)
             self.driver.maximize_window()
             self.wait = WebDriverWait(self.driver, 20)
 
