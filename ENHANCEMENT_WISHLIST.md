@@ -13,6 +13,7 @@
 - ✅ **Streamlit Deprecation**: Fixed `use_container_width` → `width='stretch'`
 - ✅ **Missing Logger Import**: Added to positions_page_improved.py
 - ✅ **Division by Zero**: Fixed probability calculation in option_roll_evaluator.py
+- ✅ **CSP Opportunities Broken**: Fixed schema mismatches and delta range (NOW WORKING)
 
 ### URGENT - Premium Options Flow 🔴
 1. **SQL Injection Vulnerability** (30 min) - validate_premium_flow.py:29-36
