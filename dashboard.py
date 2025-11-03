@@ -99,6 +99,8 @@ if st.sidebar.button("💼 Positions", width='stretch'):
 # Premium Scanner removed - functionality integrated into TradingView Watchlists and Database Scan
 # if st.sidebar.button("🔍 Premium Scanner", width='stretch'):
 #     st.session_state.page = "Premium Scanner"
+if st.sidebar.button("💸 Premium Options Flow", width='stretch'):
+    st.session_state.page = "Premium Options Flow"
 if st.sidebar.button("🏭 Sector Analysis", width='stretch'):
     st.session_state.page = "Sector Analysis"
 if st.sidebar.button("📊 TradingView Watchlists", width='stretch'):
@@ -1854,6 +1856,10 @@ elif page == "Settings":
 
     if st.button("💾 Save Settings", type="primary"):
         st.success("Settings saved successfully!")
+
+elif page == "Premium Options Flow":
+    from premium_flow_page import display_premium_flow_page
+    display_premium_flow_page()
 
 elif page == "Sector Analysis":
     from sector_analysis_page import display_sector_analysis_page
