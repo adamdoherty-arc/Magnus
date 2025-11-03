@@ -20,9 +20,9 @@ class CSPOpportunitiesFinder:
     def __init__(self):
         self.tv_manager = TradingViewDBManager()
         self.target_dte = 30
-        self.dte_range = (28, 32)  # 28-32 days
+        self.dte_range = (20, 40)  # 20-40 days (wider range)
         self.target_delta = -0.30  # 30 delta puts
-        self.delta_range = (-0.35, -0.25)  # 25-35 delta range
+        self.delta_range = (-0.45, -0.15)  # 15-45 delta range (wider to catch actual data)
 
     def find_opportunities_for_symbols(self, symbols: List[str]) -> pd.DataFrame:
         """
@@ -43,6 +43,8 @@ class CSPOpportunitiesFinder:
 
             # Query for best 30-day put option per symbol
             # Select option with delta closest to -0.30
+            # NOTE: Uses strike_type='30_delta' to get ~30 delta puts
+            # Also filters by negative delta to ensure puts only
             query = """
                 SELECT DISTINCT ON (sp.symbol)
                     sp.symbol,
@@ -53,7 +55,7 @@ class CSPOpportunitiesFinder:
                     sp.premium,
                     sp.delta,
                     sp.monthly_return,
-                    sp.annualized_return,
+                    sp.annual_return,
                     sp.implied_volatility as iv,
                     sp.bid,
                     sp.ask,
@@ -65,8 +67,9 @@ class CSPOpportunitiesFinder:
                 WHERE sp.symbol = ANY(%s)
                     AND sp.dte BETWEEN %s AND %s
                     AND sp.delta BETWEEN %s AND %s
+                    AND sp.delta < 0
                     AND sp.premium > 0
-                    AND sp.option_type = 'put'
+                    AND sp.strike_type = '30_delta'
                 ORDER BY sp.symbol, ABS(sp.delta - %s) ASC
             """
 
