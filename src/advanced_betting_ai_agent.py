@@ -117,24 +117,56 @@ class AdvancedBettingAIAgent:
         state = {
             'is_live': False,
             'score_differential': 0,
+            'away_score': 0,
+            'home_score': 0,
             'time_weight': 0.0,
             'period': '',
-            'momentum': 'neutral'
+            'momentum': 'neutral',
+            'leading_team': None
         }
 
-        # Handle status (could be string or None)
+        # Handle status - ESPN uses various formats
         status = str(game_data.get('status', '')).lower()
-        state['is_live'] = 'live' in status or 'in progress' in status
+        state['is_live'] = any(x in status for x in ['live', 'in progress', 'in_progress', 'active'])
 
-        # Parse score
-        score = game_data.get('score', '')
-        if score and '-' in str(score):
-            try:
-                away_score, home_score = map(int, str(score).split('-'))
-                state['score_differential'] = abs(away_score - home_score)
-                state['leading_team'] = 'away' if away_score > home_score else 'home'
-            except:
-                pass
+        # Also check for period - if there's a period/quarter, game is likely live or finished
+        period_raw = game_data.get('period', '')
+        if period_raw and period_raw not in ['', None, '0']:
+            state['is_live'] = True
+
+        # Parse score - try multiple formats
+        # Format 1: Separate away_score and home_score fields
+        away_score = game_data.get('away_score', 0)
+        home_score = game_data.get('home_score', 0)
+
+        # Format 2: Combined score string like "14-27"
+        if not away_score and not home_score:
+            score = game_data.get('score', '')
+            if score and '-' in str(score):
+                try:
+                    away_score, home_score = map(int, str(score).split('-'))
+                except:
+                    pass
+
+        # Convert to int if needed
+        try:
+            away_score = int(away_score) if away_score else 0
+            home_score = int(home_score) if home_score else 0
+        except:
+            away_score = 0
+            home_score = 0
+
+        state['away_score'] = away_score
+        state['home_score'] = home_score
+        state['score_differential'] = abs(away_score - home_score)
+
+        # Determine leading team
+        if away_score > home_score:
+            state['leading_team'] = 'away'
+        elif home_score > away_score:
+            state['leading_team'] = 'home'
+        else:
+            state['leading_team'] = None  # Tied or no score yet
 
         # Time remaining weight (higher = more certain)
         # Handle period (could be int like 1,2,3,4 or string like "1st Quarter")
@@ -216,27 +248,66 @@ class AdvancedBettingAIAgent:
             'factors': {}
         }
 
-        # Start with market odds as baseline
+        # Start with market odds as baseline (or 50/50 if no odds)
         away_prob = odds_analysis['away_implied_prob']
         home_prob = odds_analysis['home_implied_prob']
 
-        # Adjust based on game state
-        if game_state['is_live'] and game_state.get('leading_team'):
-            # Weight towards leading team based on time remaining
-            time_weight = game_state['time_weight']
-            score_diff = game_state['score_differential']
+        # If we have live game data with scores, heavily weight that
+        if game_state['is_live'] or game_state.get('leading_team'):
+            away_score = game_state.get('away_score', 0)
+            home_score = game_state.get('home_score', 0)
+            time_weight = game_state.get('time_weight', 0.5)
 
-            # More points and more time elapsed = higher probability
-            score_factor = min(score_diff / 14.0, 0.3)  # Max 30% adjustment for score
+            # If there's an actual score, calculate probability from game state
+            if away_score > 0 or home_score > 0:
+                score_diff = abs(away_score - home_score)
 
-            if game_state['leading_team'] == 'away':
-                away_prob += score_factor * time_weight
-                home_prob -= score_factor * time_weight
-            else:
-                home_prob += score_factor * time_weight
-                away_prob -= score_factor * time_weight
+                # Base probability from score differential
+                # 7 points (1 possession) = 60-65% win probability
+                # 14 points (2 possessions) = 75-80% win probability
+                # 21+ points (3+ possessions) = 85-90% win probability
+                if score_diff == 0:
+                    # Tied game
+                    base_prob = 0.5
+                elif score_diff <= 3:
+                    # Field goal difference
+                    base_prob = 0.55 + (score_diff / 30.0)  # 55-65%
+                elif score_diff <= 7:
+                    # Touchdown difference
+                    base_prob = 0.60 + (score_diff / 20.0)  # 60-70%
+                elif score_diff <= 14:
+                    # Two possession game
+                    base_prob = 0.70 + (score_diff / 30.0)  # 70-80%
+                else:
+                    # Three+ possession game
+                    base_prob = 0.80 + min((score_diff - 14) / 50.0, 0.15)  # 80-95%
 
-        # Normalize to sum to 1.0
+                # Apply time weighting - late in game = more certain
+                # Early game: pull back towards 50/50
+                # Late game: stay with score-based probability
+                away_prob_score = base_prob if away_score > home_score else (1.0 - base_prob)
+                home_prob_score = base_prob if home_score > away_score else (1.0 - base_prob)
+
+                # Blend market odds with score-based probability
+                # Early game: 70% market, 30% score
+                # Late game: 20% market, 80% score
+                market_weight = max(0.2, 1.0 - time_weight)
+                score_weight = min(0.8, time_weight)
+
+                away_prob = (away_prob * market_weight) + (away_prob_score * score_weight)
+                home_prob = (home_prob * market_weight) + (home_prob_score * score_weight)
+
+        # Normalize to sum to 1.0 and cap at reasonable limits
+        total = away_prob + home_prob
+        if total > 0:
+            away_prob /= total
+            home_prob /= total
+
+        # Cap probabilities at 95% max (nothing is 100% certain)
+        away_prob = min(0.95, max(0.05, away_prob))
+        home_prob = min(0.95, max(0.05, home_prob))
+
+        # Re-normalize after capping
         total = away_prob + home_prob
         if total > 0:
             away_prob /= total
@@ -373,13 +444,40 @@ class AdvancedBettingAIAgent:
 
         # Add specific reasoning factors
         game_state = prediction['factors_analyzed'].get('game_state', {})
+        away_team = prediction.get('away_team', 'Away')
+        home_team = prediction.get('home_team', 'Home')
 
         if game_state.get('is_live'):
-            if game_state.get('time_weight', 0) > 0.7:
-                reasoning.append(f"Late in game ({game_state.get('period')}) - high certainty")
+            away_score = game_state.get('away_score', 0)
+            home_score = game_state.get('home_score', 0)
+            period = game_state.get('period', '')
+            time_weight = game_state.get('time_weight', 0)
 
-            if game_state.get('score_differential', 0) > 10:
-                reasoning.append(f"Large score differential ({game_state['score_differential']} points)")
+            # Score-specific reasoning
+            if away_score > 0 or home_score > 0:
+                score_diff = abs(away_score - home_score)
+                leader = away_team if away_score > home_score else home_team
+
+                if score_diff == 0:
+                    reasoning.append(f"Tied game {away_score}-{home_score} in {period}")
+                elif score_diff <= 3:
+                    reasoning.append(f"{leader} leads by {score_diff} (field goal game)")
+                elif score_diff <= 7:
+                    reasoning.append(f"{leader} leads by {score_diff} (one possession)")
+                elif score_diff <= 14:
+                    reasoning.append(f"{leader} leads by {score_diff} (two possessions)")
+                else:
+                    reasoning.append(f"{leader} dominant with {score_diff}-point lead")
+
+            # Time-based reasoning
+            if time_weight > 0.9:
+                reasoning.append(f"Late {period} - result nearly certain")
+            elif time_weight > 0.7:
+                reasoning.append(f"{period} underway - momentum important")
+            elif time_weight > 0.4:
+                reasoning.append(f"Mid-game {period} - still time to change")
+            else:
+                reasoning.append("Early game - score less predictive")
 
         # Kelly Criterion insights
         if kelly_size > 0.10:
