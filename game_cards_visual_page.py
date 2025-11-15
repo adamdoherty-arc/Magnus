@@ -253,7 +253,7 @@ def show_sport_games(db, watchlist_manager, sport_filter, sport_name, llm_servic
     selected_ai_model = st.session_state.get('ai_model', 'Local AI (Fast & Free)')
 
     # ==================== ADVANCED SORTING & FILTERING ====================
-    col1, col2, col3, col4, col5, col6 = st.columns(6)
+    col1, col2, col3, col4, col5, col6, col7 = st.columns(7)
 
     with col1:
         sort_by = st.selectbox(
@@ -285,12 +285,22 @@ def show_sport_games(db, watchlist_manager, sport_filter, sport_name, llm_servic
 
     with col5:
         auto_refresh = st.checkbox(
-            "🔄 Auto (5min)",
+            "🔄 Auto",
             value=False,
-            key=f"auto_refresh_{sport_filter}"
+            key=f"auto_refresh_{sport_filter}",
+            help="Enable automatic page refresh"
         )
 
     with col6:
+        refresh_interval = st.selectbox(
+            "Interval",
+            ["30 sec", "1 min", "3 min", "5 min", "10 min", "30 min"],
+            index=3,  # Default to 5 min
+            key=f"refresh_interval_{sport_filter}",
+            help="Auto-refresh frequency"
+        )
+
+    with col7:
         cards_per_row = st.selectbox(
             "Cards/Row",
             [2, 4],
@@ -302,10 +312,20 @@ def show_sport_games(db, watchlist_manager, sport_filter, sport_name, llm_servic
     # Auto-refresh logic
     if auto_refresh:
         if AUTOREFRESH_AVAILABLE:
-            # Auto-refresh every 5 minutes (300000 ms)
-            count = st_autorefresh(interval=300000, key=f"autorefresh_{sport_filter}")
+            # Convert selected interval to milliseconds
+            interval_map = {
+                "30 sec": 30000,
+                "1 min": 60000,
+                "3 min": 180000,
+                "5 min": 300000,
+                "10 min": 600000,
+                "30 min": 1800000
+            }
+            interval_ms = interval_map.get(refresh_interval, 300000)
+
+            count = st_autorefresh(interval=interval_ms, key=f"autorefresh_{sport_filter}")
             if count > 0:
-                st.info(f"🔄 Auto-refreshed {count} times • Last refresh: {datetime.now().strftime('%H:%M:%S')}")
+                st.info(f"🔄 Auto-refreshed {count} times ({refresh_interval}) • Last refresh: {datetime.now().strftime('%H:%M:%S')}")
         else:
             st.warning("⚠️ Auto-refresh requires: `pip install streamlit-autorefresh`")
 
