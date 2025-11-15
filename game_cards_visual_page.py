@@ -18,6 +18,9 @@ from src.espn_ncaa_live_data import get_espn_ncaa_client
 from src.ncaa_team_database import NCAA_LOGOS, get_team_logo_url, find_team_by_name
 from src.game_watchlist_manager import GameWatchlistManager
 
+# Initialize logger first
+logger = logging.getLogger(__name__)
+
 # Optional auto-refresh (graceful degradation if not installed)
 try:
     from streamlit_autorefresh import st_autorefresh
@@ -25,8 +28,6 @@ try:
 except ImportError:
     AUTOREFRESH_AVAILABLE = False
     logger.warning("streamlit-autorefresh not installed. Auto-refresh feature disabled.")
-
-logger = logging.getLogger(__name__)
 
 # NFL Team Logo URLs (ESPN)
 TEAM_LOGOS = {
