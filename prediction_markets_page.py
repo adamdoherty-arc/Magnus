@@ -6,8 +6,8 @@ Displays prediction markets from Kalshi with quantitative scoring
 import streamlit as st
 import pandas as pd
 from datetime import datetime
-from src.kalshi_integration import KalshiIntegration
-from src.prediction_market_analyzer import PredictionMarketAnalyzer
+from src.kalshi_db_manager import KalshiDBManager
+from src.kalshi_ai_evaluator import KalshiAIEvaluator
 
 def show_prediction_markets():
     """Main function to display prediction markets page"""
@@ -16,8 +16,8 @@ def show_prediction_markets():
     st.caption("AI-powered event contract opportunities from Kalshi")
 
     # Initialize integrations
-    kalshi = KalshiIntegration()
-    analyzer = PredictionMarketAnalyzer()
+    db = KalshiDBManager()
+    evaluator = KalshiAIEvaluator()
 
     # Filters in sidebar-style columns
     col1, col2, col3, col4 = st.columns([2, 1, 1, 1])
@@ -40,13 +40,17 @@ def show_prediction_markets():
             st.cache_data.clear()
             st.rerun()
 
-    # Fetch and analyze markets
-    with st.spinner("Fetching markets from Kalshi..."):
-        markets = fetch_and_score_markets(kalshi, analyzer, category_filter, limit=50)
+    # Fetch and analyze markets from database
+    with st.spinner("Loading markets from database..."):
+        markets = fetch_and_score_markets(db, evaluator, category_filter, limit=50)
 
     if not markets:
-        st.warning("No markets found. Kalshi API may be unavailable or rate-limited.")
-        st.info("💡 Try again in a few moments. Kalshi allows 100 requests per minute.")
+        st.warning("No markets found in database.")
+        st.info("💡 Run the sync script to pull NFL markets: `python pull_nfl_games.py`")
+
+        # Show database stats
+        stats = db.get_stats()
+        st.write(f"**Database Status:** {stats.get('total_markets', 0)} total markets, {stats.get('active_markets', 0)} active")
         return
 
     # Filter by score and days
@@ -81,32 +85,127 @@ def show_prediction_markets():
     for market in filtered_markets[:20]:  # Show top 20
         display_market_card(market)
 
-@st.cache_data(ttl=3600)  # Cache for 1 hour to avoid rate limiting
-def fetch_and_score_markets(_kalshi, _analyzer, category, limit=50):
-    """Fetch markets from Kalshi and score them"""
+@st.cache_data(ttl=300)  # Cache for 5 minutes
+def fetch_and_score_markets(_db, _evaluator, category, limit=50):
+    """Fetch markets from database with AI predictions"""
     try:
-        # Fetch markets
-        if category == "All":
-            markets = _kalshi.get_enriched_markets(limit=limit)
-        else:
-            markets = _kalshi.get_markets_by_category(category, limit=limit)
+        # Fetch markets with predictions from database
+        market_type = None
+        if category == "Sports":
+            market_type = "nfl"  # We only have NFL for now
 
-        # Score each market
+        # Get markets with predictions (already scored by AI)
+        markets_with_predictions = _db.get_top_opportunities(limit=limit)
+
+        if markets_with_predictions:
+            # Convert to format expected by display
+            scored_markets = []
+            for m in markets_with_predictions:
+                scored_market = {
+                    'ticker': m.get('ticker', ''),
+                    'title': m.get('title', ''),
+                    'category': 'Sports' if m.get('market_type') == 'nfl' else 'Other',
+                    'yes_price': float(m.get('yes_price', 0)) if m.get('yes_price') else 0,
+                    'no_price': float(m.get('no_price', 0)) if m.get('no_price') else 0,
+                    'volume_24h': float(m.get('volume', 0)) if m.get('volume') else 0,
+                    'days_to_close': calculate_days_to_close(m.get('close_time')),
+                    'ai_score': float(m.get('confidence_score', 0)) if m.get('confidence_score') else 0,
+                    'ai_reasoning': m.get('reasoning', 'No analysis available'),
+                    'recommended_position': m.get('recommended_action', 'pass').upper(),
+                    'risk_level': get_risk_level(m.get('confidence_score', 0)),
+                    'expected_value': float(m.get('edge_percentage', 0)) if m.get('edge_percentage') else 0,
+                    'bid_ask_spread': 0,  # Not available in current data
+                    'close_date': m.get('close_time', ''),
+                    'description': m.get('title', '')
+                }
+                scored_markets.append(scored_market)
+            return scored_markets
+
+        # If no predictions, get raw markets and analyze them
+        active_markets = _db.get_active_markets(market_type=market_type)
+
+        if not active_markets:
+            return []
+
+        # Generate predictions if needed
+        predictions = _evaluator.evaluate_markets(active_markets[:limit])
+
+        # Store predictions in database
+        if predictions:
+            _db.store_predictions(predictions)
+
+        # Convert to display format
         scored_markets = []
-        for market in markets:
-            try:
-                analysis = _analyzer.analyze_market(market)
-                market.update(analysis)
-                scored_markets.append(market)
-            except Exception as e:
-                print(f"Error scoring market {market.get('ticker')}: {e}")
-                continue
+        for i, pred in enumerate(predictions):
+            market = active_markets[i] if i < len(active_markets) else {}
+            scored_market = {
+                'ticker': pred.get('ticker', ''),
+                'title': market.get('title', ''),
+                'category': 'Sports',
+                'yes_price': float(market.get('yes_price', 0)) if market.get('yes_price') else 0,
+                'no_price': float(market.get('no_price', 0)) if market.get('no_price') else 0,
+                'volume_24h': float(market.get('volume', 0)) if market.get('volume') else 0,
+                'days_to_close': calculate_days_to_close(market.get('close_time')),
+                'ai_score': float(pred.get('confidence_score', 0)),
+                'ai_reasoning': pred.get('reasoning', ''),
+                'recommended_position': pred.get('recommended_action', 'pass').upper(),
+                'risk_level': get_risk_level(pred.get('confidence_score', 0)),
+                'expected_value': float(pred.get('edge_percentage', 0)),
+                'bid_ask_spread': 0,
+                'close_date': market.get('close_time', ''),
+                'description': market.get('title', '')
+            }
+            scored_markets.append(scored_market)
 
         return scored_markets
 
     except Exception as e:
         st.error(f"Error fetching markets: {e}")
+        import traceback
+        st.code(traceback.format_exc())
         return []
+
+def calculate_days_to_close(close_time):
+    """Calculate days until market closes"""
+    if not close_time:
+        return 0
+    try:
+        from datetime import datetime, timezone
+        import re
+
+        if isinstance(close_time, str):
+            # Fix timezone format: -05 -> -05:00
+            close_time_fixed = re.sub(r'([-+]\d{2})$', r'\1:00', close_time)
+            # Also handle Z suffix
+            close_time_fixed = close_time_fixed.replace('Z', '+00:00')
+            close_dt = datetime.fromisoformat(close_time_fixed)
+        else:
+            close_dt = close_time
+
+        # Convert to UTC for consistent calculation
+        if close_dt.tzinfo is not None:
+            close_dt_utc = close_dt.astimezone(timezone.utc)
+        else:
+            close_dt_utc = close_dt.replace(tzinfo=timezone.utc)
+
+        now_utc = datetime.now(timezone.utc)
+        delta = (close_dt_utc - now_utc).total_seconds() / 86400  # Convert to days
+        return max(0, int(delta))
+    except Exception as e:
+        # Log error for debugging
+        import traceback
+        print(f"Error parsing close_time '{close_time}': {e}")
+        traceback.print_exc()
+        return 0
+
+def get_risk_level(confidence):
+    """Get risk level based on confidence score"""
+    if confidence >= 80:
+        return "Low"
+    elif confidence >= 60:
+        return "Medium"
+    else:
+        return "High"
 
 def display_market_card(market):
     """Display a single market opportunity card"""

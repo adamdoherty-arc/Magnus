@@ -1,4 +1,4 @@
-"""Magnus - Advanced Options Trading Platform"""
+"""AVA - Advanced Options Trading Platform"""
 
 import streamlit as st
 import pandas as pd
@@ -13,6 +13,10 @@ import asyncio
 import os
 import time
 from typing import List, Dict, Any
+from dotenv import load_dotenv
+
+# Load environment variables at the very start
+load_dotenv()
 
 # Import agents
 from src.agents.runtime.market_data_agent import MarketDataAgent
@@ -25,10 +29,13 @@ from src.tradingview_db_manager import TradingViewDBManager
 # Import safe yfinance utilities
 from src.yfinance_utils import safe_get_info, safe_get_current_price
 
+# Import Omnipresent AVA - Enhanced Version with Intelligent Question-Asking
+from src.ava.omnipresent_ava_enhanced import show_enhanced_ava as show_omnipresent_ava
+
 # Page config
 st.set_page_config(
-    page_title="Magnus Trading Platform",
-    page_icon="⚡",
+    page_title="AVA Trading Platform",
+    page_icon="🤖",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -59,6 +66,63 @@ st.markdown("""
         background-color: #f8d7da;
         border: 1px solid #f5c6cb;
     }
+
+    /* Clean sidebar navigation - extremely compact */
+    section[data-testid="stSidebar"] .stButton button {
+        background-color: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+        padding: 0rem 0.3rem !important;
+        margin: 0 !important;
+        text-align: left !important;
+        width: 100% !important;
+        font-size: 0.7rem !important;
+        line-height: 0.75 !important;
+        height: auto !important;
+        min-height: 0 !important;
+        transition: all 0.2s ease;
+    }
+
+    section[data-testid="stSidebar"] .stButton button:hover {
+        background-color: rgba(151, 166, 195, 0.45) !important;
+        border-left: 8px solid #667eea !important;
+        border-right: 3px solid #667eea !important;
+        padding: 0.25rem 0.5rem !important;
+        padding-left: 0.7rem !important;
+        margin-left: -3px !important;
+        transform: translateX(3px) scale(1.02);
+        box-shadow: 0 4px 8px rgba(102, 126, 234, 0.3) !important;
+    }
+
+    section[data-testid="stSidebar"] .element-container {
+        margin: 0 !important;
+        padding: 0 !important;
+        gap: 0 !important;
+    }
+
+    section[data-testid="stSidebar"] {
+        padding-top: 0.1rem;
+    }
+
+    /* Extremely tight section headers in sidebar */
+    section[data-testid="stSidebar"] .stMarkdown h3 {
+        margin-top: 0.1rem !important;
+        margin-bottom: 0rem !important;
+        padding: 0 !important;
+        font-size: 0.7rem !important;
+        line-height: 0.8 !important;
+    }
+
+    /* Remove extra spacing between buttons */
+    section[data-testid="stSidebar"] [data-testid="column"] > div {
+        gap: 0 !important;
+    }
+
+    /* Remove all spacing from dividers */
+    section[data-testid="stSidebar"] hr {
+        margin: 0rem !important;
+        padding: 0rem !important;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -84,21 +148,32 @@ def init_agents():
 
 market_agent, strategy_agent, risk_agent = init_agents()
 
-# Sidebar
-st.sidebar.title("⚡ Magnus")
+# Sidebar - Add prominent AVA Platform header at very top (compact)
+st.sidebar.markdown("""
+<div style="
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    padding: 4px;
+    border-radius: 6px;
+    margin-bottom: 10px;
+    text-align: center;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+">
+    <h1 style="color: white; margin: 0; font-size: 12px; font-weight: 700;">
+        🤖 AVA PLATFORM
+    </h1>
+</div>
+""", unsafe_allow_html=True)
 
 # Navigation as buttons/links
 if "page" not in st.session_state:
     st.session_state.page = "Dashboard"
 
-# Navigation buttons
+# ==================== FINANCE ====================
+st.sidebar.markdown("### 💰 Finance")
 if st.sidebar.button("📈 Dashboard", width='stretch'):
     st.session_state.page = "Dashboard"
 if st.sidebar.button("💼 Positions", width='stretch'):
     st.session_state.page = "Positions"
-# Premium Scanner removed - functionality integrated into TradingView Watchlists and Database Scan
-# if st.sidebar.button("🔍 Premium Scanner", width='stretch'):
-#     st.session_state.page = "Premium Scanner"
 if st.sidebar.button("💸 Premium Options Flow", width='stretch'):
     st.session_state.page = "Premium Options Flow"
 if st.sidebar.button("🏭 Sector Analysis", width='stretch'):
@@ -109,17 +184,41 @@ if st.sidebar.button("🗄️ Database Scan", width='stretch'):
     st.session_state.page = "Database Scan"
 if st.sidebar.button("📅 Earnings Calendar", width='stretch'):
     st.session_state.page = "Earnings Calendar"
-# Calendar Spreads moved to TradingView Watchlists page
-# if st.sidebar.button("📆 Calendar Spreads", width='stretch'):
-#     st.session_state.page = "Calendar Spreads"
 if st.sidebar.button("📱 Xtrades Watchlists", width='stretch'):
     st.session_state.page = "Xtrades Watchlists"
-if st.sidebar.button("🎲 Prediction Markets", width='stretch'):
+if st.sidebar.button("📊 Supply/Demand Zones", width='stretch'):
+    st.session_state.page = "Supply/Demand Zones"
+if st.sidebar.button("🎯 Options Analysis", width='stretch'):
+    st.session_state.page = "Options Analysis"
+# Keep original pages for functionality verification
+if st.sidebar.button("🤖 AI Options Agent", width='stretch'):
+    st.session_state.page = "AI Options Agent"
+if st.sidebar.button("🎯 Comprehensive Strategy Analysis", width='stretch'):
+    st.session_state.page = "Comprehensive Strategy Analysis"
+
+st.sidebar.markdown("---")
+
+# ==================== PREDICTION MARKETS ====================
+st.sidebar.markdown("### 🎲 Prediction Markets")
+if st.sidebar.button("🎯 AI Sports Predictions", width='stretch'):
+    st.session_state.page = "AI Sports Predictions"
+if st.sidebar.button("🎲 Kalshi Markets", width='stretch'):
     st.session_state.page = "Prediction Markets"
+if st.sidebar.button("🏈 Game-by-Game Analysis", width='stretch'):
+    st.session_state.page = "Game-by-Game Analysis"
+if st.sidebar.button("🏟️ Sports Game Cards", width='stretch'):
+    st.session_state.page = "Sports Game Cards"
+
+st.sidebar.markdown("---")
+
+# ==================== AVA MANAGEMENT ====================
+st.sidebar.markdown("### 🤖 AVA Management")
 if st.sidebar.button("⚙️ Settings", width='stretch'):
     st.session_state.page = "Settings"
 if st.sidebar.button("🔧 Enhancement Agent", width='stretch'):
     st.session_state.page = "Enhancement Agent"
+if st.sidebar.button("🚀 Enhancement Manager", width='stretch'):
+    st.session_state.page = "Enhancement Manager"
 
 page = st.session_state.page
 
@@ -131,9 +230,12 @@ min_premium = 1.0
 profit_target = 50
 watchlist = []
 
+# Show Omnipresent AVA at top of all pages
+show_omnipresent_ava()
+
 # Main content based on page selection
 if page == "Dashboard":
-    st.title("💰 Magnus Performance & Forecasts")
+    st.title("💰 AVA Performance & Forecasts")
 
     # Get account data and positions if connected
     account_data = {}
@@ -1177,8 +1279,39 @@ elif page == "Database Scan":
     st.markdown("Scan PostgreSQL database for stocks and analyze option premiums")
 
     from src.database_scanner import DatabaseScanner
+    import pytz
 
     scanner = DatabaseScanner()
+
+    # Auto-update DATABASE stocks (separate from TradingView)
+    # Runs AFTER market opens to get fresh options data
+    et_tz = pytz.timezone('America/New_York')
+    current_time_et = datetime.now(et_tz)
+    market_open_time = current_time_et.replace(hour=9, minute=30, second=0, microsecond=0)
+    sync_start_time = current_time_et.replace(hour=10, minute=0, second=0, microsecond=0)  # 10 AM ET
+
+    # Check if we need daily database sync
+    last_db_sync_date = st.session_state.get('last_db_options_sync_date')
+    today = current_time_et.date()
+
+    # Auto-sync options data AFTER market opens (10 AM ET) if not done today
+    if last_db_sync_date != today and current_time_et >= sync_start_time:
+        st.info("🔄 Starting daily premium sync (after market open)...")
+        st.info("⏱️ Syncing 30-day options premiums for ALL database stocks. Takes 3-5 minutes.")
+
+        # Start background sync process
+        import subprocess
+        try:
+            # Launch background sync script
+            subprocess.Popen(
+                ["python", "sync_database_stocks_daily.py"],
+                creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0
+            )
+            st.session_state['last_db_options_sync_date'] = today
+            st.session_state['db_sync_start_time'] = datetime.now()
+            st.success("✅ Daily database options sync started in background!")
+        except Exception as e:
+            st.warning(f"Could not start background sync: {e}")
 
     # Create tabs - NOW WITH PREMIUM SCANNER, CALENDAR SPREADS & AI RESEARCH
     tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
@@ -1192,6 +1325,17 @@ elif page == "Database Scan":
 
     with tab1:
         st.subheader("Database Overview")
+
+        # Show last update time
+        if 'last_db_update_time' in st.session_state:
+            time_since = (datetime.now() - st.session_state['last_db_update_time']).seconds // 60
+            if time_since < 60:
+                st.info(f"📅 Prices last updated: {time_since} minutes ago")
+            else:
+                hours_since = time_since // 60
+                st.info(f"📅 Prices last updated: {hours_since} hours ago")
+        else:
+            st.warning("⚠️ Prices have not been updated today. Click 'Update All Prices' below or wait for pre-market auto-update.")
 
         if scanner.connect():
             try:
@@ -1270,18 +1414,11 @@ elif page == "Database Scan":
                             st.warning("No displayable columns found in stocks data")
                             st.json(stocks[0] if stocks else {})
 
-                    # Update prices button
+                    # Refresh view button
                     st.markdown("---")
-                    col_btn1, col_btn2 = st.columns(2)
-                    with col_btn1:
-                        if st.button("🔄 Update All Prices", type="primary"):
-                            with st.spinner("Updating prices..."):
-                                updated = scanner.update_stock_prices()
-                                st.success(f"Updated {updated} stock prices")
-                                st.rerun()
-                    with col_btn2:
-                        if st.button("🔄 Refresh View"):
-                            st.rerun()
+                    st.info("💡 Stock prices update automatically during daily premium sync at 10 AM ET. Manual sync available in Premium Scanner tab.")
+                    if st.button("🔄 Refresh View", type="primary"):
+                        st.rerun()
                 else:
                     st.warning("No stocks in database yet")
                     st.info("👉 Go to 'Add Stocks' tab to add symbols to the database")
@@ -1336,19 +1473,149 @@ elif page == "Database Scan":
         st.subheader("🔍 Premium Scanner")
         st.caption("Advanced premium scanning for all database stocks - filter and sort to find best opportunities")
 
-        # Info section
-        st.info("💡 Scanning all stocks from database that have options data. Use TradingView Watchlists → Auto-Sync to add more stocks.")
+        # Show last update time and stock count info
+        col_info1, col_info2 = st.columns([3, 1])
+        with col_info1:
+            # Get count of stocks with options data
+            from src.tradingview_db_manager import TradingViewDBManager
+            tv_manager_temp = TradingViewDBManager()
+            conn_temp = tv_manager_temp.get_connection()
+            cur_temp = conn_temp.cursor()
+            cur_temp.execute("SELECT COUNT(*) FROM stocks")
+            total_in_db = cur_temp.fetchone()[0]
+            cur_temp.execute("SELECT COUNT(DISTINCT symbol) FROM stock_premiums")
+            with_options = cur_temp.fetchone()[0]
+            cur_temp.close()
+            conn_temp.close()
 
-        # Filters
-        col_f1, col_f2, col_f3, col_f4 = st.columns(4)
+            if 'last_db_options_sync_date' in st.session_state:
+                st.info(f"💡 Showing {with_options} of {total_in_db} database stocks. 30-day premiums sync daily at 10 AM ET.")
+            else:
+                st.warning(f"⚠️ Showing {with_options} of {total_in_db} database stocks. Daily premium sync runs at 10 AM ET. Click 'Sync Now' for immediate sync.")
+        with col_info2:
+            if 'last_db_update_time' in st.session_state:
+                time_since = (datetime.now() - st.session_state['last_db_update_time']).seconds // 60
+                if time_since < 60:
+                    st.success(f"📅 Updated {time_since}m ago")
+                else:
+                    hours_since = time_since // 60
+                    st.warning(f"📅 Updated {hours_since}h ago")
+            else:
+                st.warning("⚠️ Not updated today")
+
+        # Manual sync button
+        col_sync1, col_sync2 = st.columns([1, 4])
+        with col_sync1:
+            if st.button("🔄 Sync Now", type="primary", help="Manually trigger options data sync for all database stocks", key="manual_db_sync"):
+                st.info("⏱️ Starting background sync for all database stocks...")
+                import subprocess
+                try:
+                    subprocess.Popen(
+                        ["python", "sync_database_stocks_daily.py"],
+                        creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0
+                    )
+                    st.session_state['last_db_options_sync_date'] = datetime.now(pytz.timezone('America/New_York')).date()
+                    st.session_state['db_sync_start_time'] = datetime.now()
+                    st.session_state['show_sync_progress'] = True
+                    st.success("✅ Sync started in background! Monitor progress below.")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Error starting sync: {e}")
+        with col_sync2:
+            if 'db_sync_start_time' in st.session_state:
+                minutes_ago = (datetime.now() - st.session_state['db_sync_start_time']).seconds // 60
+                st.caption(f"Last sync started: {minutes_ago} minutes ago")
+
+        # Show real-time progress if sync is running
+        if st.session_state.get('show_sync_progress', False):
+            import json
+            import os
+
+            progress_file = 'database_sync_progress.json'
+
+            if os.path.exists(progress_file):
+                try:
+                    with open(progress_file, 'r') as f:
+                        progress = json.load(f)
+
+                    # Check if sync is still active (updated within last 10 seconds)
+                    from datetime import datetime
+                    last_update = datetime.fromisoformat(progress['last_updated'])
+                    seconds_since_update = (datetime.now() - last_update).total_seconds()
+
+                    if seconds_since_update < 30:  # Still active
+                        st.markdown("### 🔄 Sync Progress")
+
+                        # Progress bar
+                        progress_bar = st.progress(progress['percent'] / 100)
+
+                        # Stats
+                        col1, col2, col3, col4 = st.columns(4)
+                        with col1:
+                            st.metric("Progress", f"{progress['current']}/{progress['total']}")
+                        with col2:
+                            st.metric("Complete", f"{progress['percent']:.1f}%")
+                        with col3:
+                            elapsed_min = progress['elapsed_seconds'] // 60
+                            elapsed_sec = progress['elapsed_seconds'] % 60
+                            st.metric("Elapsed", f"{elapsed_min}m {elapsed_sec}s")
+                        with col4:
+                            remaining_min = progress['remaining_seconds'] // 60
+                            remaining_sec = progress['remaining_seconds'] % 60
+                            st.metric("Remaining", f"{remaining_min}m {remaining_sec}s")
+
+                        st.caption(f"Current: {progress['current_symbol']} | Rate: {progress['rate_per_second']} stocks/sec")
+
+                        # Auto-refresh button
+                        if st.button("🔄 Refresh Progress", key="refresh_progress"):
+                            st.rerun()
+
+                        st.info("💡 Page will auto-refresh progress. Click 'Refresh Progress' for latest status.")
+
+                    else:
+                        # Sync completed or stopped
+                        if progress.get('completed', False):
+                            st.markdown("### ✅ Sync Complete!")
+                            col1, col2, col3 = st.columns(3)
+                            with col1:
+                                st.metric("Total Stocks", progress['total'])
+                            with col2:
+                                st.metric("Successfully Synced", progress.get('stats', {}).get('successful', 0))
+                            with col3:
+                                st.metric("Failed/No Options", progress.get('stats', {}).get('failed', 0))
+
+                            duration_min = progress['elapsed_seconds'] // 60
+                            duration_sec = progress['elapsed_seconds'] % 60
+                            st.success(f"✅ Completed in {duration_min}m {duration_sec}s. Refresh page to see {progress.get('stats', {}).get('successful', 0)} stocks with fresh options data!")
+
+                            if st.button("🔄 Refresh Dashboard", key="refresh_after_sync"):
+                                st.session_state['show_sync_progress'] = False
+                                st.rerun()
+                        else:
+                            st.info("⏳ Sync may have stopped. Check database_sync.log for details.")
+                            st.session_state['show_sync_progress'] = False
+
+                except Exception as e:
+                    st.warning(f"Could not read progress: {e}")
+            else:
+                st.info("⏳ Waiting for sync to start... Click 'Refresh Progress' below to check status.")
+                # Manual refresh button instead of automatic rerun
+                if st.button("🔄 Refresh Progress", key="refresh_progress_waiting"):
+                    st.rerun()
+
+        st.markdown("---")
+
+        # Filters (30-day options only)
+        col_f1, col_f2, col_f3 = st.columns(3)
         with col_f1:
             min_stock_price = st.number_input("Min Stock Price ($)", value=0.0, min_value=0.0, step=10.0, key="db_min_stock")
         with col_f2:
             max_stock_price = st.number_input("Max Stock Price ($)", value=10000.0, min_value=10.0, step=50.0, key="db_max_stock")
         with col_f3:
             min_premium = st.number_input("Min Premium ($)", value=0.0, min_value=0.0, step=1.0, key="db_min_prem")
-        with col_f4:
-            dte_filter = st.selectbox("DTE", [31, 24, 17, 10, 38, 52], index=0, key="db_dte")
+
+        # Fixed at 30-day options
+        dte_filter = 30
 
         # Query stock_premiums table for ALL stocks with options
         from src.tradingview_db_manager import TradingViewDBManager
@@ -1380,6 +1647,7 @@ elif page == "Database Scan":
                 AND ABS(sp.delta) BETWEEN 0.25 AND 0.40
                 AND sp.premium >= %s
                 AND (sd.current_price BETWEEN %s AND %s OR sd.current_price IS NULL)
+                AND sp.strike_price < sd.current_price
             ORDER BY sp.symbol, sp.monthly_return DESC
         """
 
@@ -1414,7 +1682,7 @@ elif page == "Database Scan":
                 st.metric("Unique Stocks", df['Symbol'].nunique())
 
             # Display sortable table
-            st.markdown(f"#### 📊 All Stocks with ~{dte_filter}-Day Options (Click headers to sort)")
+            st.markdown("#### 📊 All Stocks with 30-Day Options (Click headers to sort)")
             st.dataframe(
                 df,
                 hide_index=True,
@@ -1437,8 +1705,8 @@ elif page == "Database Scan":
                 }
             )
         else:
-            st.warning(f"No options found for {dte_filter}-day expiration with current filters")
-            st.info("Only 89 of 1,205 stocks have options data synced. Use the TradingView Watchlists → Auto-Sync to sync more stocks.")
+            st.warning("No options found for 30-day expiration with current filters")
+            st.info("Run the premium sync to populate database with 30-day options for all stocks.")
 
         # AI Research Integration for Premium Scanner results
         if rows:
@@ -1767,9 +2035,43 @@ elif page == "Xtrades Watchlists":
     from xtrades_watchlists_page import show_xtrades_page
     show_xtrades_page()
 
+elif page == "AI Sports Predictions":
+    from prediction_markets_enhanced import show_prediction_markets_enhanced
+    show_prediction_markets_enhanced()
+
 elif page == "Prediction Markets":
     from prediction_markets_page import show_prediction_markets
     show_prediction_markets()
+
+elif page == "Game-by-Game Analysis":
+    from game_by_game_analysis_page import show_game_by_game
+    show_game_by_game()
+
+elif page == "Sports Game Cards":
+    from game_cards_visual_page import show_game_cards
+    show_game_cards()
+
+elif page == "Supply/Demand Zones":
+    from supply_demand_zones_page import show_supply_demand_zones
+    show_supply_demand_zones()
+
+elif page == "Options Analysis":
+    # Unified Options Analysis page (combines AI Options Agent + Comprehensive Strategy)
+    from options_analysis_page import render_options_analysis_page
+    render_options_analysis_page()
+
+# Old pages kept for backwards compatibility (can be removed later)
+elif page == "AI Options Agent":
+    from ai_options_agent_page import render_ai_options_agent_page
+    render_ai_options_agent_page()
+
+elif page == "AVA Chatbot":
+    from ava_chatbot_page import show_ava_chatbot_page
+    show_ava_chatbot_page()
+
+elif page == "Comprehensive Strategy Analysis":
+    from comprehensive_strategy_page import render_comprehensive_strategy_page
+    render_comprehensive_strategy_page()
 
 elif page == "Settings":
     st.title("⚙️ Settings")
@@ -1869,6 +2171,10 @@ elif page == "Enhancement Agent":
     from enhancement_agent_page import show_enhancement_agent
     show_enhancement_agent()
 
+elif page == "Enhancement Manager":
+    from enhancement_manager_page import render_enhancement_manager_page
+    render_enhancement_manager_page()
+
 # Footer
 st.markdown("---")
 st.markdown(
@@ -1877,3 +2183,4 @@ st.markdown(
     datetime.now().strftime("%Y-%m-%d %H:%M:%S") + "</div>",
     unsafe_allow_html=True
 )
+

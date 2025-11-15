@@ -155,17 +155,26 @@ class XtradesScraper:
         # Initialize driver
         try:
             self.driver = uc.Chrome(options=options, use_subprocess=True, version_main=None)
-            self.driver.maximize_window()
+
+            # Try to maximize window, but don't fail if it doesn't work
+            try:
+                self.driver.maximize_window()
+            except Exception as window_error:
+                print(f"Warning: Could not maximize window: {window_error}")
+
             self.wait = WebDriverWait(self.driver, 20)
 
             # Remove webdriver flag
-            self.driver.execute_cdp_cmd('Page.addScriptToEvaluateOnNewDocument', {
-                'source': '''
-                    Object.defineProperty(navigator, 'webdriver', {
-                        get: () => undefined
-                    })
-                '''
-            })
+            try:
+                self.driver.execute_cdp_cmd('Page.addScriptToEvaluateOnNewDocument', {
+                    'source': '''
+                        Object.defineProperty(navigator, 'webdriver', {
+                            get: () => undefined
+                        })
+                    '''
+                })
+            except Exception as cdp_error:
+                print(f"Warning: Could not execute CDP command: {cdp_error}")
 
             print("Chrome driver initialized successfully")
 
@@ -219,7 +228,23 @@ class XtradesScraper:
             self.driver.get(self.BASE_URL)
             time.sleep(3)
 
-            # Check for user profile elements or dashboard
+            # First check: Look for "Sign in" or "Sign up" buttons (NOT logged in)
+            page_source = self.driver.page_source
+            if 'Sign in' in page_source or 'Sign up' in page_source:
+                # Double-check with button elements
+                try:
+                    sign_in_buttons = self.driver.find_elements(By.XPATH, "//button[contains(text(), 'Sign in')] | //ion-button[contains(text(), 'Sign in')]")
+                    if sign_in_buttons:
+                        return False
+                except:
+                    pass
+
+            # Check if we're on login page
+            current_url = self.driver.current_url.lower()
+            if 'login' in current_url or 'auth' in current_url:
+                return False
+
+            # Check for user profile elements or dashboard (logged in)
             indicators = [
                 (By.CSS_SELECTOR, "[class*='profile']"),
                 (By.CSS_SELECTOR, "[class*='user']"),
@@ -235,11 +260,6 @@ class XtradesScraper:
                     return True
                 except NoSuchElementException:
                     continue
-
-            # Check if we're on login page
-            current_url = self.driver.current_url.lower()
-            if 'login' in current_url:
-                return False
 
             return False
 
@@ -417,7 +437,7 @@ class XtradesScraper:
         max_alerts: Optional[int] = None
     ) -> List[Dict]:
         """
-        Get trade alerts from a profile page.
+        Get trade alerts from a profile alerts tab.
 
         Args:
             username: Xtrades.net username to scrape
@@ -430,22 +450,79 @@ class XtradesScraper:
             ProfileNotFoundException: If profile doesn't exist
             XtradesScraperException: For other errors
         """
+        # Navigate to the profile page first
         profile_url = f"{self.BASE_URL}/profile/{username}"
 
         try:
-            print(f"\nNavigating to profile: {username}")
+            print(f"\nNavigating to profile page: {username}")
             self.driver.get(profile_url)
-            time.sleep(3)
+            time.sleep(4)
 
-            # Check for 404 or profile not found
+            # Check if profile exists
             if "404" in self.driver.title or "not found" in self.driver.page_source.lower():
                 raise ProfileNotFoundException(f"Profile '{username}' not found")
+
+            # Try multiple methods to find and click the Alerts tab
+            alerts_tab_clicked = False
+
+            # Method 1: Look for tab/button with "Alerts" text
+            selectors_to_try = [
+                "//button[contains(translate(., 'ALERTS', 'alerts'), 'alerts')]",
+                "//a[contains(translate(., 'ALERTS', 'alerts'), 'alerts')]",
+                "//div[@role='tab' and contains(translate(., 'ALERTS', 'alerts'), 'alerts')]",
+                "//*[contains(@class, 'tab') and contains(translate(., 'ALERTS', 'alerts'), 'alerts')]",
+                "//*[contains(@role, 'tab') and contains(text(), 'Alerts')]",
+                "//nav//a[contains(text(), 'Alerts')]",
+                "//nav//button[contains(text(), 'Alerts')]",
+            ]
+
+            for selector in selectors_to_try:
+                try:
+                    alerts_tab = self.driver.find_element(By.XPATH, selector)
+                    alerts_tab.click()
+                    time.sleep(3)
+                    print(f"Clicked Alerts tab using selector: {selector[:50]}...")
+                    alerts_tab_clicked = True
+                    break
+                except:
+                    continue
+
+            if not alerts_tab_clicked:
+                print("Warning: Could not find Alerts tab, attempting direct URL")
+                # Try direct /alerts URL
+                alerts_url = f"{self.BASE_URL}/profile/{username}/alerts"
+                self.driver.get(alerts_url)
+                time.sleep(3)
+
+                # If still not on alerts, scrape from current page
+                if "404" in self.driver.title:
+                    print("Alerts URL not valid, scraping from profile page")
+                    self.driver.get(profile_url)
+                    time.sleep(2)
+
+            # Wait for alerts to load (Angular dynamic content)
+            print("Waiting for alerts to load...")
+            time.sleep(5)  # Give Angular time to fetch and render alerts
 
             # Scroll to load more content
             self._scroll_page()
 
+            # Wait a bit more after scrolling
+            time.sleep(2)
+
             # Get page source and parse
-            soup = BeautifulSoup(self.driver.page_source, 'html.parser')
+            page_source = self.driver.page_source
+            soup = BeautifulSoup(page_source, 'html.parser')
+
+            # Debug: Save page HTML for inspection (only in non-headless mode)
+            if not self.headless:
+                try:
+                    debug_file = self.cache_dir / f"debug_{username}_page.html"
+                    with open(debug_file, 'w', encoding='utf-8') as f:
+                        f.write(page_source)
+                    print(f"Debug: Saved page HTML to {debug_file}")
+                except Exception as e:
+                    print(f"Warning: Could not save debug HTML: {e}")
 
             # Find alerts
             alerts = self._find_alert_elements(soup)
@@ -479,17 +556,74 @@ class XtradesScraper:
         except Exception as e:
             raise XtradesScraperException(f"Error getting profile alerts: {e}")
 
-    def _scroll_page(self, scroll_pause: float = 1.0, num_scrolls: int = 3) -> None:
-        """Scroll page to load dynamic content"""
+    def _scroll_page(self, scroll_pause: float = 1.5, max_scrolls: int = 100) -> int:
+        """
+        Scroll page to load ALL dynamic content using aggressive infinite scroll.
+
+        Continues scrolling until no new content loads for 3 consecutive attempts.
+        This ensures we get the full alert history, not just the first few posts.
+
+        Args:
+            scroll_pause: Seconds to wait after each scroll
+            max_scrolls: Maximum scrolls to prevent infinite loops
+
+        Returns:
+            Number of scrolls performed
+        """
         try:
-            for i in range(num_scrolls):
-                self.driver.execute_script(
-                    "window.scrollTo(0, document.body.scrollHeight);"
-                )
+            from selenium.webdriver.common.by import By
+
+            last_height = self.driver.execute_script("return document.body.scrollHeight")
+            last_post_count = 0
+            no_change_iterations = 0
+
+            print(f"Starting aggressive infinite scroll (max {max_scrolls} scrolls)...")
+
+            for scroll_num in range(1, max_scrolls + 1):
+                # Scroll to bottom
+                self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
                 time.sleep(scroll_pause)
-                print(f"Scrolled {i+1}/{num_scrolls}")
+
+                # Count current posts (app-post elements)
+                try:
+                    posts = self.driver.find_elements(By.TAG_NAME, "app-post")
+                    current_count = len(posts)
+                except Exception:
+                    current_count = last_post_count
+
+                # Get new page height
+                new_height = self.driver.execute_script("return document.body.scrollHeight")
+
+                # Check if anything changed (height OR post count)
+                if new_height == last_height and current_count == last_post_count:
+                    no_change_iterations += 1
+                    print(f"  Scroll {scroll_num}: No new content (attempt {no_change_iterations}/3)")
+
+                    # Stop after 3 consecutive scrolls with no change
+                    if no_change_iterations >= 3:
+                        print(f"✓ Reached end of content at scroll {scroll_num}")
+                        print(f"✓ Total posts loaded: {current_count}")
+                        return scroll_num
+                else:
+                    # Reset counter if we got new content
+                    no_change_iterations = 0
+                    new_posts = current_count - last_post_count
+                    if new_posts > 0:
+                        print(f"  Scroll {scroll_num}: +{new_posts} new posts (total: {current_count})")
+                    else:
+                        print(f"  Scroll {scroll_num}: Page height increased")
+
+                last_height = new_height
+                last_post_count = current_count
+
+            # Reached max scrolls
+            print(f"⚠ Reached max scrolls ({max_scrolls})")
+            print(f"✓ Total posts loaded: {last_post_count}")
+            return max_scrolls
+
         except Exception as e:
-            print(f"Error scrolling page: {e}")
+            print(f"Error during infinite scroll: {e}")
+            return 0
 
     def _find_alert_elements(self, soup: BeautifulSoup) -> List:
         """
@@ -501,13 +635,37 @@ class XtradesScraper:
         Returns:
             List of alert elements
         """
-        # Try various selectors
+        # Try various selectors for Xtrades.net alerts
         selectors = [
+            # REAL ALERTS - Add this first!
+            {'name': 'app-post'},
+            # Angular/Xtrades-specific components
+            {'name': 'app-alert-row'},
+            {'name': 'app-alert-item'},
+            {'name': 'app-trade-alert'},
+            {'name': re.compile(r'app-.*alert.*', re.I)},
+            # Table row selectors (alerts might be in table rows)
+            {'name': 'div', 'class_': re.compile(r'row.*alert', re.I)},
+            {'name': 'div', 'class_': re.compile(r'alert.*row', re.I)},
+            {'name': 'div', 'class_': re.compile(r'row-profile', re.I)},  # Specific to Xtrades
+            # Alert-specific selectors
+            {'name': 'div', 'class_': re.compile(r'alert.*item', re.I)},
+            {'name': 'div', 'class_': re.compile(r'alert.*card', re.I)},
+            {'name': 'div', 'class_': re.compile(r'alert.*container', re.I)},
+            {'name': 'div', 'attrs': {'data-alert': True}},
+            # Trade/post selectors
+            {'name': 'div', 'class_': re.compile(r'trade.*card', re.I)},
+            {'name': 'div', 'class_': re.compile(r'post.*item', re.I)},
+            {'name': 'article', 'class_': re.compile(r'alert', re.I)},
+            {'name': 'article', 'class_': re.compile(r'trade', re.I)},
+            # Generic containers that might hold alerts
+            {'name': 'div', 'class_': re.compile(r'feed.*item', re.I)},
+            {'name': 'div', 'class_': re.compile(r'activity.*item', re.I)},
+            # Fallback broader selectors
             {'name': 'div', 'class_': re.compile(r'alert', re.I)},
             {'name': 'div', 'class_': re.compile(r'trade', re.I)},
-            {'name': 'div', 'class_': re.compile(r'post', re.I)},
-            {'name': 'article'},
             {'name': 'div', 'class_': re.compile(r'card', re.I)},
+            {'name': 'article'},
         ]
 
         for selector in selectors:

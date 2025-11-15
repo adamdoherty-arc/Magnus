@@ -197,15 +197,6 @@ def show_xtrades_page():
                         height=600,
                         key="active_trades_table"
                     )
-
-                    # Export button
-                    csv = df.to_csv(index=False)
-                    st.download_button(
-                        label="💾 Download as CSV",
-                        data=csv,
-                        file_name=f"xtrades_active_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
-                        mime="text/csv"
-                    )
                 else:
                     st.info("No trades match the current filters")
 
@@ -372,15 +363,6 @@ def show_xtrades_page():
                         width='stretch',
                         height=600,
                         key="closed_trades_table"
-                    )
-
-                    # Export
-                    csv = df.to_csv(index=False)
-                    st.download_button(
-                        label="💾 Download as CSV",
-                        data=csv,
-                        file_name=f"xtrades_closed_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
-                        mime="text/csv"
                     )
                 else:
                     st.info("No closed trades match the current filters")

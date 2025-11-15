@@ -136,6 +136,7 @@ class EnhancedOptionsFetcher:
 
                 # Find strike with delta closest to -0.30 (30 delta)
                 # First, calculate delta for each put and find closest to -0.30
+                # IMPORTANT: For CSPs, strike MUST be below current stock price (OTM)
                 target_delta = -0.30
                 best_put = None
                 best_delta_diff = float('inf')
@@ -144,6 +145,11 @@ class EnhancedOptionsFetcher:
                     strike = float(put.get('strike_price', 0))
                     if strike <= 0:
                         continue
+
+                    # CRITICAL FIX: Only consider strikes BELOW stock price for CSPs
+                    # CSPs should be out-of-the-money (OTM), meaning strike < stock price
+                    if strike >= current_price:
+                        continue  # Skip ITM and ATM strikes
 
                     # Calculate time to expiration in years
                     T = actual_dte / 365.0

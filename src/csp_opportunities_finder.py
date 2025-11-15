@@ -43,7 +43,7 @@ class CSPOpportunitiesFinder:
 
             # Query for best 30-day put option per symbol
             # Select option with delta closest to -0.30
-            # NOTE: Uses strike_type='30_delta' to get ~30 delta puts
+            # NOTE: Accepts both '30_delta' (old) and '30_dte' (new) strike types
             # Also filters by negative delta to ensure puts only
             query = """
                 SELECT DISTINCT ON (sp.symbol)
@@ -69,7 +69,8 @@ class CSPOpportunitiesFinder:
                     AND sp.delta BETWEEN %s AND %s
                     AND sp.delta < 0
                     AND sp.premium > 0
-                    AND sp.strike_type = '30_delta'
+                    AND sp.strike_type IN ('30_delta', '30_dte')
+                    AND sp.strike_price < sd.current_price
                 ORDER BY sp.symbol, ABS(sp.delta - %s) ASC
             """
 

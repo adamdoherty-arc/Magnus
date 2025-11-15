@@ -275,16 +275,6 @@ def show_calendar_spreads():
 Net Debit: ${opp['net_debit']:.2f}
                 """, language="text")
 
-        # Download CSV
-        st.markdown("---")
-        csv = display_df.to_csv(index=False)
-        st.download_button(
-            label="📥 Download Results as CSV",
-            data=csv,
-            file_name=f"calendar_spreads_{selected_watchlist}_{datetime.now().strftime('%Y%m%d')}.csv",
-            mime="text/csv"
-        )
-
         # Visualization - Score distribution
         st.markdown("---")
         st.markdown("### 📊 Score Distribution")

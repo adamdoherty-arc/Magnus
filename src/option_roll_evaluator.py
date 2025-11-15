@@ -535,12 +535,17 @@ class OptionRollEvaluator:
         # True cost basis = strike - premium received per share
         cost_basis = current_strike - premium_per_share
 
-        # Paper loss is current unrealized loss on shares at current market price
-        # But we already have a position with existing loss - don't double count
-        current_unrealized_loss_per_share = max(0, cost_basis - current_price)
-        total_unrealized_loss = current_unrealized_loss_per_share * shares_to_receive * quantity
+        # Calculate actual unrealized P&L (can be negative for profit, positive for loss)
+        # True P&L = (cost_basis - current_price) per share
+        unrealized_pnl_per_share = cost_basis - current_price
+        total_unrealized_pnl = unrealized_pnl_per_share * shares_to_receive * quantity
 
-        loss_percentage = (current_unrealized_loss_per_share / cost_basis * 100) if cost_basis > 0 else 0
+        # For display purposes, separate loss and profit
+        immediate_loss = max(0, total_unrealized_pnl)  # Only positive values (losses)
+        immediate_profit = abs(min(0, total_unrealized_pnl))  # Only negative values (profits), converted to positive
+
+        # Calculate percentage
+        pnl_percentage = (unrealized_pnl_per_share / cost_basis * 100) if cost_basis > 0 else 0
 
         evaluation.update({
             'shares_to_receive': shares_to_receive * quantity,
@@ -548,8 +553,10 @@ class OptionRollEvaluator:
             'premium_per_share': premium_per_share,
             'total_cost': cost_basis * shares_to_receive * quantity,
             'current_market_value': current_price * shares_to_receive * quantity,
-            'immediate_loss': total_unrealized_loss,
-            'loss_percentage': loss_percentage,
+            'immediate_loss': immediate_loss,
+            'immediate_profit': immediate_profit,
+            'unrealized_pnl': total_unrealized_pnl,  # Full P&L (negative = profit)
+            'loss_percentage': pnl_percentage,
             'capital_required': current_strike * shares_to_receive * quantity,
             'wheel_opportunity': True  # Can sell covered calls after assignment
         })
@@ -886,7 +893,18 @@ class OptionRollEvaluator:
     def _generate_assignment_cons(self, evaluation: Dict) -> List[str]:
         """Generate cons for assignment strategy"""
         cons = []
-        cons.append(f"Immediate paper loss of ${abs(evaluation.get('immediate_loss', 0)):.2f}")
+
+        # Show profit or loss based on actual P&L
+        immediate_loss = evaluation.get('immediate_loss', 0)
+        immediate_profit = evaluation.get('immediate_profit', 0)
+
+        if immediate_loss > 0:
+            cons.append(f"Immediate paper loss of ${immediate_loss:.2f}")
+        elif immediate_profit > 0:
+            cons.append(f"Immediate paper profit of ${immediate_profit:.2f} (current price above cost basis)")
+        else:
+            cons.append("Position at breakeven (current price equals cost basis)")
+
         cons.append(f"Requires ${evaluation.get('capital_required', 0):.2f} capital")
         cons.append("Risk of further stock decline")
         cons.append("May take time to recover through covered calls")

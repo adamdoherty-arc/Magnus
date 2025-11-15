@@ -29,7 +29,7 @@ class KalshiIntegration:
 
         Args:
             limit: Maximum markets to return (default 200, max 1000)
-            status: 'active', 'closed', or 'settled'
+            status: 'active', 'closed', or 'settled' (Note: API may not support this filter)
 
         Returns:
             List of market dictionaries
@@ -37,15 +37,20 @@ class KalshiIntegration:
         try:
             url = f"{self.base_url}/markets"
             params = {
-                'limit': min(limit, 1000),
-                'status': status
+                'limit': min(limit, 1000)
             }
+            # Note: The elections API doesn't accept status parameter
+            # We'll filter for active markets after fetching
 
             response = self.session.get(url, params=params, timeout=30)
             response.raise_for_status()
 
             data = response.json()
             markets = data.get('markets', [])
+
+            # Filter by status if requested
+            if status:
+                markets = [m for m in markets if m.get('status', '').lower() == status.lower()]
 
             print(f"Fetched {len(markets)} markets from Kalshi")
             return markets

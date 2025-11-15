@@ -12,16 +12,23 @@ import streamlit as st
 import robin_stocks.robinhood as rh
 import pandas as pd
 import logging
+import os
 from datetime import datetime, timedelta
 from collections import defaultdict
+from dotenv import load_dotenv
 from src.trade_history_sync import TradeHistorySyncService
 from src.theta_forecast_display import display_theta_forecasts
+
+load_dotenv()
 from src.components.ai_research_widget import (
     display_consolidated_ai_research_section,
     display_quick_links_section
 )
+from src.components.expert_position_advisory import display_expert_position_advisory
 from src.yfinance_utils import safe_get_history, safe_get_current_price
 from src.recovery_strategies_tab import display_recovery_strategies_tab
+from src.portfolio_balance_display import display_portfolio_balance_dashboard
+from src.auto_balance_recorder import AutoBalanceRecorder
 
 logger = logging.getLogger(__name__)
 
@@ -89,14 +96,46 @@ def display_news_section(symbols):
                 st.info(f"No recent news found for {selected_symbol}")
 
 
+def ensure_rh_login():
+    """Ensure Robinhood is logged in, re-login if session is lost"""
+    username = os.getenv('ROBINHOOD_USERNAME')
+    password = os.getenv('ROBINHOOD_PASSWORD')
+
+    if not username or not password:
+        logger.error("Robinhood credentials not found in environment variables")
+        return False
+
+    max_retries = 2
+    for attempt in range(max_retries):
+        try:
+            # Test if we're logged in
+            rh.profiles.load_account_profile()
+            return True
+        except Exception as e:
+            logger.warning(f"Session test failed (attempt {attempt + 1}): {e}")
+            try:
+                rh.logout()
+            except:
+                pass
+
+            try:
+                rh.login(username=username, password=password, store_session=True)
+                logger.info("Re-logged in to Robinhood")
+            except Exception as login_error:
+                logger.error(f"Re-login failed: {login_error}")
+                if attempt == max_retries - 1:
+                    return False
+    return False
+
+
 def show_positions_page():
     """Main positions page with all improvements"""
 
     st.title("💼 Active Positions")
     st.caption("Live option positions from Robinhood with auto-refresh")
 
-    # Auto-Refresh Controls
-    col1, col2, col3 = st.columns([1, 1, 2])
+    # Auto-Refresh Controls and Navigation
+    col1, col2, col3, col4 = st.columns([1, 1, 2, 2])
     with col1:
         auto_refresh = st.checkbox("🔄 Auto-Refresh", value=False, key="pos_auto_refresh")
     with col2:
@@ -110,6 +149,11 @@ def show_positions_page():
     with col3:
         if st.button("🔄 Refresh Now", type="primary"):
             st.rerun()
+    with col4:
+        if st.button("🔍 Find More Opportunities", type="secondary", help="Jump to Options Analysis to find new trades"):
+            st.session_state.page = "Options Analysis"
+            st.session_state.options_analysis_mode = "scan"
+            st.rerun()
 
     # Auto-refresh logic
     if auto_refresh:
@@ -120,13 +164,55 @@ def show_positions_page():
         )
 
     # === LOGIN TO ROBINHOOD (once for entire page) ===
+    username = os.getenv('ROBINHOOD_USERNAME')
+    password = os.getenv('ROBINHOOD_PASSWORD')
+
+    if not username or not password:
+        st.error("❌ Robinhood credentials not configured")
+        st.info("Please set ROBINHOOD_USERNAME and ROBINHOOD_PASSWORD in your .env file")
+        return
+
     rh_session = None
-    try:
-        rh.login(username='brulecapital@gmail.com', password='FortKnox')
-        rh_session = rh  # Store the logged-in session
-    except Exception as e:
-        st.error(f"Failed to connect to Robinhood: {e}")
-        st.info("Please refresh the page to try again")
+    max_retries = 3
+    retry_count = 0
+
+    while retry_count < max_retries:
+        try:
+            # Force logout first to clear any stale session
+            try:
+                rh.logout()
+            except:
+                pass  # Ignore logout errors
+
+            # Fresh login
+            login_result = rh.login(username=username, password=password, store_session=True)
+
+            # Verify we're actually logged in by testing the session
+            test_profile = rh.profiles.load_account_profile()
+            if test_profile:
+                rh_session = rh  # Store the logged-in session
+                logger.info("Successfully logged into Robinhood")
+                break
+            else:
+                raise Exception("Login succeeded but session test failed")
+
+        except Exception as e:
+            retry_count += 1
+            logger.error(f"Robinhood login attempt {retry_count} failed: {e}")
+
+            if retry_count >= max_retries:
+                st.error(f"❌ Failed to connect to Robinhood after {max_retries} attempts")
+                st.error(f"Error: {str(e)}")
+                st.info("💡 If you see a device approval prompt, check your Robinhood mobile app to approve this device")
+                st.info("Then refresh this page")
+                return
+
+            # Wait before retrying
+            import time
+            time.sleep(2)
+
+    if not rh_session:
+        st.error("❌ Could not establish Robinhood connection")
         return
 
     # === ACTIVE POSITIONS ===
@@ -140,9 +226,15 @@ def show_positions_page():
     long_put_positions = []
 
     try:
+        # Ensure we're logged in before proceeding
+        if not ensure_rh_login():
+            st.error("❌ Could not establish or maintain Robinhood session")
+            st.info("Please refresh the page to try again")
+            return
+
         # Get total account value
-        account_profile = rh.load_account_profile()
-        portfolio = rh.load_portfolio_profile()
+        account_profile = rh.profiles.load_account_profile()
+        portfolio = rh.profiles.load_portfolio_profile()
         total_equity = float(portfolio.get('equity', 0)) if portfolio else 0
 
         # === STOCK POSITIONS ===
@@ -199,6 +291,17 @@ def show_positions_page():
             # Display stock positions if any
             if stock_positions_data:
                 with st.expander(f"📊 Stock Positions ({len(stock_positions_data)})", expanded=False):
+                    # Add refresh button for stock positions
+                    col_refresh1, col_refresh2 = st.columns([5, 1])
+                    with col_refresh1:
+                        st.caption(f"{len(stock_positions_data)} stock position{'s' if len(stock_positions_data) > 1 else ''}")
+                    with col_refresh2:
+                        if st.button("🔄", key="refresh_stock_positions", help="Refresh stock positions data"):
+                            # Clear any cached stock data
+                            if "stock_positions_cache" in st.session_state:
+                                del st.session_state["stock_positions_cache"]
+                            st.rerun()
+
                     df_stocks = pd.DataFrame(stock_positions_data)
 
                     # Format display
@@ -276,13 +379,14 @@ def show_positions_page():
                 total_premium = avg_price * quantity
 
                 # Get current market price
+                # adjusted_mark_price is in dollars per share, need to multiply by 100 (shares per contract)
                 market_data = rh.get_option_market_data_by_id(opt_id)
                 if market_data and len(market_data) > 0:
-                    current_price = float(market_data[0].get('adjusted_mark_price', 0)) * 100
+                    current_price_per_share = float(market_data[0].get('adjusted_mark_price', 0))  # dollars per share
+                    current_value = current_price_per_share * 100 * quantity  # dollars total
                 else:
-                    current_price = 0
-
-                current_value = current_price * quantity
+                    current_price_per_share = 0
+                    current_value = 0
 
                 # Calculate P/L
                 if position_type == 'short':
@@ -309,32 +413,94 @@ def show_positions_page():
                 else:
                     strategy = 'Other'
 
-                # Get current stock price (regular hours)
-                try:
-                    stock_quote = rh.get_latest_price(symbol)
-                    stock_price = float(stock_quote[0]) if stock_quote else 0
-                except:
-                    stock_price = 0
+                # Get stock prices (regular close and after-hours)
+                stock_price = 0  # Regular market close
+                after_hours_price = None  # Current after-hours price
 
-                # Get after-hours stock price using quotes API
-                after_hours_price = None
                 try:
-                    # Use get_quotes which includes extended hours data
+                    # Use get_quotes which includes both regular and extended hours data
                     quote_data = rh.get_quotes(symbol)
                     if quote_data and len(quote_data) > 0:
                         quote = quote_data[0]
-                        # Try multiple fields for extended hours price
+
+                        # Get regular hours close price (last trade during regular hours)
+                        last_trade = quote.get('last_trade_price')
+                        if last_trade:
+                            stock_price = float(last_trade)
+
+                        # Get extended hours price - always show if available
                         extended_price = quote.get('last_extended_hours_trade_price')
                         if extended_price:
                             after_hours_price = float(extended_price)
-                            # Only use if different from regular price (threshold: $0.01)
-                            if abs(after_hours_price - stock_price) < 0.01:
-                                after_hours_price = None
-                except:
-                    after_hours_price = None
+                except Exception as e:
+                    logger.debug(f"Could not get prices for {symbol}: {e}")
+                    # Fallback to get_latest_price
+                    try:
+                        stock_quote = rh.get_latest_price(symbol)
+                        stock_price = float(stock_quote[0]) if stock_quote else 0
+                    except:
+                        stock_price = 0
 
                 # Create TradingView link (will display as clickable icon)
                 tv_link = f"https://www.tradingview.com/chart/?symbol={symbol}"
+
+                # Store per-contract prices for better display (in dollars)
+                per_contract_cost = avg_price  # This is already per-contract in dollars
+                per_contract_current = current_price_per_share * 100  # Convert per-share to per-contract
+
+                # Calculate capital secured for CSPs (money that must be held in reserve)
+                capital_secured = None
+                if position_type == 'short' and opt_type == 'put':
+                    # For CSPs: strike price * 100 * number of contracts
+                    capital_secured = strike * 100 * quantity
+
+                # Calculate estimated after-hours option value
+                after_hours_value = None
+                after_hours_pl = None
+                if after_hours_price and stock_price and stock_price > 0:
+                    # Calculate stock price change
+                    stock_change = after_hours_price - stock_price
+
+                    # Estimate delta based on moneyness
+                    # Delta represents how much option price changes per $1 change in stock
+                    if opt_type == 'put':
+                        # For puts: OTM (stock > strike) = lower delta, ITM (stock < strike) = higher delta
+                        if stock_price > strike:
+                            # OTM put - delta around -0.30
+                            estimated_delta = -0.30
+                        elif stock_price < strike:
+                            # ITM put - delta around -0.70
+                            estimated_delta = -0.70
+                        else:
+                            # ATM put - delta around -0.50
+                            estimated_delta = -0.50
+
+                        # For puts, delta is negative (stock up = put value down)
+                        option_price_change = estimated_delta * stock_change * 100  # dollars per contract (100 shares)
+                    else:  # call
+                        # For calls: OTM (stock < strike) = lower delta, ITM (stock > strike) = higher delta
+                        if stock_price < strike:
+                            # OTM call - delta around 0.30
+                            estimated_delta = 0.30
+                        elif stock_price > strike:
+                            # ITM call - delta around 0.70
+                            estimated_delta = 0.70
+                        else:
+                            # ATM call - delta around 0.50
+                            estimated_delta = 0.50
+
+                        # For calls, delta is positive (stock up = call value up)
+                        option_price_change = estimated_delta * stock_change * 100  # dollars per contract (100 shares)
+
+                    # Calculate after-hours option value
+                    # option_price_change is per contract in dollars, multiply by quantity for total dollars
+                    after_hours_value = max(0, current_value + (option_price_change * quantity))
+
+                    # Calculate P/L at after-hours prices
+                    if position_type == 'short':
+                        after_hours_pl = total_premium - after_hours_value
+                    else:
+                        after_hours_pl = after_hours_value - total_premium
 
                 positions_data.append({
                     'Symbol': symbol,
@@ -345,9 +511,12 @@ def show_positions_page():
                     'Expiration': exp_date,
                     'DTE': dte,
                     'Contracts': int(quantity),
-                    'Premium': total_premium,
-                    'Current': current_value,
+                    'Premium': total_premium,  # Total premium collected/paid
+                    'Value': current_value,  # Current market value
+                    'Capital Secured': capital_secured,  # NEW: For CSPs only
+                    'AH Value': after_hours_value,  # After-hours estimated value
                     'P/L': pl,
+                    'AH P/L': after_hours_pl,  # After-hours P/L
                     'P/L %': (pl/total_premium*100) if total_premium > 0 else 0,
                     'Chart': tv_link,  # Plain URL - will be styled by column_config
                     'symbol_raw': symbol,  # For AI research lookup
@@ -366,7 +535,40 @@ def show_positions_page():
                 total_pl = sum([p['P/L'] for p in positions_data])
                 total_premium = sum([p['Premium'] for p in positions_data])
 
-                col1, col2, col3, col4, col5 = st.columns(5)
+                # Calculate after-hours totals
+                total_ah_pl = sum([p.get('AH P/L', p['P/L']) for p in positions_data if p.get('AH P/L') is not None])
+                has_ah_data = any(p.get('AH Value') is not None for p in positions_data)
+
+                # Calculate after-hours account value
+                # The account value changes by the P/L change (after-hours P/L - regular P/L)
+                if has_ah_data:
+                    total_pl_change = total_ah_pl - total_pl
+                    ah_account_value = total_equity + total_pl_change
+                else:
+                    ah_account_value = None
+
+                # Auto-record daily balance (once per day)
+                try:
+                    auto_recorder = AutoBalanceRecorder()
+                    options_val = sum([p['Value'] for p in positions_data])
+                    stock_val = sum([p['Current Value'] for p in stock_positions_data]) if stock_positions_data else 0
+
+                    result = auto_recorder.auto_record_balance(
+                        total_equity=total_equity,
+                        buying_power=buying_power,
+                        options_value=options_val,
+                        stock_value=stock_val,
+                        total_positions=len(positions_data)
+                    )
+
+                    # Store status for display
+                    balance_status = auto_recorder.get_recording_status()
+                except Exception as e:
+                    logger.error(f"Error auto-recording balance: {e}")
+                    balance_status = "⚠️ Auto-record error"
+
+                # Display metrics in two rows
+                col1, col2, col3, col4, col5 = st.columns([1.5, 1, 1, 1, 1.5])
                 with col1:
                     st.metric("Total Account Value", f'${total_equity:,.2f}')
                 with col2:
@@ -384,6 +586,35 @@ def show_positions_page():
                         delta_color=pl_color
                     )
 
+                # Second row with after-hours metrics
+                if has_ah_data:
+                    col1, col2, col3, col4, col5 = st.columns([1.5, 1, 1, 1, 1.5])
+                    with col1:
+                        ah_diff = ah_account_value - total_equity
+                        st.metric(
+                            "After-Hours Value",
+                            f'${ah_account_value:,.2f}',
+                            delta=f'${ah_diff:+,.2f}',
+                            delta_color="normal" if ah_diff >= 0 else "inverse"
+                        )
+                    with col2:
+                        st.caption("") # Spacer
+                    with col3:
+                        st.caption("") # Spacer
+                    with col4:
+                        st.caption("") # Spacer
+                    with col5:
+                        ah_pl_color = "normal" if total_ah_pl >= 0 else "inverse"
+                        st.metric(
+                            "After-Hours P/L",
+                            f'${total_ah_pl:,.2f}',
+                            delta=f'${total_ah_pl - total_pl:+,.2f}' if total_pl else None,
+                            delta_color="normal" if (total_ah_pl - total_pl) >= 0 else "inverse"
+                        )
+
+                # Display balance recording status
+                st.caption(f"📊 {balance_status}")
+
                 # Separate positions by strategy type
                 csp_positions = [p for p in positions_data if p['Strategy'] == 'CSP']
                 cc_positions = [p for p in positions_data if p['Strategy'] == 'CC']
@@ -397,18 +628,60 @@ def show_positions_page():
                         return
 
                     with st.expander(f"{emoji} {title} ({len(positions)})", expanded=expanded):
+                        # Add refresh button for this specific table
+                        col_refresh1, col_refresh2 = st.columns([5, 1])
+                        with col_refresh1:
+                            st.caption(f"{len(positions)} active position{'s' if len(positions) > 1 else ''}")
+                        with col_refresh2:
+                            if st.button("🔄", key=f"refresh_{section_key}", help=f"Refresh {title} data"):
+                                # Clear any cached data for this section
+                                cache_key = f"positions_cache_{section_key}"
+                                if cache_key in st.session_state:
+                                    del st.session_state[cache_key]
+                                st.rerun()
+
                         df = pd.DataFrame(positions)
 
                         # Format display columns
                         display_df = df.copy()
+
+                        # Rename Contracts to # to save space
+                        display_df = display_df.rename(columns={'Contracts': '#'})
+
                         display_df['Stock Price'] = display_df['Stock Price'].apply(lambda x: f'${x:.2f}')
-                        display_df['After-Hours'] = display_df['After-Hours'].apply(lambda x: f'${x:.2f}' if x is not None else '-')
+                        # Handle After-Hours with proper NaN/None checking
+                        display_df['After-Hours'] = display_df['After-Hours'].apply(
+                            lambda x: f'${x:.2f}' if (x is not None and pd.notna(x)) else '-'
+                        )
                         display_df['Strike'] = display_df['Strike'].apply(lambda x: f'${x:.2f}')
+
+                        # Format value columns
                         display_df['Premium'] = display_df['Premium'].apply(lambda x: f'${x:,.2f}')
-                        display_df['Current'] = display_df['Current'].apply(lambda x: f'${x:,.2f}')
+                        display_df['Value'] = display_df['Value'].apply(lambda x: f'${x:,.2f}')
+
+                        # Format Capital Secured for CSPs (will be None for other strategies)
+                        if 'Capital Secured' in display_df.columns:
+                            display_df['Capital Secured'] = display_df['Capital Secured'].apply(
+                                lambda x: f'${x:,.0f}' if (x is not None and pd.notna(x)) else '-'
+                            )
 
                         # Store raw P/L values for coloring before formatting
                         pl_vals = display_df['P/L'].copy()
+
+                        # Store raw after-hours P/L for coloring if it exists
+                        ah_pl_vals = None
+                        if 'AH P/L' in display_df.columns:
+                            ah_pl_vals = display_df['AH P/L'].copy()
+
+                        # Format after-hours columns if they exist
+                        if 'AH Value' in display_df.columns:
+                            display_df['AH Value'] = display_df['AH Value'].apply(
+                                lambda x: f'${x:,.2f}' if (x is not None and pd.notna(x)) else '-'
+                            )
+                        if 'AH P/L' in display_df.columns:
+                            display_df['AH P/L'] = display_df['AH P/L'].apply(
+                                lambda x: f'${x:,.2f}' if (x is not None and pd.notna(x)) else '-'
+                            )
 
                         display_df['P/L'] = display_df['P/L'].apply(lambda x: f'${x:,.2f}')
                         display_df['P/L %'] = display_df['P/L %'].apply(lambda x: f'{x:.1f}%')
@@ -437,6 +710,20 @@ def show_positions_page():
                                 styles[pl_pct_idx] = 'color: #DD0000; font-weight: bold'
                             # else pl_val == 0, no styling (neutral)
 
+                            # Color after-hours P/L if column exists
+                            if ah_pl_vals is not None and 'AH P/L' in display_df.columns:
+                                try:
+                                    ah_pl_idx = list(display_df.columns).index('AH P/L')
+                                    if idx < len(ah_pl_vals):
+                                        ah_pl_val = ah_pl_vals.iloc[idx]
+                                        if pd.notna(ah_pl_val):
+                                            if ah_pl_val > 0:
+                                                styles[ah_pl_idx] = 'color: #00AA00; font-weight: bold'
+                                            elif ah_pl_val < 0:
+                                                styles[ah_pl_idx] = 'color: #DD0000; font-weight: bold'
+                                except:
+                                    pass
+
                             return styles
 
                         # Apply styling
@@ -457,11 +744,32 @@ def show_positions_page():
                             key=f"positions_table_{section_key}"
                         )
 
+                        # Add Quick Actions - Analyze buttons for each position
+                        st.markdown("**Quick Actions:**")
+                        action_cols = st.columns(min(len(positions), 5))  # Max 5 columns
+                        for idx, position in enumerate(positions):
+                            col_idx = idx % 5  # Wrap to next row if more than 5
+                            with action_cols[col_idx]:
+                                symbol = position.get('symbol_raw', position.get('Symbol', 'N/A'))
+                                if st.button(
+                                    f"🔍 {symbol}",
+                                    key=f"analyze_pos_{section_key}_{idx}",
+                                    help=f"Analyze {symbol} in Options Analysis page",
+                                    use_container_width=True
+                                ):
+                                    # Store position data in session state
+                                    st.session_state.options_analysis_symbol = symbol
+                                    st.session_state.options_analysis_mode = "position"
+                                    st.session_state.options_analysis_position = position
+                                    # Navigate to Options Analysis page
+                                    st.session_state.page = "Options Analysis"
+                                    st.rerun()
+
                 # Display each strategy section
                 display_strategy_table("Cash-Secured Puts", "💰", csp_positions, "csp", expanded=True)
-                display_strategy_table("Covered Calls", "📞", cc_positions, "cc")
-                display_strategy_table("Long Calls", "📈", long_call_positions, "long_calls")
-                display_strategy_table("Long Puts", "📉", long_put_positions, "long_puts")
+                display_strategy_table("Covered Calls", "📞", cc_positions, "cc", expanded=True)
+                display_strategy_table("Long Calls", "📈", long_call_positions, "long_calls", expanded=True)
+                display_strategy_table("Long Puts", "📉", long_put_positions, "long_puts", expanded=True)
 
                 # Display Next CSP Opportunities (30-day, ~0.3 delta)
                 if csp_positions:
@@ -523,30 +831,92 @@ def show_positions_page():
                             st.error(f"Error loading CSP opportunities: {e}")
                             logger.error(f"CSP opportunities error: {e}")
 
-                # Display Theta Decay Forecasts for CSP positions
-                if csp_positions:
+                # === PORTFOLIO BALANCE HISTORY ===
+                display_portfolio_balance_dashboard(days_back=90, expanded=False)
+
+                # Display Theta Decay Forecasts for CSP, Covered Calls, and Long Call positions
+                if csp_positions or cc_positions or long_call_positions:
                     # Create title with info icon
                     col_title, col_info = st.columns([6, 1])
                     with col_title:
                         expander_open = st.expander("📉 Theta Decay Forecasts", expanded=False)
                     with col_info:
-                        st.markdown("""
-                            <div title="Theta Decay shows how much premium you'll earn each day as time passes.
+                        with st.popover("ℹ️"):
+                            st.markdown("**Theta Decay Forecasts**")
+                            st.markdown("""
+Theta Decay shows how much premium you'll earn/lose each day as time passes.
 
-• Daily Theta: Premium earned per day
-• 7-Day Forecast: Expected premium over next week
-• 30-Day Forecast: Total premium to expiration
-• Cumulative: Running total of earned premium
+**What you'll see:**
+- **Daily Theta:** Premium earned per day (CSP/CC) or lost per day (Long Calls)
+- **7-Day Forecast:** Expected premium over next week
+- **30-Day Forecast:** Total premium to expiration
+- **Cumulative:** Running total of earned/lost premium
 
-How to use:
+**How to use:**
 1. Expand to see daily forecasts
 2. Compare theta across positions
-3. Identify positions earning the most per day
-4. Plan when to close or roll based on remaining premium" style="cursor: help; font-size: 20px;">ℹ️</div>
-                        """, unsafe_allow_html=True)
+3. Identify positions earning/losing the most per day
+4. Plan when to close or roll based on remaining premium
+                            """)
 
                     with expander_open:
-                        display_theta_forecasts(csp_positions)
+                        # Build list of available position types
+                        available_types = []
+                        if csp_positions:
+                            available_types.append("Cash-Secured Puts")
+                        if cc_positions:
+                            available_types.append("Covered Calls")
+                        if long_call_positions:
+                            available_types.append("Long Calls")
+
+                        # Add option to select position type
+                        position_type = st.radio(
+                            "Select Position Type:",
+                            available_types,
+                            horizontal=True,
+                            key="theta_position_type"
+                        )
+
+                        if position_type == "Cash-Secured Puts" and csp_positions:
+                            display_theta_forecasts(csp_positions)
+                        elif position_type == "Covered Calls" and cc_positions:
+                            display_theta_forecasts(cc_positions)
+                        elif position_type == "Long Calls" and long_call_positions:
+                            display_theta_forecasts(long_call_positions)
+                        else:
+                            st.info(f"No {position_type} positions to display")
+
+                # === EXPERT POSITION ADVISORY ===
+                # Comprehensive AI-powered trade analysis for all positions
+                col_title, col_info = st.columns([6, 1])
+                with col_title:
+                    expander_advisory = st.expander("💼 Expert Position Advisory - AI Trade Analysis", expanded=False)
+                with col_info:
+                    with st.popover("ℹ️"):
+                        st.markdown("**Expert Position Advisory**")
+                        st.markdown("""
+Get comprehensive expert analysis for any position:
+
+**What you'll see:**
+- **Current Position Assessment:** Risk level, time decay, probability analysis
+- **Scenario Analysis:** Pros & cons for Hold, Close, or Roll
+- **Expert Recommendation:** Single best action with clear reasoning
+- **Risk Management:** Key risks and protective actions
+
+**How to use:**
+1. Select a position from the dropdown
+2. Click 'Generate Expert Analysis'
+3. Review the comprehensive pros/cons analysis
+4. Follow the expert recommendation
+                        """)
+
+                with expander_advisory:
+                    # Display advisory for all positions combined
+                    all_positions = csp_positions + cc_positions + long_call_positions + long_put_positions
+                    if all_positions:
+                        display_expert_position_advisory(all_positions)
+                    else:
+                        st.info("No positions available for analysis")
 
                 # === RECOVERY STRATEGIES TAB ===
                 # Check if there are any losing CSP positions
@@ -557,9 +927,14 @@ How to use:
                         pos['symbol'] = pos.get('Symbol', pos.get('symbol_raw', ''))  # Fix: add lowercase 'symbol' key
                         pos['option_type'] = 'put'
                         pos['position_type'] = 'short'
-                        pos['current_price'] = pos.get('Current Price', 0)
-                        if isinstance(pos['current_price'], str):
-                            pos['current_price'] = float(pos['current_price'].replace('$', '').replace(',', ''))
+
+                        # Calculate current price per contract from Value (Value / quantity / 100)
+                        value = pos.get('Value', 0)
+                        if isinstance(value, str):
+                            value = float(value.replace('$', '').replace(',', ''))
+                        quantity = abs(pos.get('Contracts', 1))
+                        pos['current_price'] = value / quantity / 100 if quantity > 0 else 0
+
                         pos['strike_price'] = pos.get('Strike', 0)  # Fix: use 'strike_price' not 'current_strike'
                         pos['current_strike'] = pos.get('Strike', 0)
                         if isinstance(pos['current_strike'], str):
@@ -573,9 +948,14 @@ How to use:
                         pos['days_to_expiry'] = pos.get('DTE', 0)
                         pos['expiration_date'] = pos.get('Expiration', '')  # Fix: use 'expiration_date' not 'expiration'
                         pos['expiration'] = pos.get('Expiration', '')
-                        pos['quantity'] = abs(pos.get('Contracts', 1))  # Fix: add quantity
-                        pos['average_price'] = abs(pos.get('Premium', 0)) / 100 if pos.get('Premium', 0) else 0  # Fix: add average_price
-                        pos['premium_collected'] = abs(pos.get('Premium', 0))
+                        pos['quantity'] = quantity
+
+                        premium = pos.get('Premium', 0)
+                        if isinstance(premium, str):
+                            premium = float(premium.replace('$', '').replace(',', ''))
+                        # Premium is total for all contracts, convert to per-contract
+                        pos['average_price'] = abs(premium) / quantity if quantity > 0 and premium else 0
+                        pos['premium_collected'] = abs(premium)
                         losing_csp_positions.append(pos)
 
                 if losing_csp_positions:

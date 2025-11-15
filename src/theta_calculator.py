@@ -58,7 +58,9 @@ class ThetaCalculator:
                           current_premium: float,
                           entry_premium: float,
                           implied_volatility: float,
-                          quantity: int = 1) -> ThetaForecast:
+                          quantity: int = 1,
+                          option_type: str = 'put',
+                          position_type: str = 'short') -> ThetaForecast:
         """
         Calculate day-by-day theta decay forecast
 
@@ -70,6 +72,8 @@ class ThetaCalculator:
             entry_premium: Entry premium when position was opened
             implied_volatility: IV as decimal (e.g., 0.30 for 30%)
             quantity: Number of contracts
+            option_type: 'put' or 'call'
+            position_type: 'short' or 'long'
 
         Returns:
             ThetaForecast object with daily projections
@@ -108,22 +112,34 @@ class ThetaCalculator:
                      (implied_volatility * np.sqrt(time_to_exp))
                 d2 = d1 - implied_volatility * np.sqrt(time_to_exp)
 
-                # Put option value
-                option_value = (strike_price * np.exp(-self.risk_free_rate * time_to_exp) * norm.cdf(-d2) -
-                               current_price * norm.cdf(-d1))
+                # Calculate option value based on type
+                if option_type == 'put':
+                    option_value = (strike_price * np.exp(-self.risk_free_rate * time_to_exp) * norm.cdf(-d2) -
+                                   current_price * norm.cdf(-d1))
+                else:  # call
+                    option_value = (current_price * norm.cdf(d1) -
+                                   strike_price * np.exp(-self.risk_free_rate * time_to_exp) * norm.cdf(d2))
 
                 # Theta calculation
                 theta = self.black_scholes_theta(
                     current_price, strike_price, time_to_exp,
-                    self.risk_free_rate, implied_volatility, 'put'
+                    self.risk_free_rate, implied_volatility, option_type
                 )
             else:
                 # At expiration
-                option_value = max(strike_price - current_price, 0)
+                if option_type == 'put':
+                    option_value = max(strike_price - current_price, 0)
+                else:  # call
+                    option_value = max(current_price - strike_price, 0)
                 theta = 0
 
-            # P/L calculation (for short put)
-            pnl = (entry_premium - option_value) * quantity * 100
+            # P/L calculation based on position type
+            if position_type == 'short':
+                # Short position: profit when option value decreases
+                pnl = (entry_premium - option_value) * quantity * 100
+            else:  # long
+                # Long position: profit when option value increases
+                pnl = (option_value - entry_premium) * quantity * 100
 
             dates.append(forecast_date)
             days_remaining.append(days_left)

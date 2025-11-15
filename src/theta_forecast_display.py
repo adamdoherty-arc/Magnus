@@ -10,10 +10,10 @@ import yfinance as yf
 from src.theta_calculator import ThetaCalculator
 
 
-def display_theta_forecasts(csp_positions: list):
-    """Display theta decay forecasts for CSP positions"""
+def display_theta_forecasts(positions: list):
+    """Display theta decay forecasts for option positions (CSP, CC, or Long Calls)"""
 
-    if not csp_positions:
+    if not positions:
         return
 
     st.markdown("---")
@@ -22,15 +22,15 @@ def display_theta_forecasts(csp_positions: list):
 
     # Position selector
     position_labels = [f"{p['Symbol']} ${p['Strike']:.2f} exp {p['Expiration']}"
-                      for p in csp_positions]
+                      for p in positions]
     selected_idx = st.selectbox(
-        "Select CSP position:",
-        options=range(len(csp_positions)),
+        "Select position:",
+        options=range(len(positions)),
         format_func=lambda i: position_labels[i],
         key="theta_forecast_selector"
     )
 
-    position = csp_positions[selected_idx]
+    position = positions[selected_idx]
 
     # Extract position details
     symbol = position.get('symbol_raw', position['Symbol'])
@@ -39,6 +39,7 @@ def display_theta_forecasts(csp_positions: list):
     current_premium = abs(float(position.get('Current', 0))) / 100  # Convert to per-share price
     entry_premium = abs(float(position.get('Premium', 0))) / 100  # Convert to per-share price
     quantity = int(position.get('Contracts', 1))
+    strategy = position.get('Strategy', 'CSP')
 
     # Get current stock price and IV
     try:
@@ -49,11 +50,16 @@ def display_theta_forecasts(csp_positions: list):
         try:
             exp_date_str = exp_date.strftime('%Y-%m-%d')
             options = ticker.option_chain(exp_date_str)
-            puts = options.puts
+
+            # Get appropriate chain based on strategy
+            if strategy in ['CSP', 'Long Put']:
+                chain = options.puts
+            else:  # CC or Long Call
+                chain = options.calls
 
             # Find the closest strike to our position
-            closest_strike_idx = abs(puts['strike'] - strike).idxmin()
-            iv = puts.loc[closest_strike_idx, 'impliedVolatility']
+            closest_strike_idx = abs(chain['strike'] - strike).idxmin()
+            iv = chain.loc[closest_strike_idx, 'impliedVolatility']
 
             # If IV is not available, use default
             if pd.isna(iv):
@@ -66,6 +72,24 @@ def display_theta_forecasts(csp_positions: list):
         current_stock_price = position.get('Stock Price', strike * 1.05)
         iv = 0.30
 
+    # Determine option type and position type from strategy
+    if strategy == 'CSP':
+        option_type = 'put'
+        position_type = 'short'
+    elif strategy == 'CC':
+        option_type = 'call'
+        position_type = 'short'
+    elif strategy == 'Long Call':
+        option_type = 'call'
+        position_type = 'long'
+    elif strategy == 'Long Put':
+        option_type = 'put'
+        position_type = 'long'
+    else:
+        # Default to put/short (CSP)
+        option_type = 'put'
+        position_type = 'short'
+
     # Calculate forecast
     calculator = ThetaCalculator()
     forecast = calculator.calculate_forecast(
@@ -75,7 +99,9 @@ def display_theta_forecasts(csp_positions: list):
         current_premium=current_premium,
         entry_premium=entry_premium,
         implied_volatility=iv,
-        quantity=quantity
+        quantity=quantity,
+        option_type=option_type,
+        position_type=position_type
     )
 
     # Display summary metrics
@@ -146,8 +172,11 @@ def display_theta_forecasts(csp_positions: list):
         annotation_position="left"
     )
 
+    # Determine position type for title
+    position_strategy = position.get('Strategy', 'Position')
+
     fig.update_layout(
-        title=f"Theta Decay Forecast: {symbol} ${strike:.2f} CSP",
+        title=f"Theta Decay Forecast: {symbol} ${strike:.2f} {position_strategy}",
         xaxis_title="Date",
         yaxis_title="Cumulative P/L ($)",
         hovermode='x unified',
@@ -161,7 +190,7 @@ def display_theta_forecasts(csp_positions: list):
         )
     )
 
-    st.plotly_chart(fig, width='stretch')
+    st.plotly_chart(fig, use_container_width=True)
 
     # Data table
     df = calculator.create_forecast_dataframe(forecast)

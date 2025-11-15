@@ -113,17 +113,22 @@ def display_recovery_opportunities(losing_positions: List[Dict],
     st.markdown("### 💡 Buy Better CSPs - Recovery Opportunities")
     st.caption("Recommended new positions to help recover losses")
 
-    # Position selector
-    selected_symbol = st.selectbox(
+    # Position selector with detailed information
+    position_labels = []
+    for pos in losing_positions:
+        label = f"{pos['symbol']} ${pos['current_strike']:.2f} Put - Exp {pos.get('expiration_date', 'N/A')} ({pos['days_to_expiry']}d) - Loss: ${abs(pos['current_loss']):.0f}"
+        position_labels.append(label)
+
+    selected_position_label = st.selectbox(
         "Select position to analyze:",
-        options=[f"{pos['symbol']} - ${pos['current_strike']}" for pos in losing_positions],
+        options=position_labels,
         format_func=lambda x: x,
         key="recovery_position_selector"
     )
 
-    if selected_symbol:
-        # Get selected position
-        symbol = selected_symbol.split(' - ')[0]
+    if selected_position_label:
+        # Get selected position - extract symbol from label
+        symbol = selected_position_label.split(' ')[0]
         selected_position = next(pos for pos in losing_positions if pos['symbol'] == symbol)
 
         # Show current position details
@@ -182,14 +187,17 @@ def display_recovery_opportunities(losing_positions: List[Dict],
 
             # Use Streamlit's dataframe with highlighting
             def highlight_scores(row):
-                """Color code based on AI Score"""
+                """Color code based on AI Score with dark text for readability"""
                 score = float(row['AI Score'])
                 if score >= 80:
-                    return ['background-color: #d4f4dd'] * len(row)
+                    # Green background with dark text
+                    return ['background-color: #d4f4dd; color: #1a472a; font-weight: 500'] * len(row)
                 elif score >= 60:
-                    return ['background-color: #fff4d4'] * len(row)
+                    # Yellow background with dark text
+                    return ['background-color: #fff4d4; color: #4a3c00; font-weight: 500'] * len(row)
                 else:
-                    return ['background-color: #ffd4d4'] * len(row)
+                    # Pink background with dark text
+                    return ['background-color: #ffd4d4; color: #4a0000; font-weight: 500'] * len(row)
 
             styled_df = df_display.style.apply(highlight_scores, axis=1)
             st.dataframe(styled_df, use_container_width=True, hide_index=True)
@@ -282,9 +290,11 @@ def display_roll_evaluations(losing_positions: List[Dict],
     st.markdown("### 🔄 Roll Strategy Evaluations")
     st.caption("Compare different roll strategies for each losing position")
 
-    # Position selector
-    position_options = [f"{pos['symbol']} ${pos['current_strike']} ({pos['days_to_expiry']}d)"
-                       for pos in losing_positions]
+    # Position selector with detailed information
+    position_options = [
+        f"{pos['symbol']} ${pos['current_strike']:.2f} Put - Exp {pos.get('expiration_date', 'N/A')} ({pos['days_to_expiry']}d) - {pos.get('quantity', 1)} contracts - Loss: ${abs(pos['current_loss']):.0f}"
+        for pos in losing_positions
+    ]
 
     selected_position_str = st.selectbox(
         "Select position to evaluate rolls:",
@@ -431,16 +441,42 @@ def display_ai_analysis(losing_positions: List[Dict], advisor: AIOptionsAdvisor)
     st.markdown("### 🤖 AI Market Analysis")
     st.caption("Deep analysis using fundamental, technical, and sentiment data")
 
-    # Select position for analysis
-    symbol_options = list(set(pos['symbol'] for pos in losing_positions))
+    # Select position for analysis with detailed information
+    # Group positions by symbol and show summary info
+    position_details = {}
+    for pos in losing_positions:
+        symbol = pos['symbol']
+        if symbol not in position_details:
+            position_details[symbol] = {
+                'count': 0,
+                'total_loss': 0,
+                'strikes': [],
+                'expirations': []
+            }
+        position_details[symbol]['count'] += 1
+        position_details[symbol]['total_loss'] += abs(pos.get('current_loss', 0))
+        position_details[symbol]['strikes'].append(pos['current_strike'])
+        if pos.get('expiration_date'):
+            position_details[symbol]['expirations'].append(pos['expiration_date'])
 
-    selected_symbol = st.selectbox(
-        "Select symbol for deep analysis:",
-        options=symbol_options,
+    # Create detailed labels
+    symbol_labels = []
+    for symbol, details in position_details.items():
+        if details['count'] > 1:
+            label = f"{symbol} - {details['count']} positions - Total Loss: ${details['total_loss']:.0f}"
+        else:
+            label = f"{symbol} - ${details['strikes'][0]:.2f} Put - Loss: ${details['total_loss']:.0f}"
+        symbol_labels.append(label)
+
+    selected_symbol_label = st.selectbox(
+        "Select position for deep analysis:",
+        options=symbol_labels,
         key="ai_analysis_symbol"
     )
 
-    if selected_symbol:
+    if selected_symbol_label:
+        # Extract symbol from label
+        selected_symbol = selected_symbol_label.split(' - ')[0].strip()
         # Get position details
         position = next(pos for pos in losing_positions if pos['symbol'] == selected_symbol)
 
