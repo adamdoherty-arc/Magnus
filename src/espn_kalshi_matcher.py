@@ -17,8 +17,97 @@ class ESPNKalshiMatcher:
     Match ESPN live games to Kalshi prediction markets
     """
 
+    # NFL team name variations mapping
+    NFL_TEAM_VARIATIONS = {
+        'Arizona Cardinals': ['Arizona', 'Cardinals', 'ARI'],
+        'Atlanta Falcons': ['Atlanta', 'Falcons', 'ATL'],
+        'Baltimore Ravens': ['Baltimore', 'Ravens', 'BAL'],
+        'Buffalo Bills': ['Buffalo', 'Bills', 'BUF'],
+        'Carolina Panthers': ['Carolina', 'Panthers', 'CAR'],
+        'Chicago Bears': ['Chicago', 'Bears', 'CHI'],
+        'Cincinnati Bengals': ['Cincinnati', 'Bengals', 'CIN'],
+        'Cleveland Browns': ['Cleveland', 'Browns', 'CLE'],
+        'Dallas Cowboys': ['Dallas', 'Cowboys', 'DAL'],
+        'Denver Broncos': ['Denver', 'Broncos', 'DEN'],
+        'Detroit Lions': ['Detroit', 'Lions', 'DET'],
+        'Green Bay Packers': ['Green Bay', 'Packers', 'GB'],
+        'Houston Texans': ['Houston', 'Texans', 'HOU'],
+        'Indianapolis Colts': ['Indianapolis', 'Colts', 'IND'],
+        'Jacksonville Jaguars': ['Jacksonville', 'Jaguars', 'JAX', 'Jags'],
+        'Kansas City Chiefs': ['Kansas City', 'Chiefs', 'KC'],
+        'Las Vegas Raiders': ['Las Vegas', 'Raiders', 'LV', 'Oakland Raiders'],
+        'Los Angeles Chargers': ['Los Angeles Chargers', 'LA Chargers', 'Chargers', 'LAC', 'Los Angeles C'],
+        'Los Angeles Rams': ['Los Angeles Rams', 'LA Rams', 'Rams', 'LAR', 'Los Angeles R'],
+        'Miami Dolphins': ['Miami', 'Dolphins', 'MIA'],
+        'Minnesota Vikings': ['Minnesota', 'Vikings', 'MIN'],
+        'New England Patriots': ['New England', 'Patriots', 'NE'],
+        'New Orleans Saints': ['New Orleans', 'Saints', 'NO'],
+        'New York Giants': ['New York Giants', 'NY Giants', 'Giants', 'NYG'],
+        'New York Jets': ['New York Jets', 'NY Jets', 'Jets', 'NYJ'],
+        'Philadelphia Eagles': ['Philadelphia', 'Eagles', 'PHI'],
+        'Pittsburgh Steelers': ['Pittsburgh', 'Steelers', 'PIT'],
+        'San Francisco 49ers': ['San Francisco', '49ers', 'SF'],
+        'Seattle Seahawks': ['Seattle', 'Seahawks', 'SEA'],
+        'Tampa Bay Buccaneers': ['Tampa Bay', 'Buccaneers', 'Bucs', 'TB'],
+        'Tennessee Titans': ['Tennessee', 'Titans', 'TEN'],
+        'Washington Commanders': ['Washington', 'Commanders', 'WAS', 'Washington Football Team']
+    }
+
+    # Common CFB team name variations
+    CFB_TEAM_VARIATIONS = {
+        'Alabama Crimson Tide': ['Alabama', 'Crimson Tide', 'Bama'],
+        'Ohio State Buckeyes': ['Ohio State', 'Buckeyes', 'OSU'],
+        'Georgia Bulldogs': ['Georgia', 'Bulldogs', 'UGA'],
+        'Michigan Wolverines': ['Michigan', 'Wolverines'],
+        'Clemson Tigers': ['Clemson', 'Tigers'],
+        'Texas Longhorns': ['Texas', 'Longhorns', 'UT'],
+        'Oklahoma Sooners': ['Oklahoma', 'Sooners', 'OU'],
+        'Notre Dame Fighting Irish': ['Notre Dame', 'Fighting Irish', 'ND'],
+        'USC Trojans': ['USC', 'Trojans', 'Southern California'],
+        'Penn State Nittany Lions': ['Penn State', 'Nittany Lions', 'PSU'],
+        'Florida Gators': ['Florida', 'Gators', 'UF'],
+        'LSU Tigers': ['LSU', 'Tigers', 'Louisiana State'],
+        'Auburn Tigers': ['Auburn', 'Tigers'],
+        'Oregon Ducks': ['Oregon', 'Ducks'],
+        'Tennessee Volunteers': ['Tennessee', 'Volunteers', 'Vols'],
+        'Texas A&M Aggies': ['Texas A&M', 'Aggies', 'TAMU'],
+        'Wisconsin Badgers': ['Wisconsin', 'Badgers'],
+        'Miami Hurricanes': ['Miami', 'Hurricanes', 'The U'],
+        'Iowa Hawkeyes': ['Iowa', 'Hawkeyes']
+    }
+
     def __init__(self):
         self.db = KalshiDBManager()
+        # Combine all team variations
+        self.all_team_variations = {**self.NFL_TEAM_VARIATIONS, **self.CFB_TEAM_VARIATIONS}
+
+    def get_team_variations(self, team_name: str) -> List[str]:
+        """
+        Get all possible variations of a team name
+
+        Args:
+            team_name: Original team name from ESPN
+
+        Returns:
+            List of variations to try matching
+        """
+        # Start with the original name
+        variations = [team_name]
+
+        # Check if we have predefined variations
+        for full_name, var_list in self.all_team_variations.items():
+            # If ESPN name matches any variation, return all variations
+            if team_name.lower() in [v.lower() for v in var_list] or \
+               full_name.lower() == team_name.lower():
+                return var_list + [team_name, full_name]
+
+        # If no predefined variations, generate common ones
+        parts = team_name.split()
+        if len(parts) >= 2:
+            variations.append(parts[-1])  # Just mascot (e.g., "Bills")
+            variations.append(' '.join(parts[:-1]))  # Just city (e.g., "Buffalo")
+
+        return list(set(variations))  # Remove duplicates
 
     def match_game_to_kalshi(self, espn_game: Dict) -> Optional[Dict]:
         """
@@ -37,6 +126,10 @@ class ESPNKalshiMatcher:
         if not away_team or not home_team:
             return None
 
+        # Get all team name variations
+        away_variations = self.get_team_variations(away_team)
+        home_variations = self.get_team_variations(home_team)
+
         # Extract date from game_time (format: "YYYY-MM-DD HH:MM")
         try:
             if game_time:
@@ -54,43 +147,51 @@ class ESPNKalshiMatcher:
             conn = self.db.get_connection()
             cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
-            # Search for market with both team names
-            # Kalshi markets often format as: "Team1-to-win-vs-Team2" or similar
-            query = """
-            SELECT
-                ticker,
-                title,
-                yes_price,
-                no_price,
-                volume,
-                close_time,
-                market_type
-            FROM kalshi_markets
-            WHERE
-                (
-                    title ILIKE %s AND title ILIKE %s
-                )
-                AND market_type IN ('nfl', 'cfb', 'winner')
-                AND close_time >= %s
-                AND close_time <= %s
-                AND status != 'closed'
-                AND yes_price IS NOT NULL
-            ORDER BY volume DESC, close_time ASC
-            LIMIT 1
-            """
-
             # Search within +/- 3 days of game time
             date_start = game_date - timedelta(days=3)
             date_end = game_date + timedelta(days=3)
 
-            cur.execute(query, (
-                f'%{away_team}%',
-                f'%{home_team}%',
-                date_start,
-                date_end
-            ))
+            # Try matching with team name variations
+            result = None
+            for away_var in away_variations:
+                for home_var in home_variations:
+                    query = """
+                    SELECT
+                        ticker,
+                        title,
+                        yes_price,
+                        no_price,
+                        volume,
+                        close_time,
+                        market_type
+                    FROM kalshi_markets
+                    WHERE
+                        (
+                            title ILIKE %s AND title ILIKE %s
+                        )
+                        AND market_type IN ('nfl', 'cfb', 'winner')
+                        AND close_time >= %s
+                        AND close_time <= %s
+                        AND status != 'closed'
+                        AND yes_price IS NOT NULL
+                    ORDER BY volume DESC, close_time ASC
+                    LIMIT 1
+                    """
 
-            result = cur.fetchone()
+                    cur.execute(query, (
+                        f'%{away_var}%',
+                        f'%{home_var}%',
+                        date_start,
+                        date_end
+                    ))
+
+                    result = cur.fetchone()
+                    if result:
+                        logger.debug(f"Matched using variations: {away_var} vs {home_var}")
+                        break
+
+                if result:
+                    break
 
             if result:
                 # Determine which team is "yes" and which is "no"
