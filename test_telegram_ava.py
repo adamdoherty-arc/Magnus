@@ -2,8 +2,13 @@
 Test Telegram Connection and Get Chat ID for AVA Bot
 """
 import os
+import sys
 import requests
 from dotenv import load_dotenv
+
+# Fix Windows console encoding
+if sys.platform == 'win32':
+    sys.stdout.reconfigure(encoding='utf-8')
 
 load_dotenv()
 
@@ -12,7 +17,7 @@ def get_telegram_updates():
     token = os.getenv("TELEGRAM_BOT_TOKEN")
 
     if not token or token == "YOUR_BOT_TOKEN_HERE":
-        print("❌ TELEGRAM_BOT_TOKEN not configured in .env")
+        print("[ERROR] TELEGRAM_BOT_TOKEN not configured in .env")
         return
 
     print("=" * 70)
@@ -28,15 +33,15 @@ def get_telegram_updates():
         bot_info = response.json()
         if bot_info['ok']:
             bot = bot_info['result']
-            print(f"✅ Bot Connected: @{bot['username']}")
-            print(f"   Bot Name: {bot['first_name']}")
-            print(f"   Bot ID: {bot['id']}")
+            print(f"[OK] Bot Connected: @{bot['username']}")
+            print(f"     Bot Name: {bot['first_name']}")
+            print(f"     Bot ID: {bot['id']}")
             print()
         else:
-            print("❌ Bot connection failed")
+            print("[ERROR] Bot connection failed")
             return
     else:
-        print("❌ Failed to connect to Telegram API")
+        print("[ERROR] Failed to connect to Telegram API")
         return
 
     # Get recent messages
@@ -51,7 +56,7 @@ def get_telegram_updates():
         data = response.json()
 
         if data['ok'] and data['result']:
-            print(f"✅ Found {len(data['result'])} message(s)")
+            print(f"[OK] Found {len(data['result'])} message(s)")
             print()
 
             # Get the most recent chat ID
@@ -86,17 +91,17 @@ def get_telegram_updates():
                 if test_send.lower() == 'y':
                     send_test_message(token, chat_id)
             else:
-                print("⚠️ No message found in updates")
-                print("   Please send a message to your bot first")
+                print("[WARN] No message found in updates")
+                print("       Please send a message to your bot first")
         else:
-            print("⚠️ No messages found")
+            print("[WARN] No messages found")
             print()
             print("TO FIX:")
             print(f"1. Open Telegram and search for your bot")
             print("2. Send any message (e.g., 'hello')")
             print("3. Run this script again")
     else:
-        print("❌ Failed to get updates")
+        print("[ERROR] Failed to get updates")
 
 def send_test_message(token, chat_id):
     """Send a test message"""
