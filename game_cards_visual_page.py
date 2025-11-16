@@ -158,14 +158,12 @@ def show_game_cards():
             background: var(--secondary-background-color);
             border: 2px solid rgba(128, 128, 128, 0.5);
             border-radius: 12px;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2),
-                        inset 0 1px 0 rgba(255, 255, 255, 0.1);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
             transition: all 0.3s ease;
         }
 
         .game-card:hover {
-            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3),
-                        inset 0 1px 0 rgba(255, 255, 255, 0.15);
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
             transform: translateY(-2px);
         }
 
@@ -1015,9 +1013,10 @@ def display_espn_game_card(game, sport_filter, watchlist_manager, llm_service=No
             btn_bg_color = '#4CAF50' if is_watched else '#6c757d'
             btn_hover_color = '#45a049' if is_watched else '#5a6268'
 
+            # Wrapper div with unique class for targeting
             st.markdown(f"""
                 <style>
-                button[kind="secondary"].subscribe-btn {{
+                .sub-btn-wrapper-{unique_key} button {{
                     background-color: {btn_bg_color} !important;
                     color: white !important;
                     font-size: 11px !important;
@@ -1027,11 +1026,12 @@ def display_espn_game_card(game, sport_filter, watchlist_manager, llm_service=No
                     border-radius: 4px !important;
                     transition: all 0.3s ease !important;
                 }}
-                button[kind="secondary"].subscribe-btn:hover {{
+                .sub-btn-wrapper-{unique_key} button:hover {{
                     background-color: {btn_hover_color} !important;
                     transform: scale(1.03);
                 }}
                 </style>
+                <div class="sub-btn-wrapper-{unique_key}">
             """, unsafe_allow_html=True)
 
             if st.button(button_label, key=button_key, use_container_width=True, help="Subscribe for live game updates"):
@@ -1044,6 +1044,9 @@ def display_espn_game_card(game, sport_filter, watchlist_manager, llm_service=No
                         notifier.send_message(message)
                     except: pass
                     st.rerun()
+
+            # Close wrapper div
+            st.markdown('</div>', unsafe_allow_html=True)
 
         # Get sports-specific AI prediction FIRST (for visual highlighting)
         game_date_str = game.get('game_time', '')
@@ -1087,59 +1090,70 @@ def display_espn_game_card(game, sport_filter, watchlist_manager, llm_service=No
         home_odds = kalshi_odds.get('home_win_price', 0) * 100 if kalshi_odds else 0
 
         # Team matchup with logos and scores - WITH GLOWING TOP BAR
-
-        # Determine CSS class for winner column
         is_away_winner = (predicted_winner == away_team)
         is_home_winner = (predicted_winner == home_team)
 
+        # Determine glow bar color based on confidence
         if confidence_level == 'high':
-            winner_col_class = 'winner-column-high'
+            glow_color = '#00ff00'
+            glow_shadow = 'rgba(0, 255, 0, 0.8)'
         elif confidence_level == 'medium':
-            winner_col_class = 'winner-column-medium'
+            glow_color = '#ffd700'
+            glow_shadow = 'rgba(255, 215, 0, 0.7)'
         else:
-            winner_col_class = 'winner-column-low'
+            glow_color = 'transparent'
+            glow_shadow = 'transparent'
 
-        # Start columns with glowing top bar for predicted winner
-        st.markdown('<div style="display: flex; align-items: flex-start; gap: 8px;">', unsafe_allow_html=True)
+        col1, col2, col3 = st.columns([2, 1, 2])
 
-        # Away team column
-        if is_away_winner and confidence_level != 'low':
-            st.markdown(f'<div class="{winner_col_class}" style="flex: 2; text-align: center;">', unsafe_allow_html=True)
-        else:
-            st.markdown('<div style="flex: 2; text-align: center; padding-top: 8px;">', unsafe_allow_html=True)
+        with col1:
+            # Away team - add glowing bar ABOVE if predicted winner
+            if is_away_winner and confidence_level != 'low':
+                st.markdown(f"""
+                    <div style="
+                        border-top: 4px solid {glow_color};
+                        box-shadow: 0 -3px 15px {glow_shadow};
+                        padding-top: 8px;
+                        margin-bottom: 8px;
+                    "></div>
+                """, unsafe_allow_html=True)
 
-        if away_logo:
-            st.image(away_logo, width=70)
-        rank_display = f"#{away_rank} " if away_rank and away_rank <= 25 else ""
-        st.markdown(f"**{rank_display}{away_team[:20]}**")
-        if is_away_winner and sports_prediction:
-            st.markdown(f"{confidence_emoji} **{int(win_probability * 100)}%**")
-        st.markdown(f"<h2 style='margin:0; font-weight:bold;'>{away_score}</h2>", unsafe_allow_html=True)
-        if away_odds > 0:
-            st.markdown(f"<p style='font-size:18px; font-weight:bold; color:#4CAF50; margin:0;'>{away_odds:.0f}¢</p>", unsafe_allow_html=True)
-        st.markdown('</div>', unsafe_allow_html=True)
+            # Away team logo and info
+            if away_logo:
+                st.image(away_logo, width=70)
+            rank_display = f"#{away_rank} " if away_rank and away_rank <= 25 else ""
+            st.markdown(f"**{rank_display}{away_team[:20]}**")
+            if is_away_winner and sports_prediction:
+                st.markdown(f"{confidence_emoji} **{int(win_probability * 100)}%**")
+            st.markdown(f"<h2 style='margin:0; font-weight:bold;'>{away_score}</h2>", unsafe_allow_html=True)
+            if away_odds > 0:
+                st.markdown(f"<p style='font-size:18px; font-weight:bold; color:#4CAF50; margin:0;'>{away_odds:.0f}¢</p>", unsafe_allow_html=True)
 
-        # VS column
-        st.markdown('<div style="flex: 1; text-align: center; padding-top: 43px;"><p style="font-size:18px;">@</p></div>', unsafe_allow_html=True)
+        with col2:
+            st.markdown("<p style='text-align:center; padding-top:35px; font-size:18px;'>@</p>", unsafe_allow_html=True)
 
-        # Home team column
-        if is_home_winner and confidence_level != 'low':
-            st.markdown(f'<div class="{winner_col_class}" style="flex: 2; text-align: center;">', unsafe_allow_html=True)
-        else:
-            st.markdown('<div style="flex: 2; text-align: center; padding-top: 8px;">', unsafe_allow_html=True)
+        with col3:
+            # Home team - add glowing bar ABOVE if predicted winner
+            if is_home_winner and confidence_level != 'low':
+                st.markdown(f"""
+                    <div style="
+                        border-top: 4px solid {glow_color};
+                        box-shadow: 0 -3px 15px {glow_shadow};
+                        padding-top: 8px;
+                        margin-bottom: 8px;
+                    "></div>
+                """, unsafe_allow_html=True)
 
-        if home_logo:
-            st.image(home_logo, width=70)
-        rank_display = f"#{home_rank} " if home_rank and home_rank <= 25 else ""
-        st.markdown(f"**{rank_display}{home_team[:20]}**")
-        if is_home_winner and sports_prediction:
-            st.markdown(f"{confidence_emoji} **{int(win_probability * 100)}%**")
-        st.markdown(f"<h2 style='margin:0; font-weight:bold;'>{home_score}</h2>", unsafe_allow_html=True)
-        if home_odds > 0:
-            st.markdown(f"<p style='font-size:18px; font-weight:bold; color:#4CAF50; margin:0;'>{home_odds:.0f}¢</p>", unsafe_allow_html=True)
-        st.markdown('</div>', unsafe_allow_html=True)
-
-        st.markdown('</div>', unsafe_allow_html=True)  # Close flex container
+            # Home team logo and info
+            if home_logo:
+                st.image(home_logo, width=70)
+            rank_display = f"#{home_rank} " if home_rank and home_rank <= 25 else ""
+            st.markdown(f"**{rank_display}{home_team[:20]}**")
+            if is_home_winner and sports_prediction:
+                st.markdown(f"{confidence_emoji} **{int(win_probability * 100)}%**")
+            st.markdown(f"<h2 style='margin:0; font-weight:bold;'>{home_score}</h2>", unsafe_allow_html=True)
+            if home_odds > 0:
+                st.markdown(f"<p style='font-size:18px; font-weight:bold; color:#4CAF50; margin:0;'>{home_odds:.0f}¢</p>", unsafe_allow_html=True)
 
         # Get AI prediction (CACHED for performance)
         try:
