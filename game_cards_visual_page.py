@@ -994,300 +994,306 @@ def display_espn_game_card(game, sport_filter, watchlist_manager, llm_service=No
 
     # ==================== CARD CONTAINER WITH BORDER ====================
     st.markdown('<div class="game-card">', unsafe_allow_html=True)
-    with st.container():
-        # Compact top row: Status + Quick Telegram Subscribe
-        col_status, col_quick_tg = st.columns([2.5, 1])
-        with col_status:
-            if is_live:
-                st.markdown(f'<span class="live-indicator"></span><strong style="font-size:13px;">LIVE • {status}</strong>', unsafe_allow_html=True)
-            elif is_completed:
-                st.markdown(f"<strong style='font-size:13px;'>FINAL • {status}</strong>", unsafe_allow_html=True)
-            else:
-                st.markdown(f"<strong style='font-size:13px;'>{status}</strong>", unsafe_allow_html=True)
-        with col_quick_tg:
-            # Subscribe button - gray text that turns green when subscribed
-            button_label = "Subscribe" if not is_watched else "Subscribed"
-            button_key = f"subscribe_{unique_key}"
 
-            # Custom CSS for neutral gray/green subscribe button
-            btn_bg_color = '#4CAF50' if is_watched else '#6c757d'
-            btn_hover_color = '#45a049' if is_watched else '#5a6268'
+    # Compact top row: Status + Quick Telegram Subscribe
+    col_status, col_quick_tg = st.columns([2.5, 1])
+    with col_status:
+        if is_live:
+            st.markdown(f'<span class="live-indicator"></span><strong style="font-size:13px;">LIVE • {status}</strong>', unsafe_allow_html=True)
+        elif is_completed:
+            st.markdown(f"<strong style='font-size:13px;'>FINAL • {status}</strong>", unsafe_allow_html=True)
+        else:
+            st.markdown(f"<strong style='font-size:13px;'>{status}</strong>", unsafe_allow_html=True)
+    with col_quick_tg:
+        # Subscribe button - gray text that turns green when subscribed
+        button_label = "Subscribe" if not is_watched else "Subscribed"
+        button_key = f"subscribe_{unique_key}"
 
-            # Wrapper div with unique class for targeting
-            st.markdown(f"""
+        # Custom CSS for neutral gray/green subscribe button - ENSURE TEXT IS VISIBLE
+        btn_bg_color = '#4CAF50' if is_watched else '#6c757d'
+        btn_hover_color = '#45a049' if is_watched else '#5a6268'
+
+        # Wrapper div with unique class for targeting
+        st.markdown(f"""
                 <style>
                 .sub-btn-wrapper-{unique_key} button {{
                     background-color: {btn_bg_color} !important;
                     color: white !important;
-                    font-size: 11px !important;
-                    font-weight: 500 !important;
-                    padding: 6px 12px !important;
+                    font-size: 13px !important;
+                    font-weight: 600 !important;
+                    padding: 8px 16px !important;
                     border: none !important;
-                    border-radius: 4px !important;
+                    border-radius: 6px !important;
                     transition: all 0.3s ease !important;
+                    min-width: 100px !important;
+                    text-align: center !important;
+                    white-space: nowrap !important;
                 }}
                 .sub-btn-wrapper-{unique_key} button:hover {{
                     background-color: {btn_hover_color} !important;
                     transform: scale(1.03);
                 }}
-                </style>
-                <div class="sub-btn-wrapper-{unique_key}">
-            """, unsafe_allow_html=True)
+                .sub-btn-wrapper-{unique_key} button p {{
+                    margin: 0 !important;
+                    padding: 0 !important;
+                    display: inline !important;
+                }}
+            </style>
+            <div class="sub-btn-wrapper-{unique_key}">
+        """, unsafe_allow_html=True)
 
-            if st.button(button_label, key=button_key, use_container_width=True, help="Subscribe for live game updates"):
-                if not is_watched:
-                    watchlist_manager.add_game_to_watchlist(user_id, game, selected_team=None)
-                    try:
-                        from src.telegram_notifier import TelegramNotifier
-                        notifier = TelegramNotifier()
-                        message = f"🏈 Subscribed: {away_team} @ {home_team}\nYou'll get live updates via Telegram!"
-                        notifier.send_message(message)
-                    except: pass
-                    st.rerun()
-
-            # Close wrapper div
-            st.markdown('</div>', unsafe_allow_html=True)
-
-        # Get sports-specific AI prediction FIRST (for visual highlighting)
-        game_date_str = game.get('game_time', '')
-        sports_prediction = get_sports_prediction_cached(
-            game_id=str(game_id),
-            sport_filter=sport_filter,
-            home_team=home_team,
-            away_team=away_team,
-            game_date_str=game_date_str if game_date_str else None
-        )
-
-        # Determine predicted winner and confidence
-        if sports_prediction:
-            predicted_winner = sports_prediction.get('winner', '')
-            win_probability = sports_prediction.get('probability', 0.5)
-            confidence_level = sports_prediction.get('confidence', 'low')  # 'high', 'medium', 'low'
-            predicted_spread = sports_prediction.get('spread', 0)
-        else:
-            predicted_winner = ''
-            win_probability = 0.5
-            confidence_level = 'low'
-            predicted_spread = 0
-
-        # Determine CSS class for visual highlighting
-        if confidence_level == 'high':
-            highlight_class = 'team-logo-high-confidence'
-            confidence_emoji = '🟢'
-            confidence_text = 'HIGH CONFIDENCE'
-        elif confidence_level == 'medium':
-            highlight_class = 'team-logo-medium-confidence'
-            confidence_emoji = '🟡'
-            confidence_text = 'MEDIUM CONFIDENCE'
-        else:
-            highlight_class = 'team-logo-low-confidence'
-            confidence_emoji = '⚪'
-            confidence_text = 'Low Confidence'
-
-        # Get Kalshi odds
-        kalshi_odds = game.get('kalshi_odds', {})
-        away_odds = kalshi_odds.get('away_win_price', 0) * 100 if kalshi_odds else 0
-        home_odds = kalshi_odds.get('home_win_price', 0) * 100 if kalshi_odds else 0
-
-        # Team matchup with logos and scores - WITH GLOWING TOP BAR
-        is_away_winner = (predicted_winner == away_team)
-        is_home_winner = (predicted_winner == home_team)
-
-        # Determine glow bar color based on confidence
-        if confidence_level == 'high':
-            glow_color = '#00ff00'
-            glow_shadow = 'rgba(0, 255, 0, 0.8)'
-        elif confidence_level == 'medium':
-            glow_color = '#ffd700'
-            glow_shadow = 'rgba(255, 215, 0, 0.7)'
-        else:
-            glow_color = 'transparent'
-            glow_shadow = 'transparent'
-
-        col1, col2, col3 = st.columns([2, 1, 2])
-
-        with col1:
-            # Away team - add glowing bar ABOVE if predicted winner
-            if is_away_winner and confidence_level != 'low':
-                st.markdown(f"""
-                    <div style="
-                        border-top: 4px solid {glow_color};
-                        box-shadow: 0 -3px 15px {glow_shadow};
-                        padding-top: 8px;
-                        margin-bottom: 8px;
-                    "></div>
-                """, unsafe_allow_html=True)
-
-            # Away team logo and info
-            if away_logo:
-                st.image(away_logo, width=70)
-            rank_display = f"#{away_rank} " if away_rank and away_rank <= 25 else ""
-            st.markdown(f"**{rank_display}{away_team[:20]}**")
-            if is_away_winner and sports_prediction:
-                st.markdown(f"{confidence_emoji} **{int(win_probability * 100)}%**")
-            st.markdown(f"<h2 style='margin:0; font-weight:bold;'>{away_score}</h2>", unsafe_allow_html=True)
-            if away_odds > 0:
-                st.markdown(f"<p style='font-size:18px; font-weight:bold; color:#4CAF50; margin:0;'>{away_odds:.0f}¢</p>", unsafe_allow_html=True)
-
-        with col2:
-            st.markdown("<p style='text-align:center; padding-top:35px; font-size:18px;'>@</p>", unsafe_allow_html=True)
-
-        with col3:
-            # Home team - add glowing bar ABOVE if predicted winner
-            if is_home_winner and confidence_level != 'low':
-                st.markdown(f"""
-                    <div style="
-                        border-top: 4px solid {glow_color};
-                        box-shadow: 0 -3px 15px {glow_shadow};
-                        padding-top: 8px;
-                        margin-bottom: 8px;
-                    "></div>
-                """, unsafe_allow_html=True)
-
-            # Home team logo and info
-            if home_logo:
-                st.image(home_logo, width=70)
-            rank_display = f"#{home_rank} " if home_rank and home_rank <= 25 else ""
-            st.markdown(f"**{rank_display}{home_team[:20]}**")
-            if is_home_winner and sports_prediction:
-                st.markdown(f"{confidence_emoji} **{int(win_probability * 100)}%**")
-            st.markdown(f"<h2 style='margin:0; font-weight:bold;'>{home_score}</h2>", unsafe_allow_html=True)
-            if home_odds > 0:
-                st.markdown(f"<p style='font-size:18px; font-weight:bold; color:#4CAF50; margin:0;'>{home_odds:.0f}¢</p>", unsafe_allow_html=True)
-
-        # Get AI prediction (CACHED for performance)
-        try:
-            import json
-            kalshi_odds = game.get('kalshi_odds', {})
-            kalshi_odds_str = json.dumps(kalshi_odds) if kalshi_odds else ""
-
-            ai_prediction = get_ai_predictions_cached(
-                game_id=str(game_id),
-                away_team=away_team,
-                home_team=home_team,
-                away_score=away_score,
-                home_score=home_score,
-                kalshi_odds_str=kalshi_odds_str
-            )
-        except:
-            ai_prediction = {
-                'predicted_winner': 'home' if home_score > away_score else 'away',
-                'win_probability': 0.5,
-                'confidence_score': 0,
-                'expected_value': 0,
-                'recommendation': 'PASS'
-            }
-
-        # Display ENHANCED AI prediction with sports-specific analysis
-        st.markdown("<p style='font-size:15px; font-weight:600; margin:8px 0 4px 0;'>🤖 AI Prediction</p>", unsafe_allow_html=True)
-
-        if sports_prediction:
-            # Show prediction from sport-specific agent (NFL/NCAA) with styled badge
-            if confidence_level == 'high':
-                badge_class = 'confidence-high'
-            elif confidence_level == 'medium':
-                badge_class = 'confidence-medium'
-            else:
-                badge_class = 'confidence-low'
-
-            st.markdown(f'<div class="confidence-badge {badge_class}">{confidence_emoji} {confidence_text}</div>', unsafe_allow_html=True)
-
-            # Show key prediction details
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                st.metric(
-                    "Predicted Winner",
-                    predicted_winner[:15],
-                    help="AI predicted winner using Elo ratings and advanced stats"
-                )
-            with col2:
-                st.metric(
-                    "Win Probability",
-                    f"{int(win_probability * 100)}%",
-                    help="Likelihood of predicted outcome"
-                )
-            with col3:
-                st.metric(
-                    "Predicted Spread",
-                    f"{abs(predicted_spread):.1f}" if predicted_spread != 0 else "-",
-                    help="Expected point difference"
-                )
-
-            # Show detailed explanation in expandable section
-            explanation = sports_prediction.get('explanation', '')
-            if explanation:
-                with st.expander("📊 Why this prediction?"):
-                    st.markdown(explanation)
-
-                    # Show key features
-                    features = sports_prediction.get('features', {})
-                    adjustments = sports_prediction.get('adjustments', {})
-
-                    if features:
-                        st.markdown("**Key Factors:**")
-
-                        if sport_filter == 'NFL':
-                            # NFL-specific features
-                            st.markdown(f"- **Elo Ratings:** {home_team} ({features.get('home_elo', 0):.0f}) vs {away_team} ({features.get('away_elo', 0):.0f})")
-                            st.markdown(f"- **Home Field:** +{features.get('home_field_advantage', 0):.1f} pts")
-
-                            if features.get('is_divisional') == 1.0:
-                                st.markdown("- **🔥 Divisional Rivalry** (typically more competitive)")
-
-                            if adjustments.get('injury_impact', 0) != 0:
-                                injury_text = "favors home" if adjustments['injury_impact'] > 0 else "favors away"
-                                st.markdown(f"- **Injury Impact:** {injury_text}")
-
-                        else:  # NCAA
-                            # NCAA-specific features
-                            st.markdown(f"- **Elo Ratings:** {home_team} ({features.get('home_elo', 0):.0f}) vs {away_team} ({features.get('away_elo', 0):.0f})")
-                            st.markdown(f"- **Conference Power:** {home_team} ({features.get('home_conf_power', 0):.2f}) vs {away_team} ({features.get('away_conf_power', 0):.2f})")
-                            st.markdown(f"- **Recruiting:** {home_team} ({features.get('home_recruiting', 0):.0f}/100) vs {away_team} ({features.get('away_recruiting', 0):.0f}/100)")
-
-                            if features.get('is_rivalry') == 1.0:
-                                st.markdown("- **🔥 RIVALRY GAME** (expect closer contest)")
-
-                            if adjustments.get('crowd_size', 0) > 80000:
-                                st.markdown(f"- **Massive Home Crowd:** {adjustments['crowd_size']:,} fans")
-        else:
-            # Fallback: Show traditional AI analysis if sports prediction unavailable
-            st.caption("⚠️ Sports-specific prediction unavailable. Using fallback analysis.")
-
-            # Get traditional AI prediction
-            predicted_winner_fallback = ai_prediction.get('predicted_winner', 'away')
-            win_prob_fallback = ai_prediction.get('win_probability', 0.5)
-            confidence_fallback = ai_prediction.get('confidence_score', 0)
-            ev = ai_prediction.get('expected_value', 0)
-            recommendation = ai_prediction.get('recommendation', 'PASS')
-
-            winner_name = away_team if predicted_winner_fallback == 'away' else home_team
-
-            # Display fallback prediction
-            display_win_prob = win_prob_fallback if win_prob_fallback > 1 else win_prob_fallback * 100
-            display_confidence = confidence_fallback if confidence_fallback > 1 else confidence_fallback * 100
-
-            # Recommendation
-            if recommendation == 'STRONG_BUY':
-                st.success("🚀 **STRONG BUY** - High confidence opportunity")
-            elif recommendation == 'BUY':
-                st.info("💰 **BUY** - Good betting value")
-            else:
-                st.info("⏸️ **PASS** - No strong value detected")
-
-            # Metrics
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                st.metric("Predicted", winner_name[:12])
-            with col2:
-                st.metric("Win Prob", f"{display_win_prob:.1f}%")
-            with col3:
-                st.metric("EV", f"{ev:.1f}%")
-
-        # Unsubscribe button (only if subscribed)
-        if is_watched:
-            if st.button("🗑️ Unsubscribe", key=f"unsub_{unique_key}", use_container_width=True):
-                watchlist_manager.remove_game_from_watchlist(user_id, game_id)
+        if st.button(button_label, key=button_key, use_container_width=False, help="Subscribe for live game updates"):
+            if not is_watched:
+                watchlist_manager.add_game_to_watchlist(user_id, game, selected_team=None)
+                try:
+                    from src.telegram_notifier import TelegramNotifier
+                    notifier = TelegramNotifier()
+                    message = f"🏈 Subscribed: {away_team} @ {home_team}\nYou'll get live updates via Telegram!"
+                    notifier.send_message(message)
+                except: pass
                 st.rerun()
+
+        # Close wrapper div
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    # Get sports-specific AI prediction FIRST (for visual highlighting)
+    game_date_str = game.get('game_time', '')
+    sports_prediction = get_sports_prediction_cached(
+        game_id=str(game_id),
+        sport_filter=sport_filter,
+        home_team=home_team,
+        away_team=away_team,
+        game_date_str=game_date_str if game_date_str else None
+    )
+
+    # Determine predicted winner and confidence
+    if sports_prediction:
+        predicted_winner = sports_prediction.get('winner', '')
+        win_probability = sports_prediction.get('probability', 0.5)
+        confidence_level = sports_prediction.get('confidence', 'low')  # 'high', 'medium', 'low'
+        predicted_spread = sports_prediction.get('spread', 0)
+    else:
+        predicted_winner = ''
+        win_probability = 0.5
+        confidence_level = 'low'
+        predicted_spread = 0
+
+    # Determine CSS class for visual highlighting
+    if confidence_level == 'high':
+        highlight_class = 'team-logo-high-confidence'
+        confidence_emoji = '🟢'
+        confidence_text = 'HIGH CONFIDENCE'
+    elif confidence_level == 'medium':
+        highlight_class = 'team-logo-medium-confidence'
+        confidence_emoji = '🟡'
+        confidence_text = 'MEDIUM CONFIDENCE'
+    else:
+        highlight_class = 'team-logo-low-confidence'
+        confidence_emoji = '⚪'
+        confidence_text = 'Low Confidence'
+
+    # Get Kalshi odds
+    kalshi_odds = game.get('kalshi_odds', {})
+    away_odds = kalshi_odds.get('away_win_price', 0) * 100 if kalshi_odds else 0
+    home_odds = kalshi_odds.get('home_win_price', 0) * 100 if kalshi_odds else 0
+
+    # Team matchup with logos and scores - WITH GLOWING TOP BAR
+    is_away_winner = (predicted_winner == away_team)
+    is_home_winner = (predicted_winner == home_team)
+
+    # Determine glow bar color based on confidence
+    if confidence_level == 'high':
+        glow_color = '#00ff00'
+        glow_shadow = 'rgba(0, 255, 0, 0.8)'
+    elif confidence_level == 'medium':
+        glow_color = '#ffd700'
+        glow_shadow = 'rgba(255, 215, 0, 0.7)'
+    else:
+        glow_color = 'transparent'
+        glow_shadow = 'transparent'
+
+    col1, col2, col3 = st.columns([2, 1, 2])
+
+    with col1:
+        # Away team logo with glowing effect if predicted winner
+        if away_logo:
+            if is_away_winner and confidence_level != 'low':
+                # Highlight logo with glowing border
+                st.markdown(f"""
+                    <div style="display: inline-block; padding: 8px; border: 3px solid {glow_color};
+                                border-radius: 12px; box-shadow: 0 0 20px {glow_shadow};
+                                background: linear-gradient(135deg, {glow_shadow.replace('0.8', '0.15').replace('0.7', '0.1')} 0%, transparent 100%);">
+                        <img src="{away_logo}" width="70" style="display: block; border-radius: 8px;"/>
+                    </div>
+                """, unsafe_allow_html=True)
+            else:
+                st.image(away_logo, width=70)
+        rank_display = f"#{away_rank} " if away_rank and away_rank <= 25 else ""
+        st.markdown(f"**{rank_display}{away_team[:20]}**")
+        if is_away_winner and sports_prediction:
+            st.markdown(f"{confidence_emoji} **{int(win_probability * 100)}%**")
+        st.markdown(f"<h2 style='margin:0; font-weight:bold;'>{away_score}</h2>", unsafe_allow_html=True)
+        if away_odds > 0:
+            st.markdown(f"<p style='font-size:18px; font-weight:bold; color:#4CAF50; margin:0;'>{away_odds:.0f}¢</p>", unsafe_allow_html=True)
+
+    with col2:
+        st.markdown("<p style='text-align:center; padding-top:35px; font-size:18px;'>@</p>", unsafe_allow_html=True)
+
+    with col3:
+        # Home team logo with glowing effect if predicted winner
+        if home_logo:
+            if is_home_winner and confidence_level != 'low':
+                # Highlight logo with glowing border
+                st.markdown(f"""
+                    <div style="display: inline-block; padding: 8px; border: 3px solid {glow_color};
+                                border-radius: 12px; box-shadow: 0 0 20px {glow_shadow};
+                                background: linear-gradient(135deg, {glow_shadow.replace('0.8', '0.15').replace('0.7', '0.1')} 0%, transparent 100%);">
+                        <img src="{home_logo}" width="70" style="display: block; border-radius: 8px;"/>
+                    </div>
+                """, unsafe_allow_html=True)
+            else:
+                st.image(home_logo, width=70)
+        rank_display = f"#{home_rank} " if home_rank and home_rank <= 25 else ""
+        st.markdown(f"**{rank_display}{home_team[:20]}**")
+        if is_home_winner and sports_prediction:
+            st.markdown(f"{confidence_emoji} **{int(win_probability * 100)}%**")
+        st.markdown(f"<h2 style='margin:0; font-weight:bold;'>{home_score}</h2>", unsafe_allow_html=True)
+        if home_odds > 0:
+            st.markdown(f"<p style='font-size:18px; font-weight:bold; color:#4CAF50; margin:0;'>{home_odds:.0f}¢</p>", unsafe_allow_html=True)
+
+    # Get AI prediction (CACHED for performance)
+    try:
+        import json
+        kalshi_odds = game.get('kalshi_odds', {})
+        kalshi_odds_str = json.dumps(kalshi_odds) if kalshi_odds else ""
+
+        ai_prediction = get_ai_predictions_cached(
+            game_id=str(game_id),
+            away_team=away_team,
+            home_team=home_team,
+            away_score=away_score,
+            home_score=home_score,
+            kalshi_odds_str=kalshi_odds_str
+        )
+    except:
+        ai_prediction = {
+            'predicted_winner': 'home' if home_score > away_score else 'away',
+            'win_probability': 0.5,
+            'confidence_score': 0,
+            'expected_value': 0,
+            'recommendation': 'PASS'
+        }
+
+    # Display ENHANCED AI prediction with sports-specific analysis
+    st.markdown("<p style='font-size:15px; font-weight:600; margin:8px 0 4px 0;'>🤖 AI Prediction</p>", unsafe_allow_html=True)
+
+    if sports_prediction:
+        # Show prediction from sport-specific agent (NFL/NCAA) with styled badge
+        if confidence_level == 'high':
+            badge_class = 'confidence-high'
+        elif confidence_level == 'medium':
+            badge_class = 'confidence-medium'
+        else:
+            badge_class = 'confidence-low'
+
+        st.markdown(f'<div class="confidence-badge {badge_class}">{confidence_emoji} {confidence_text}</div>', unsafe_allow_html=True)
+
+        # Show key prediction details
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric(
+                "Predicted Winner",
+                predicted_winner[:15],
+                help="AI predicted winner using Elo ratings and advanced stats"
+            )
+        with col2:
+            st.metric(
+                "Win Probability",
+                f"{int(win_probability * 100)}%",
+                help="Likelihood of predicted outcome"
+            )
+        with col3:
+            st.metric(
+                "Predicted Spread",
+                f"{abs(predicted_spread):.1f}" if predicted_spread != 0 else "-",
+                help="Expected point difference"
+            )
+
+        # Show detailed explanation in expandable section
+        explanation = sports_prediction.get('explanation', '')
+        if explanation:
+            with st.expander("📊 Why this prediction?"):
+                st.markdown(explanation)
+
+                # Show key features
+                features = sports_prediction.get('features', {})
+                adjustments = sports_prediction.get('adjustments', {})
+
+                if features:
+                    st.markdown("**Key Factors:**")
+
+                    if sport_filter == 'NFL':
+                        # NFL-specific features
+                        st.markdown(f"- **Elo Ratings:** {home_team} ({features.get('home_elo', 0):.0f}) vs {away_team} ({features.get('away_elo', 0):.0f})")
+                        st.markdown(f"- **Home Field:** +{features.get('home_field_advantage', 0):.1f} pts")
+
+                        if features.get('is_divisional') == 1.0:
+                            st.markdown("- **🔥 Divisional Rivalry** (typically more competitive)")
+
+                        if adjustments.get('injury_impact', 0) != 0:
+                            injury_text = "favors home" if adjustments['injury_impact'] > 0 else "favors away"
+                            st.markdown(f"- **Injury Impact:** {injury_text}")
+
+                    else:  # NCAA
+                        # NCAA-specific features
+                        st.markdown(f"- **Elo Ratings:** {home_team} ({features.get('home_elo', 0):.0f}) vs {away_team} ({features.get('away_elo', 0):.0f})")
+                        st.markdown(f"- **Conference Power:** {home_team} ({features.get('home_conf_power', 0):.2f}) vs {away_team} ({features.get('away_conf_power', 0):.2f})")
+                        st.markdown(f"- **Recruiting:** {home_team} ({features.get('home_recruiting', 0):.0f}/100) vs {away_team} ({features.get('away_recruiting', 0):.0f}/100)")
+
+                        if features.get('is_rivalry') == 1.0:
+                            st.markdown("- **🔥 RIVALRY GAME** (expect closer contest)")
+
+                        if adjustments.get('crowd_size', 0) > 80000:
+                            st.markdown(f"- **Massive Home Crowd:** {adjustments['crowd_size']:,} fans")
+    else:
+        # Fallback: Show traditional AI analysis if sports prediction unavailable
+        st.caption("⚠️ Sports-specific prediction unavailable. Using fallback analysis.")
+
+        # Get traditional AI prediction
+        predicted_winner_fallback = ai_prediction.get('predicted_winner', 'away')
+        win_prob_fallback = ai_prediction.get('win_probability', 0.5)
+        confidence_fallback = ai_prediction.get('confidence_score', 0)
+        ev = ai_prediction.get('expected_value', 0)
+        recommendation = ai_prediction.get('recommendation', 'PASS')
+
+        winner_name = away_team if predicted_winner_fallback == 'away' else home_team
+
+        # Display fallback prediction
+        display_win_prob = win_prob_fallback if win_prob_fallback > 1 else win_prob_fallback * 100
+        display_confidence = confidence_fallback if confidence_fallback > 1 else confidence_fallback * 100
+
+        # Recommendation
+        if recommendation == 'STRONG_BUY':
+            st.success("🚀 **STRONG BUY** - High confidence opportunity")
+        elif recommendation == 'BUY':
+            st.info("💰 **BUY** - Good betting value")
+        else:
+            st.info("⏸️ **PASS** - No strong value detected")
+
+        # Metrics
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("Predicted", winner_name[:12])
+        with col2:
+            st.metric("Win Prob", f"{display_win_prob:.1f}%")
+        with col3:
+            st.metric("EV", f"{ev:.1f}%")
+
+    # Unsubscribe button (only if subscribed)
+    if is_watched:
+        if st.button("🗑️ Unsubscribe", key=f"unsub_{unique_key}", use_container_width=True):
+            watchlist_manager.remove_game_from_watchlist(user_id, game_id)
+            st.rerun()
 
     st.markdown('</div>', unsafe_allow_html=True)  # Close game-card div
     # Removed horizontal separator to save space
