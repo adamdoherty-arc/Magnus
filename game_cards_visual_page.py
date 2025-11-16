@@ -243,102 +243,19 @@ def show_game_cards():
             }
         }
 
-        /* Predicted winner highlighting - HIGH CONFIDENCE */
-        .predicted-winner-high {
-            border: 3px solid #00ff00 !important;
-            background: linear-gradient(135deg, rgba(0, 255, 0, 0.12) 0%, rgba(0, 255, 0, 0.05) 100%) !important;
-            box-shadow: 0 0 25px rgba(0, 255, 0, 0.6),
-                        0 4px 12px rgba(0, 0, 0, 0.3),
-                        inset 0 1px 0 rgba(0, 255, 0, 0.2) !important;
-            animation: pulse-green 2s infinite;
+        /* Logo glow wrapper - subtle pulsing animation for predicted winner */
+        .logo-glow-wrapper {
+            animation: pulse-logo-glow 2s ease-in-out infinite;
         }
 
-        /* Predicted winner highlighting - MEDIUM CONFIDENCE */
-        .predicted-winner-medium {
-            border: 3px solid #ffd700 !important;
-            background: linear-gradient(135deg, rgba(255, 215, 0, 0.1) 0%, rgba(255, 215, 0, 0.04) 100%) !important;
-            box-shadow: 0 0 20px rgba(255, 215, 0, 0.5),
-                        0 4px 12px rgba(0, 0, 0, 0.3),
-                        inset 0 1px 0 rgba(255, 215, 0, 0.15) !important;
-            animation: pulse-yellow 2s infinite;
-        }
-
-        /* Predicted winner highlighting - LOW CONFIDENCE */
-        .predicted-winner-low {
-            border: 2px solid rgba(150, 150, 150, 0.6) !important;
-            background: var(--secondary-background-color) !important;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2),
-                        inset 0 1px 0 rgba(255, 255, 255, 0.05) !important;
-        }
-
-        /* Pulse animations */
-        @keyframes pulse-green {
+        @keyframes pulse-logo-glow {
             0%, 100% {
-                box-shadow: 0 0 25px rgba(0, 255, 0, 0.6),
-                            0 4px 12px rgba(0, 0, 0, 0.3),
-                            inset 0 1px 0 rgba(0, 255, 0, 0.2);
+                transform: scale(1);
+                opacity: 1;
             }
             50% {
-                box-shadow: 0 0 35px rgba(0, 255, 0, 0.8),
-                            0 6px 16px rgba(0, 0, 0, 0.4),
-                            inset 0 1px 0 rgba(0, 255, 0, 0.3);
-            }
-        }
-
-        @keyframes pulse-yellow {
-            0%, 100% {
-                box-shadow: 0 0 20px rgba(255, 215, 0, 0.5),
-                            0 4px 12px rgba(0, 0, 0, 0.3),
-                            inset 0 1px 0 rgba(255, 215, 0, 0.15);
-            }
-            50% {
-                box-shadow: 0 0 30px rgba(255, 215, 0, 0.7),
-                            0 6px 16px rgba(0, 0, 0, 0.4),
-                            inset 0 1px 0 rgba(255, 215, 0, 0.25);
-            }
-        }
-
-        /* Glowing bar above predicted winner - replaces team logo highlighting */
-        .winner-column-high {
-            position: relative;
-            border-top: 4px solid #00ff00;
-            box-shadow: 0 -3px 15px rgba(0, 255, 0, 0.8);
-            animation: pulse-top-bar-green 2s infinite;
-            padding-top: 8px;
-        }
-
-        .winner-column-medium {
-            position: relative;
-            border-top: 4px solid #ffd700;
-            box-shadow: 0 -3px 12px rgba(255, 215, 0, 0.7);
-            animation: pulse-top-bar-yellow 2s infinite;
-            padding-top: 8px;
-        }
-
-        .winner-column-low {
-            padding-top: 8px;
-        }
-
-        /* Pulse animations for top bars */
-        @keyframes pulse-top-bar-green {
-            0%, 100% {
-                box-shadow: 0 -3px 15px rgba(0, 255, 0, 0.8);
-                border-top-color: #00ff00;
-            }
-            50% {
-                box-shadow: 0 -5px 25px rgba(0, 255, 0, 1.0);
-                border-top-color: #00ff88;
-            }
-        }
-
-        @keyframes pulse-top-bar-yellow {
-            0%, 100% {
-                box-shadow: 0 -3px 12px rgba(255, 215, 0, 0.7);
-                border-top-color: #ffd700;
-            }
-            50% {
-                box-shadow: 0 -5px 20px rgba(255, 215, 0, 0.9);
-                border-top-color: #ffea00;
+                transform: scale(1.02);
+                opacity: 0.95;
             }
         }
 
@@ -1115,19 +1032,15 @@ def display_espn_game_card(game, sport_filter, watchlist_manager, llm_service=No
     col1, col2, col3 = st.columns([2, 1, 2])
 
     with col1:
-        # Away team logo with glowing effect if predicted winner
+        # Away team logo - add wrapper div with glow if predicted winner
         if away_logo:
             if is_away_winner and confidence_level != 'low':
-                # Highlight logo with glowing border
-                st.markdown(f"""
-                    <div style="display: inline-block; padding: 8px; border: 3px solid {glow_color};
-                                border-radius: 12px; box-shadow: 0 0 20px {glow_shadow};
-                                background: linear-gradient(135deg, {glow_shadow.replace('0.8', '0.15').replace('0.7', '0.1')} 0%, transparent 100%);">
-                        <img src="{away_logo}" width="70" style="display: block; border-radius: 8px;"/>
-                    </div>
-                """, unsafe_allow_html=True)
+                # Wrapper with glowing border effect
+                st.markdown(f'<div class="logo-glow-wrapper" style="display: inline-block; padding: 8px; border: 3px solid {glow_color}; border-radius: 12px; box-shadow: 0 0 20px {glow_shadow}, 0 0 40px {glow_shadow.replace("0.8", "0.4").replace("0.7", "0.3")}; background: linear-gradient(135deg, {glow_shadow.replace("0.8", "0.1").replace("0.7", "0.08")} 0%, transparent 100%);">', unsafe_allow_html=True)
+                st.image(away_logo, width=70, use_column_width=False)
+                st.markdown('</div>', unsafe_allow_html=True)
             else:
-                st.image(away_logo, width=70)
+                st.image(away_logo, width=70, use_column_width=False)
         rank_display = f"#{away_rank} " if away_rank and away_rank <= 25 else ""
         st.markdown(f"**{rank_display}{away_team[:20]}**")
         if is_away_winner and sports_prediction:
@@ -1140,19 +1053,15 @@ def display_espn_game_card(game, sport_filter, watchlist_manager, llm_service=No
         st.markdown("<p style='text-align:center; padding-top:35px; font-size:18px;'>@</p>", unsafe_allow_html=True)
 
     with col3:
-        # Home team logo with glowing effect if predicted winner
+        # Home team logo - add wrapper div with glow if predicted winner
         if home_logo:
             if is_home_winner and confidence_level != 'low':
-                # Highlight logo with glowing border
-                st.markdown(f"""
-                    <div style="display: inline-block; padding: 8px; border: 3px solid {glow_color};
-                                border-radius: 12px; box-shadow: 0 0 20px {glow_shadow};
-                                background: linear-gradient(135deg, {glow_shadow.replace('0.8', '0.15').replace('0.7', '0.1')} 0%, transparent 100%);">
-                        <img src="{home_logo}" width="70" style="display: block; border-radius: 8px;"/>
-                    </div>
-                """, unsafe_allow_html=True)
+                # Wrapper with glowing border effect
+                st.markdown(f'<div class="logo-glow-wrapper" style="display: inline-block; padding: 8px; border: 3px solid {glow_color}; border-radius: 12px; box-shadow: 0 0 20px {glow_shadow}, 0 0 40px {glow_shadow.replace("0.8", "0.4").replace("0.7", "0.3")}; background: linear-gradient(135deg, {glow_shadow.replace("0.8", "0.1").replace("0.7", "0.08")} 0%, transparent 100%);">', unsafe_allow_html=True)
+                st.image(home_logo, width=70, use_column_width=False)
+                st.markdown('</div>', unsafe_allow_html=True)
             else:
-                st.image(home_logo, width=70)
+                st.image(home_logo, width=70, use_column_width=False)
         rank_display = f"#{home_rank} " if home_rank and home_rank <= 25 else ""
         st.markdown(f"**{rank_display}{home_team[:20]}**")
         if is_home_winner and sports_prediction:
