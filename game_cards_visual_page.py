@@ -1,11 +1,11 @@
 """
-Visual Game Cards - NFL Predictions with Team Logos
-Grid layout with expandable details and live data feed
+Visual Game Cards - Sports Betting Dashboard with Modern UI
+Compact, responsive design inspired by DraftKings, FanDuel, and ESPN
 """
 
 import streamlit as st
 import pandas as pd
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import re
 import psycopg2
 import psycopg2.extras
@@ -17,6 +17,7 @@ from src.espn_live_data import get_espn_client
 from src.espn_ncaa_live_data import get_espn_ncaa_client
 from src.ncaa_team_database import NCAA_LOGOS, get_team_logo_url, find_team_by_name
 from src.game_watchlist_manager import GameWatchlistManager
+from src.prediction_agents import NFLPredictor, NCAAPredictor
 
 # Initialize logger first
 logger = logging.getLogger(__name__)
@@ -107,14 +108,304 @@ TEAM_SHORT_NAMES = {
 
 
 def show_game_cards():
-    """Main function for visual game cards"""
+    """Main function for visual game cards with modern compact UI"""
 
-    st.title("🏟️ Sports Game Cards")
-    st.caption("Win/Lose predictions ranked by profit potential • Verified odds from premium sources")
+    # Apply custom CSS for compact, modern design
+    st.markdown("""
+        <style>
+        /* Compact header spacing */
+        .block-container {
+            padding-top: 1rem;
+            padding-bottom: 1rem;
+        }
+
+        /* Sticky header */
+        .sticky-header {
+            position: sticky;
+            top: 0;
+            z-index: 999;
+            background: var(--background-color);
+            padding: 0.5rem 0;
+            border-bottom: 1px solid var(--secondary-background-color);
+        }
+
+        /* Sport tabs - horizontal compact design */
+        .stTabs [data-baseweb="tab-list"] {
+            gap: 8px;
+        }
+
+        .stTabs [data-baseweb="tab"] {
+            padding: 8px 16px;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        /* Collapsible sections */
+        .streamlit-expanderHeader {
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        /* Compact metrics */
+        [data-testid="stMetricValue"] {
+            font-size: 20px;
+        }
+
+        /* Game cards with visible border on all 4 sides - TILE EFFECT */
+        .game-card {
+            padding: 12px 16px;
+            margin-bottom: 16px;
+            background: var(--secondary-background-color);
+            border: 2px solid rgba(128, 128, 128, 0.5);
+            border-radius: 12px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2),
+                        inset 0 1px 0 rgba(255, 255, 255, 0.1);
+            transition: all 0.3s ease;
+        }
+
+        .game-card:hover {
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3),
+                        inset 0 1px 0 rgba(255, 255, 255, 0.15);
+            transform: translateY(-2px);
+        }
+
+        /* Live indicator */
+        .live-indicator {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            background: #ff4444;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+            margin-right: 6px;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+
+        /* Card action buttons (Subscribe/Unsubscribe) */
+        .game-card .stButton button {
+            padding: 8px 14px;
+            font-size: 13px;
+            font-weight: 500;
+        }
+
+        /* Filter and control buttons */
+        .filter-buttons .stButton button {
+            padding: 6px 12px;
+            font-size: 12px;
+        }
+
+        /* Pagination buttons */
+        .pagination-buttons .stButton button {
+            padding: 8px 16px;
+            font-size: 13px;
+        }
+
+        /* Watch list sidebar */
+        .watch-sidebar {
+            background: var(--secondary-background-color);
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 16px;
+        }
+
+        /* Hide excessive spacing - make cards compact */
+        .element-container {
+            margin-bottom: 0.3rem;
+        }
+
+        /* Reduce spacing in game cards specifically */
+        .game-card .element-container {
+            margin-bottom: 0.2rem;
+        }
+
+        /* Compact metrics in cards */
+        .game-card [data-testid="stMetricValue"] {
+            font-size: 18px;
+            line-height: 1.2;
+        }
+
+        .game-card [data-testid="stMetricLabel"] {
+            font-size: 11px;
+        }
+
+        /* Reduce button padding in cards */
+        .game-card .stButton button {
+            padding: 6px 12px;
+            font-size: 12px;
+        }
+
+        /* Responsive grid */
+        @media (max-width: 768px) {
+            .block-container {
+                padding: 0.5rem;
+            }
+        }
+
+        /* Predicted winner highlighting - HIGH CONFIDENCE */
+        .predicted-winner-high {
+            border: 3px solid #00ff00 !important;
+            background: linear-gradient(135deg, rgba(0, 255, 0, 0.12) 0%, rgba(0, 255, 0, 0.05) 100%) !important;
+            box-shadow: 0 0 25px rgba(0, 255, 0, 0.6),
+                        0 4px 12px rgba(0, 0, 0, 0.3),
+                        inset 0 1px 0 rgba(0, 255, 0, 0.2) !important;
+            animation: pulse-green 2s infinite;
+        }
+
+        /* Predicted winner highlighting - MEDIUM CONFIDENCE */
+        .predicted-winner-medium {
+            border: 3px solid #ffd700 !important;
+            background: linear-gradient(135deg, rgba(255, 215, 0, 0.1) 0%, rgba(255, 215, 0, 0.04) 100%) !important;
+            box-shadow: 0 0 20px rgba(255, 215, 0, 0.5),
+                        0 4px 12px rgba(0, 0, 0, 0.3),
+                        inset 0 1px 0 rgba(255, 215, 0, 0.15) !important;
+            animation: pulse-yellow 2s infinite;
+        }
+
+        /* Predicted winner highlighting - LOW CONFIDENCE */
+        .predicted-winner-low {
+            border: 2px solid rgba(150, 150, 150, 0.6) !important;
+            background: var(--secondary-background-color) !important;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2),
+                        inset 0 1px 0 rgba(255, 255, 255, 0.05) !important;
+        }
+
+        /* Pulse animations */
+        @keyframes pulse-green {
+            0%, 100% {
+                box-shadow: 0 0 25px rgba(0, 255, 0, 0.6),
+                            0 4px 12px rgba(0, 0, 0, 0.3),
+                            inset 0 1px 0 rgba(0, 255, 0, 0.2);
+            }
+            50% {
+                box-shadow: 0 0 35px rgba(0, 255, 0, 0.8),
+                            0 6px 16px rgba(0, 0, 0, 0.4),
+                            inset 0 1px 0 rgba(0, 255, 0, 0.3);
+            }
+        }
+
+        @keyframes pulse-yellow {
+            0%, 100% {
+                box-shadow: 0 0 20px rgba(255, 215, 0, 0.5),
+                            0 4px 12px rgba(0, 0, 0, 0.3),
+                            inset 0 1px 0 rgba(255, 215, 0, 0.15);
+            }
+            50% {
+                box-shadow: 0 0 30px rgba(255, 215, 0, 0.7),
+                            0 6px 16px rgba(0, 0, 0, 0.4),
+                            inset 0 1px 0 rgba(255, 215, 0, 0.25);
+            }
+        }
+
+        /* Team logo container with highlighting */
+        .team-logo-container {
+            padding: 12px;
+            border-radius: 10px;
+            transition: all 0.3s ease;
+            margin: 4px 0;
+        }
+
+        .team-logo-high-confidence {
+            background: linear-gradient(135deg, rgba(0, 255, 0, 0.2) 0%, rgba(0, 255, 0, 0.1) 100%);
+            border: 3px solid #00ff00;
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.7),
+                        inset 0 2px 4px rgba(0, 255, 0, 0.2);
+            animation: pulse-glow-green 2s infinite;
+        }
+
+        .team-logo-medium-confidence {
+            background: linear-gradient(135deg, rgba(255, 215, 0, 0.15) 0%, rgba(255, 215, 0, 0.08) 100%);
+            border: 3px solid #ffd700;
+            box-shadow: 0 0 15px rgba(255, 215, 0, 0.6),
+                        inset 0 2px 4px rgba(255, 215, 0, 0.15);
+            animation: pulse-glow-yellow 2s infinite;
+        }
+
+        .team-logo-low-confidence {
+            background: rgba(200, 200, 200, 0.05);
+            border: 1px solid rgba(150, 150, 150, 0.5);
+            box-shadow: none;
+        }
+
+        /* Additional glow animations for team logos */
+        @keyframes pulse-glow-green {
+            0%, 100% { box-shadow: 0 0 20px rgba(0, 255, 0, 0.7), inset 0 2px 4px rgba(0, 255, 0, 0.2); }
+            50% { box-shadow: 0 0 30px rgba(0, 255, 0, 0.9), inset 0 2px 4px rgba(0, 255, 0, 0.3); }
+        }
+
+        @keyframes pulse-glow-yellow {
+            0%, 100% { box-shadow: 0 0 15px rgba(255, 215, 0, 0.6), inset 0 2px 4px rgba(255, 215, 0, 0.15); }
+            50% { box-shadow: 0 0 25px rgba(255, 215, 0, 0.8), inset 0 2px 4px rgba(255, 215, 0, 0.25); }
+        }
+
+        /* Confidence badge styling */
+        .confidence-badge {
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-weight: 700;
+            font-size: 14px;
+            text-align: center;
+            margin: 8px 0;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .confidence-high {
+            background: linear-gradient(135deg, #00ff00 0%, #00cc00 100%);
+            color: #000;
+            box-shadow: 0 0 15px rgba(0, 255, 0, 0.6);
+            animation: pulse-badge-green 2s infinite;
+        }
+
+        .confidence-medium {
+            background: linear-gradient(135deg, #ffd700 0%, #ffaa00 100%);
+            color: #000;
+            box-shadow: 0 0 12px rgba(255, 215, 0, 0.5);
+            animation: pulse-badge-yellow 2s infinite;
+        }
+
+        .confidence-low {
+            background: linear-gradient(135deg, #888 0%, #666 100%);
+            color: #fff;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        @keyframes pulse-badge-green {
+            0%, 100% { box-shadow: 0 0 15px rgba(0, 255, 0, 0.6); }
+            50% { box-shadow: 0 0 25px rgba(0, 255, 0, 0.9); }
+        }
+
+        @keyframes pulse-badge-yellow {
+            0%, 100% { box-shadow: 0 0 12px rgba(255, 215, 0, 0.5); }
+            50% { box-shadow: 0 0 20px rgba(255, 215, 0, 0.8); }
+        }
+        </style>
+    """, unsafe_allow_html=True)
 
     # Initialize
     db = KalshiDBManager()
     watchlist_manager = GameWatchlistManager(db)
+
+    # Initialize prediction agents (cached in session state)
+    if 'nfl_predictor' not in st.session_state:
+        try:
+            st.session_state.nfl_predictor = NFLPredictor()
+            logger.info("NFL Predictor initialized")
+        except Exception as e:
+            logger.warning(f"Could not initialize NFL Predictor: {e}")
+            st.session_state.nfl_predictor = None
+
+    if 'ncaa_predictor' not in st.session_state:
+        try:
+            st.session_state.ncaa_predictor = NCAAPredictor()
+            logger.info("NCAA Predictor initialized")
+        except Exception as e:
+            logger.warning(f"Could not initialize NCAA Predictor: {e}")
+            st.session_state.ncaa_predictor = None
 
     # Initialize user ID (from Telegram or default)
     if 'user_id' not in st.session_state:
@@ -125,211 +416,222 @@ def show_game_cards():
     if 'selected_sport' not in st.session_state:
         st.session_state.selected_sport = 'NFL'
 
-    # ==================== AI MODEL SELECTOR ====================
-    st.markdown("### 🤖 AI Prediction Model")
+    # Initialize filters collapsed state
+    if 'filters_collapsed' not in st.session_state:
+        st.session_state.filters_collapsed = True
 
-    # Initialize LLM Service
-    try:
-        from src.services.llm_service import LLMService
-        llm_service = LLMService()
-        available_providers = llm_service.get_available_providers()
-        llm_available = True
-    except Exception as e:
-        logger.warning(f"LLM Service not available: {e}")
-        llm_available = False
-        available_providers = []
+    # Initialize watch sidebar collapsed state
+    if 'watch_sidebar_collapsed' not in st.session_state:
+        st.session_state.watch_sidebar_collapsed = False
 
-    # Model options
-    model_options = ["Local AI (Fast & Free)"]
+    # ==================== COMPACT STICKY HEADER ====================
+    st.markdown('<div class="sticky-header">', unsafe_allow_html=True)
 
-    if llm_available:
-        model_options.append("───────────")  # Visual separator
+    # Title row - more compact
+    col_title, col_watch, col_ai, col_refresh = st.columns([3, 2, 2, 1])
 
-        # Add free providers first
-        if "groq" in available_providers:
-            model_options.append("Groq (Free)")
-        if "huggingface" in available_providers:
-            model_options.append("Hugging Face (Free)")
-        if "ollama" in available_providers:
-            model_options.append("Ollama (Local)")
+    with col_title:
+        st.markdown("## 🏟️ Sports Game Cards")
 
-        # Add paid providers
-        if "deepseek" in available_providers:
-            model_options.append("DeepSeek ($0.14/1M)")
-        if "gemini" in available_providers:
-            model_options.append("Gemini (Google)")
-        if "openai" in available_providers:
-            model_options.append("GPT-4 (Premium)")
-        if "anthropic" in available_providers:
-            model_options.append("Claude (Premium)")
+    with col_watch:
+        # Watch list count
+        watchlist = watchlist_manager.get_user_watchlist(st.session_state.user_id)
+        watch_count = len(watchlist) if watchlist else 0
 
-    # Model selector
-    col_model, col_info = st.columns([2, 3])
+        # Auto-cleanup: Remove finished games from watchlist
+        if watchlist:
+            cleaned_count = watchlist_manager.cleanup_finished_games(st.session_state.user_id)
+            if cleaned_count > 0:
+                watch_count = len(watchlist_manager.get_user_watchlist(st.session_state.user_id))
 
-    with col_model:
+        if watch_count > 0:
+            if st.button(f"📍 Watching: {watch_count}", key="toggle_watch_sidebar", use_container_width=True):
+                st.session_state.watch_sidebar_collapsed = not st.session_state.watch_sidebar_collapsed
+        else:
+            st.caption("📍 Watch games for updates")
+
+    with col_ai:
+        # Initialize LLM Service
+        try:
+            from src.services.llm_service import LLMService
+            llm_service = LLMService()
+            available_providers = llm_service.get_available_providers()
+            llm_available = True
+        except Exception as e:
+            logger.warning(f"LLM Service not available: {e}")
+            llm_available = False
+            available_providers = []
+
+        # Compact AI model selector
+        model_options = ["Local AI"]
+        if llm_available and "groq" in available_providers:
+            model_options.append("Groq")
+        if llm_available and "deepseek" in available_providers:
+            model_options.append("DeepSeek")
+
         selected_model = st.selectbox(
-            "Choose AI Model",
+            "AI Model",
             model_options,
-            help="Local AI is instant and free. LLM models provide deeper analysis but are slower.",
-            label_visibility="collapsed"
+            label_visibility="collapsed",
+            key="ai_model_selector"
         )
+        st.session_state.ai_model = f"{selected_model} (Fast & Free)" if selected_model == "Local AI" else selected_model
 
-        # Store in session state
-        st.session_state.ai_model = selected_model
+    with col_refresh:
+        # Auto-refresh toggle
+        auto_refresh = st.checkbox("🔄", value=False, key="auto_refresh_header", help="Auto-refresh")
 
-    with col_info:
-        # Show info based on selected model
-        if "Local AI" in selected_model:
-            st.success("⚡ **Instant predictions** using statistical analysis (Kelly Criterion)")
-        elif "Free" in selected_model or "Local" in selected_model:
-            st.info("🆓 **Free LLM analysis** - Slower but considers more factors")
-        else:
-            st.warning("💰 **Premium model** - Best accuracy, small API cost per prediction")
+    st.markdown('</div>', unsafe_allow_html=True)
 
-    # Show current provider availability
-    with st.expander("🔍 View Available AI Providers"):
-        if llm_available:
-            st.markdown("**Available LLM Providers:**")
-            for provider in available_providers:
-                st.markdown(f"- ✅ {provider.title()}")
-        else:
-            st.warning("LLM Service not initialized. Only Local AI available.")
-
-        st.markdown("---")
-        st.markdown("**Model Comparison:**")
-        st.markdown("""
-        | Model | Speed | Cost | Accuracy | External Data |
-        |-------|-------|------|----------|---------------|
-        | Local AI | ⚡ Instant | Free | ~60% | Score, Odds |
-        | Groq | Fast | Free | ~65% | + News, Trends |
-        | DeepSeek | Fast | $0.0001 | ~68% | + Advanced |
-        | GPT-4 | Slow | $0.003 | ~70% | + Everything |
-        """)
-
-    # Show watchlist summary
-    watchlist = watchlist_manager.get_user_watchlist(st.session_state.user_id)
-    if watchlist:
-        st.info(f"📍 You are watching **{len(watchlist)} game(s)** • Updates will be sent to Telegram")
-    else:
-        st.info("💡 Check the box on games you want to follow for Telegram updates")
-
-    # ==================== SPORT SELECTOR ====================
-    st.markdown("### Select Sport")
-    sport_tabs = st.tabs(["🏈 NFL", "🎓 NCAA", "🏀 NBA (Coming Soon)", "⚾ MLB (Coming Soon)"])
+    # ==================== SPORT TABS (Horizontal at top) ====================
+    sport_tabs = st.tabs(["🏈 NFL", "🎓 NCAA", "🏀 NBA", "⚾ MLB"])
 
     with sport_tabs[0]:  # NFL
         sport_filter = "NFL"
         st.session_state.selected_sport = 'NFL'
-        st.info("📊 **Data Sources**: ESPN (Live Scores), OddsAPI (Betting Lines), Kalshi (Predictions)")
-
-        # ==================== NFL GAME CARDS ====================
-        # This will only show when NFL tab is active
-        show_sport_games(db, watchlist_manager, sport_filter, "NFL", llm_service if llm_available else None)
+        show_sport_games(db, watchlist_manager, sport_filter, "NFL", llm_service if llm_available else None, auto_refresh)
 
     with sport_tabs[1]:  # NCAA
         sport_filter = "CFB"
         st.session_state.selected_sport = 'NCAA'
-        st.info("📊 **Data Sources**: ESPN (Live Scores), CollegeFootballData.com (Stats), OddsAPI (Lines)")
-
-        # ==================== NCAA GAME CARDS ====================
-        # This will only show when NCAA tab is active
-        show_sport_games(db, watchlist_manager, sport_filter, "NCAA", llm_service if llm_available else None)
+        show_sport_games(db, watchlist_manager, sport_filter, "NCAA", llm_service if llm_available else None, auto_refresh)
 
     with sport_tabs[2]:  # NBA
-        st.warning("🚧 NBA data integration coming soon")
-        st.info("NBA game cards will be available in a future update. Check back later!")
+        st.info("🏀 **NBA Coming Soon** - Integration in progress")
 
     with sport_tabs[3]:  # MLB
-        st.warning("🚧 MLB data integration coming soon")
-        st.info("MLB game cards will be available in a future update. Check back later!")
+        st.info("⚾ **MLB Coming Soon** - Integration in progress")
 
 
-def show_sport_games(db, watchlist_manager, sport_filter, sport_name, llm_service=None):
-    """Display games for a specific sport - called from within tabs"""
-
-    st.markdown("---")
+def show_sport_games(db, watchlist_manager, sport_filter, sport_name, llm_service=None, auto_refresh=False):
+    """Display games for a specific sport with compact UI"""
 
     # Get selected AI model from session state
     selected_ai_model = st.session_state.get('ai_model', 'Local AI (Fast & Free)')
 
-    # ==================== ADVANCED SORTING & FILTERING ====================
-    col1, col2, col3, col4, col5, col6, col7 = st.columns(7)
+    # ==================== ALWAYS VISIBLE FILTERS ====================
+    st.markdown("### 🎛️ Filters & Sorting")
+
+    col1, col2, col3, col4, col5, col6 = st.columns(6)
 
     with col1:
         sort_by = st.selectbox(
             "Sort By",
-            ["Opportunity Score", "Game Time", "Win Probability", "Expected Profit", "AI Confidence", "Kalshi Odds", "Best Value"],
-            key=f"sort_{sport_filter}"
+            ["🔴 Live First", "⏰ Game Time", "🎯 Best Odds"],
+            key=f"sort_{sport_filter}",
+            help="Sort games (AI sorting disabled for performance)"
         )
 
     with col2:
         filter_status = st.selectbox(
             "Game Status",
-            ["All Games", "Live Only", "Upcoming", "Final", "Alert-Worthy Only"],
+            ["All Games", "Live Only", "Upcoming", "Final"],
             key=f"filter_{sport_filter}"
         )
 
     with col3:
         odds_filter = st.selectbox(
-            "Odds Filter",
-            ["All Odds", "Underdog Only", "Favorite Only", "Close Games", "Blowouts Expected"],
+            "Money Filter",
+            ["All Games", "💰 EV > 5%", "💰 EV > 10%", "🎯 High Confidence"],
             key=f"odds_filter_{sport_filter}"
         )
 
     with col4:
         min_opportunity = st.slider(
-            "Min Opp Score",
-            0, 100, 50,
+            "Min EV %",
+            0, 50, 0,
             key=f"min_opp_{sport_filter}"
         )
 
     with col5:
-        auto_refresh = st.checkbox(
-            "🔄 Auto",
-            value=False,
-            key=f"auto_refresh_{sport_filter}",
-            help="Enable automatic page refresh"
+        cards_per_row = st.selectbox(
+            "Cards/Row",
+            [2, 3, 4],
+            index=2,  # Default to 4
+            key=f"cards_per_row_{sport_filter}"
         )
 
     with col6:
-        refresh_interval = st.selectbox(
-            "Interval",
-            ["30 sec", "1 min", "3 min", "5 min", "10 min", "30 min"],
-            index=3,  # Default to 5 min
-            key=f"refresh_interval_{sport_filter}",
-            help="Auto-refresh frequency"
+        hide_final = st.checkbox(
+            "Hide Final",
+            value=False,
+            key=f"hide_final_{sport_filter}",
+            help="Filter out completed games"
         )
 
-    with col7:
-        cards_per_row = st.selectbox(
-            "Cards/Row",
-            [2, 4],
-            index=1,  # Default to 4
-            key=f"cards_per_row_{sport_filter}",
-            help="Number of game cards to show per row"
+    # Auto-refresh settings row
+    col_auto1, col_auto2 = st.columns([1, 1])
+    with col_auto1:
+        auto_refresh_enabled = st.checkbox(
+            "⚡ Auto-Refresh",
+            value=False,
+            key=f"auto_refresh_{sport_filter}",
+            help="Automatically sync live data at set interval"
         )
+    with col_auto2:
+        if auto_refresh_enabled:
+            refresh_interval = st.selectbox(
+                "Interval",
+                ["30 sec", "1 min", "2 min", "5 min"],
+                index=2,  # Default to 2 min
+                key=f"refresh_interval_{sport_filter}"
+            )
+        else:
+            refresh_interval = None
+
+    # Manual sync buttons and status
+    col_sync1, col_sync2, col_sync3, col_sync4 = st.columns([2, 2, 2, 1])
+    with col_sync1:
+        if st.button("🔄 Sync ESPN Data", key=f"sync_espn_{sport_filter}", help="Refresh live scores from ESPN", use_container_width=True):
+            with st.spinner(f"Syncing {sport_name} data from ESPN..."):
+                st.cache_data.clear()
+                import time
+                time.sleep(0.5)  # Brief pause to show spinner
+            st.success(f"✅ {sport_name} data refreshed!")
+            st.rerun()
+    with col_sync2:
+        if st.button("💰 Sync Kalshi Odds", key=f"sync_kalshi_{sport_filter}", help="Refresh betting odds from Kalshi", use_container_width=True):
+            with st.spinner("Syncing Kalshi betting odds..."):
+                st.cache_data.clear()
+                import time
+                time.sleep(0.5)
+            st.success("✅ Kalshi odds refreshed!")
+            st.rerun()
+    with col_sync3:
+        if st.button("🤖 Refresh AI Analysis", key=f"sync_ai_{sport_filter}", help="Regenerate AI predictions", use_container_width=True):
+            with st.spinner("Regenerating AI predictions..."):
+                st.cache_data.clear()
+                import time
+                time.sleep(0.5)
+            st.success("✅ AI analysis refreshed!")
+            st.rerun()
+    with col_sync4:
+        # Last sync indicator
+        import datetime
+        current_time = datetime.datetime.now().strftime("%H:%M")
+        st.caption(f"🕐 {current_time}")
+
+    st.markdown("---")
 
     # Auto-refresh logic
-    if auto_refresh:
-        if AUTOREFRESH_AVAILABLE:
-            # Convert selected interval to milliseconds
-            interval_map = {
-                "30 sec": 30000,
-                "1 min": 60000,
-                "3 min": 180000,
-                "5 min": 300000,
-                "10 min": 600000,
-                "30 min": 1800000
-            }
-            interval_ms = interval_map.get(refresh_interval, 300000)
+    if auto_refresh_enabled and refresh_interval:
+        import time
+        # Convert interval to seconds
+        interval_map = {"30 sec": 30, "1 min": 60, "2 min": 120, "5 min": 300}
+        interval_seconds = interval_map.get(refresh_interval, 120)
 
-            count = st_autorefresh(interval=interval_ms, key=f"autorefresh_{sport_filter}")
-            if count > 0:
-                st.info(f"🔄 Auto-refreshed {count} times ({refresh_interval}) • Last refresh: {datetime.now().strftime('%H:%M:%S')}")
-        else:
-            st.warning("⚠️ Auto-refresh requires: `pip install streamlit-autorefresh`")
+        # Use Streamlit's experimental rerun to auto-refresh
+        if 'last_refresh' not in st.session_state:
+            st.session_state.last_refresh = time.time()
+
+        time_since_refresh = time.time() - st.session_state.last_refresh
+        if time_since_refresh >= interval_seconds:
+            st.session_state.last_refresh = time.time()
+            st.cache_data.clear()
+            st.rerun()
 
     # Fetch live ESPN data first (primary data source)
+    espn_status = "❌ Failed"
     try:
         if sport_filter == 'CFB':
             # NCAA Football - use college football API
@@ -339,390 +641,316 @@ def show_sport_games(db, watchlist_manager, sport_filter, sport_name, llm_servic
             # NFL - use NFL API
             espn = get_espn_client()
             espn_games = espn.get_scoreboard()
+        espn_status = f"✅ {len(espn_games)} games fetched"
     except Exception as e:
         logger.error(f"Could not fetch ESPN data: {e}")
         espn_games = []
+        st.error(f"⚠️ Could not fetch {sport_name} games from ESPN: {str(e)}")
+        st.info("💡 Try: 1) Clear cache (press C) 2) Check internet connection 3) Verify ESPN API status")
+        # Don't return - allow UI to still show with helpful messages
 
     # Enrich ESPN games with Kalshi odds
+    kalshi_status = "❌ No odds"
     try:
         from src.espn_kalshi_matcher import enrich_games_with_kalshi_odds
         espn_games = enrich_games_with_kalshi_odds(espn_games)
         kalshi_matched = sum(1 for g in espn_games if g.get('kalshi_odds'))
         if kalshi_matched > 0:
             logger.info(f"Matched {kalshi_matched}/{len(espn_games)} ESPN games with Kalshi odds")
+            kalshi_status = f"✅ {kalshi_matched}/{len(espn_games)} games with odds"
+        else:
+            kalshi_status = f"⚠️ 0/{len(espn_games)} games matched"
     except Exception as e:
         logger.warning(f"Could not enrich with Kalshi odds: {e}")
+        kalshi_status = f"❌ Error: {str(e)[:50]}"
 
-    # Check for Kalshi game markets (team vs team, not player props)
-    kalshi_game_markets = fetch_games_grouped(db, min_confidence=70, sport=sport_filter)
+    # Display sync status
+    col_status1, col_status2, col_status3 = st.columns(3)
+    with col_status1:
+        st.info(f"**ESPN Status:** {espn_status}")
+    with col_status2:
+        st.info(f"**Kalshi Status:** {kalshi_status}")
+    with col_status3:
+        ai_status = "✅ Active" if llm_service else "⚠️ Local only"
+        st.info(f"**AI Status:** {ai_status}")
 
-    # Display mode selection
-    st.markdown("### 📊 Data Source")
+    # Show help if Kalshi data is missing
+    if kalshi_matched == 0:
+        with st.expander("💡 How to sync Kalshi odds", expanded=False):
+            st.markdown("""
+            **To get Kalshi betting odds, run one of these scripts:**
 
-    # Count player prop markets
+            1. **Quick Sync (NFL only):**
+               ```bash
+               python sync_kalshi_team_winners.py
+               ```
+
+            2. **Complete Sync (All markets):**
+               ```bash
+               python sync_kalshi_complete.py
+               ```
+
+            3. **Real-time Sync (Keep running):**
+               ```bash
+               python sync_kalshi_prices_realtime.py
+               ```
+
+            Make sure your Kalshi credentials are set in `.env` file:
+            ```
+            KALSHI_EMAIL=your@email.com
+            KALSHI_PASSWORD=your_password
+            ```
+            """)
+
+            if st.button("🔧 Open Kalshi Setup Guide", key=f"kalshi_setup_{sport_filter}"):
+                st.info("Check KALSHI_SETUP_GUIDE.md for detailed setup instructions")
+
+    # Check if games exist
+    if not espn_games:
+        st.warning(f"No live {sport_name} games available at this time")
+        return
+
+    # Calculate live count for display in pagination
+    live_count = sum(1 for g in espn_games if g.get('is_live', False))
+
+    # ==================== WATCH LIST SIDEBAR ====================
+    watchlist = watchlist_manager.get_user_watchlist(st.session_state.user_id)
+
+    if watchlist and not st.session_state.watch_sidebar_collapsed:
+        with st.sidebar:
+            st.markdown("### 📍 Your Watch List")
+
+            for watch_game in watchlist:
+                game_id = watch_game.get('game_id', '')
+                game_data = watch_game.get('game_data', {})
+                selected_team = watch_game.get('selected_team', '')
+
+                away_team = game_data.get('away_team', 'Away')
+                home_team = game_data.get('home_team', 'Home')
+                away_score = game_data.get('away_score', 0)
+                home_score = game_data.get('home_score', 0)
+                status = game_data.get('status_detail', 'Scheduled')
+                is_live = game_data.get('is_live', False)
+
+                # Highlight selected team
+                team_display = f"**{selected_team}**" if selected_team else f"{away_team} @ {home_team}"
+
+                col_watch1, col_watch2 = st.columns([4, 1])
+                with col_watch1:
+                    if is_live:
+                        st.markdown(f'<span class="live-indicator"></span>{team_display}', unsafe_allow_html=True)
+                        st.caption(f"{away_score} - {home_score} • {status}")
+                    else:
+                        st.markdown(team_display)
+                        st.caption(status)
+
+                with col_watch2:
+                    if st.button("✖", key=f"unwatch_{game_id}", help="Remove from watch list"):
+                        watchlist_manager.remove_game_from_watchlist(st.session_state.user_id, game_id)
+                        st.rerun()
+
+    # ==================== DISPLAY ESPN LIVE GAMES ====================
+    display_espn_live_games(
+        espn_games,
+        sport_name,
+        sport_filter,
+        watchlist_manager,
+        cards_per_row,
+        llm_service,
+        live_count,
+        filter_settings={
+            'sort_by': sort_by,
+            'filter_status': filter_status,
+            'odds_filter': odds_filter,
+            'min_opportunity': min_opportunity,
+            'hide_final': hide_final
+        }
+    )
+
+
+@st.cache_data(ttl=300, show_spinner=False)
+def get_sports_prediction_cached(game_id, sport_filter, home_team, away_team, game_date_str=None):
+    """
+    Get prediction from sport-specific AI agents (NFL or NCAA).
+    Uses cached Elo-based predictions with sport-specific features.
+
+    Returns:
+        dict: Prediction with winner, probability, confidence, spread, etc.
+    """
     try:
-        conn = db.get_connection()
-        cur = conn.cursor()
-        cur.execute("""
-            SELECT COUNT(*)
-            FROM kalshi_markets
-            WHERE status = 'active'
-            AND ticker LIKE %s
-        """, (f'%NFL%',) if sport_filter == 'NFL' else (f'%CFB%',))
-        player_props_count = cur.fetchone()[0]
-        cur.close()
-        conn.close()
-    except:
-        player_props_count = 0
-
-    if kalshi_game_markets:
-        st.success(f"✅ Found {len(kalshi_game_markets)} {sport_name} game markets from Kalshi")
-        data_source = "kalshi_games"
-    elif player_props_count > 0:
-        st.info(f"📊 **ESPN Live Scores** ({len(espn_games)} games) + **Kalshi Player Props** ({player_props_count:,} markets)")
-        st.caption("Note: Kalshi has player prop bets (fantasy-style) instead of traditional team game markets. Showing ESPN live games below.")
-        data_source = "espn_live"
-    else:
-        st.info(f"📊 **ESPN Live Scores** ({len(espn_games)} games)")
-        st.caption("Displaying live games from ESPN. Traditional betting markets coming soon.")
-        data_source = "espn_live"
-
-    st.markdown("---")
-
-    # ==================== RANKING CONTROLS (for Kalshi mode) ====================
-    if data_source == "kalshi_games":
-        st.markdown("### 🎯 Ranking System (Best Money Opportunities)")
-
-        col1, col2, col3, col4, col5 = st.columns([2, 1, 1, 1, 1])
-
-        with col1:
-            ranking_mode = st.selectbox(
-                "Rank By",
-                ["Expected Value (EV)", "Highest Edge", "Best Odds", "High Confidence", "Volume"],
-                key=f"ranking_mode_{sport_filter}"  # Unique key per sport
-            )
-
-        with col2:
-            view_mode = st.radio(
-                "View",
-                ["Top 10", "All Games", "Live"],
-                horizontal=False,
-                key=f"view_mode_{sport_filter}"  # Unique key per sport
-            )
-
-        with col3:
-            min_confidence = st.slider("Min Conf %", 0, 100, 70, key=f"min_conf_{sport_filter}")
-
-        with col4:
-            min_edge = st.slider("Min Edge %", 0, 50, 5, key=f"min_edge_{sport_filter}")
-
-        with col5:
-            if st.button("🔄 Refresh", key=f"refresh_{sport_filter}"):
-                st.cache_data.clear()
-                st.rerun()
-
-        # Fetch live ESPN data for merging
-        try:
-            if sport_filter == 'CFB':
-                espn = get_espn_ncaa_client()
-                live_scores = {game['game_id']: game for game in espn.get_scoreboard(group='80')}
-            else:
-                espn = get_espn_client()
-                live_scores = {game['game_id']: game for game in espn.get_scoreboard()}
-        except Exception as e:
-            logger.warning(f"Could not fetch live scores: {e}")
-            live_scores = {}
-
-        # Merge live scores and calculate EV
-        games = kalshi_game_markets
-        for game in games:
-            game['live_data'] = find_matching_live_game(game, live_scores)
-            game['expected_value'] = calculate_expected_value(game)
-
-    # ==================== ESPN LIVE GAMES MODE ====================
-    if data_source == "espn_live":
-        display_espn_live_games(espn_games, sport_name, sport_filter, watchlist_manager, cards_per_row, llm_service)
-        return
-
-    # ==================== KALSHI GAMES MODE ====================
-    if not games:
-        sport_name = "NCAA Football" if sport_filter == "CFB" else "NFL"
-        st.error(f"### No {sport_name} games found in database")
-
-        if sport_filter == "CFB":
-            # NCAA-specific empty state with ESPN live data
-            st.info("""
-            **📊 NCAA Market Status:**
-
-            Kalshi currently has **0 active NCAA football markets**. However, you can still view live games from ESPN:
-            """)
-
-            # Show live NCAA games from ESPN as fallback
+        # Parse game date if provided
+        game_date = None
+        if game_date_str:
             try:
-                espn_ncaa = get_espn_ncaa_client()
-                ncaa_games = espn_ncaa.get_scoreboard(group='80')  # FBS games
+                from dateutil import parser
+                game_date = parser.parse(game_date_str)
+            except:
+                pass
 
-                if ncaa_games:
-                    st.success(f"✅ Found {len(ncaa_games)} live NCAA games from ESPN")
-                    st.markdown("### 🏈 Live NCAA Games (ESPN)")
+        # Get appropriate predictor
+        if sport_filter == 'NFL':
+            predictor = st.session_state.get('nfl_predictor')
+        else:  # CFB / NCAA
+            predictor = st.session_state.get('ncaa_predictor')
 
-                    for game in ncaa_games[:10]:  # Show top 10
-                        away_rank = f"#{game['away_rank']} " if game.get('away_rank') else ""
-                        home_rank = f"#{game['home_rank']} " if game.get('home_rank') else ""
+        if not predictor:
+            return None
 
-                        st.markdown(f"""
-                        **{away_rank}{game['away_team']} @ {home_rank}{game['home_team']}**
-                        Score: {game['away_score']} - {game['home_score']} | {game['status_detail']}
-                        {f"📺 {game.get('tv_network', '')}" if game.get('tv_network') else ""}
-                        """)
-                else:
-                    st.warning("No NCAA games found on ESPN at this time")
-
-            except Exception as e:
-                logger.error(f"Error fetching NCAA games from ESPN: {e}")
-
-            st.info("""
-            **To get NCAA prediction markets:**
-
-            1. Kalshi may add NCAA markets during the college football season
-            2. Run `python pull_nfl_games.py` to check for new markets
-            3. Markets typically appear for major games and College Football Playoff
-
-            **Alternative:** Navigate to other prediction market pages for available sports
-            """)
-        else:
-            # NFL-specific empty state
-            st.info("""
-            **To populate NFL game data:**
-
-            1. **Sync Kalshi Markets**: Run `python pull_nfl_games.py` or use Prediction Markets page
-            2. **ESPN Data**: Game data auto-fetches from ESPN when markets exist
-            3. **Check Database**: Make sure PostgreSQL is running and tables are created
-
-            **Alternative Data Sources:**
-            - Navigate to "AI Sports Predictions" page for ESPN-based predictions
-            - Check "Kalshi Markets" page to manually sync markets
-
-            The system needs active betting markets in the database to display cards.
-            """)
-
-        # Show database connection status
-        try:
-            conn = db.get_connection()
-            cur = conn.cursor()
-            cur.execute("SELECT COUNT(*) FROM kalshi_markets WHERE status = 'active'")
-            active_markets = cur.fetchone()[0]
-            cur.close()
-            conn.close()
-            st.metric("Active Markets in Database", active_markets)
-            if active_markets == 0:
-                st.warning("Database has 0 active markets. Sync Kalshi markets to populate data.")
-        except Exception as e:
-            st.error(f"Database Error: {e}")
-        return
-
-    # Filter by min edge
-    games = [g for g in games if g.get('edge', 0) >= min_edge]
-
-    # Filter by view mode
-    if view_mode == "Live":
-        games = [g for g in games if g.get('is_live', False)]
-
-    # ==================== RANKING SYSTEM ====================
-    if ranking_mode == "Expected Value (EV)":
-        games.sort(key=lambda x: x.get('expected_value', 0), reverse=True)
-    elif ranking_mode == "Highest Edge":
-        games.sort(key=lambda x: x.get('edge', 0), reverse=True)
-    elif ranking_mode == "Best Odds":
-        games.sort(key=lambda x: x.get('best_odds_value', 0), reverse=True)
-    elif ranking_mode == "High Confidence":
-        games.sort(key=lambda x: x.get('confidence', 0), reverse=True)
-    elif ranking_mode == "Volume":
-        games.sort(key=lambda x: x.get('volume', 0), reverse=True)
-
-    # Apply Top 10 filter after ranking
-    if view_mode == "Top 10":
-        games = games[:10]
-
-    # ==================== TOP PICKS SUMMARY ====================
-    st.markdown("### 💰 Top Money-Making Opportunities")
-
-    col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        st.metric("Games Found", len(games))
-    with col2:
-        if games:
-            avg_ev = sum(g.get('expected_value', 0) for g in games) / len(games)
-            st.metric("Avg Expected Value", f"{avg_ev:.1f}%")
-    with col3:
-        if games:
-            best_edge = max(g.get('edge', 0) for g in games)
-            st.metric("Best Edge", f"{best_edge:.1f}%")
-    with col4:
-        live_count = sum(1 for g in games if g.get('is_live', False))
-        st.metric("Live Now", live_count)
-
-    st.markdown("---")
-
-    # ==================== DISPLAY RANKED GAMES ====================
-    st.markdown(f"### 📊 Games Ranked by {ranking_mode}")
-
-    # Display game cards in grid (use user-selected cards_per_row from above)
-    for i in range(0, len(games), cards_per_row):
-        cols = st.columns(cards_per_row)
-
-        for j, col in enumerate(cols):
-            if i + j < len(games):
-                with col:
-                    rank = i + j + 1
-                    display_ranked_game_card(games[i + j], rank, ranking_mode)
-
-    # Auto-refresh for live games (non-blocking)
-    if any(g.get('is_live', False) for g in games):
-        st.info("🔴 Live games detected - Page will auto-refresh in 60s")
-        # Use JavaScript for non-blocking refresh - doesn't freeze UI
-        st.markdown(
-            """
-            <script>
-                setTimeout(function() {
-                    window.location.reload();
-                }, 60000);
-            </script>
-            """,
-            unsafe_allow_html=True
+        # Get prediction
+        prediction = predictor.predict_winner(
+            home_team=home_team,
+            away_team=away_team,
+            game_date=game_date
         )
 
+        return prediction
 
-def calculate_expected_value(game):
-    """
-    Calculate Expected Value (EV) for a game
-    EV = (Win Probability × Payout) - (Loss Probability × Stake)
-
-    For betting $100:
-    - If we win: Payout = $100 × (1/price - 1)
-    - If we lose: Loss = $100
-    """
-    confidence = game.get('confidence', 50) / 100  # Convert to decimal
-    yes_price = game.get('yes_price', 0.5)
-    no_price = game.get('no_price', 0.5)
-
-    # Choose the bet side based on prediction
-    if game.get('predicted', '').upper() == 'YES':
-        bet_price = yes_price
-    else:
-        bet_price = no_price
-
-    if bet_price == 0 or bet_price == 1:
-        return 0
-
-    stake = 100  # Standard $100 bet
-    payout = stake * (1 / bet_price - 1)  # Profit if win
-
-    # EV = (Win Prob × Profit) - (Loss Prob × Stake)
-    ev = (confidence * payout) - ((1 - confidence) * stake)
-
-    # Return as percentage of stake
-    return (ev / stake) * 100
+    except Exception as e:
+        logger.warning(f"Sports prediction error for {home_team} vs {away_team}: {e}")
+        return None
 
 
-def display_espn_live_games(espn_games, sport_name, sport_filter, watchlist_manager, cards_per_row=4, llm_service=None):
-    """Display ESPN live games in a visual grid format"""
+@st.cache_data(ttl=300, show_spinner=False)
+def get_ai_predictions_cached(game_id, away_team, home_team, away_score, home_score, kalshi_odds_str):
+    """Cached AI predictions to avoid redundant calls"""
+    try:
+        from src.advanced_betting_ai_agent import AdvancedBettingAIAgent
+        ai_agent = AdvancedBettingAIAgent()
+
+        # Reconstruct game and market data from hashable parameters
+        game = {
+            'game_id': game_id,
+            'away_team': away_team,
+            'home_team': home_team,
+            'away_score': away_score,
+            'home_score': home_score
+        }
+
+        import json
+        kalshi_odds = json.loads(kalshi_odds_str) if kalshi_odds_str else {}
+
+        ai_pred = ai_agent.analyze_betting_opportunity(game, kalshi_odds)
+        return ai_pred
+    except:
+        return {
+            'expected_value': 0,
+            'confidence_score': 0,
+            'recommendation': 'PASS',
+            'predicted_winner': 'away',
+            'win_probability': 0.5
+        }
+
+
+def display_espn_live_games(espn_games, sport_name, sport_filter, watchlist_manager, cards_per_row=4, llm_service=None, live_count=0, filter_settings=None):
+    """Display ESPN live games in a compact visual grid format"""
     from src.nfl_team_database import NFL_LOGOS, get_team_logo_url as get_nfl_logo
     from src.ncaa_team_database import get_team_logo_url as get_ncaa_logo
+    import json
 
     if not espn_games:
         st.warning(f"No live {sport_name} games available from ESPN at this time")
         return
 
-    st.markdown(f"### 🏈 Live {sport_name} Games")
-    st.caption(f"Showing {len(espn_games)} games from ESPN • Real-time scores and stats")
+    # OPTIMIZATION: Skip heavy AI analysis for initial filtering
+    # Just use basic game data for filtering, AI will be loaded per-card on-demand
+    games_with_ev = []
+    for game in espn_games:
+        # Set defaults for sorting (will be computed on-demand per card)
+        game['expected_value'] = 0
+        game['confidence'] = 0
+        game['recommendation'] = 'PASS'
+        games_with_ev.append(game)
 
-    # Add filters
-    col1, col2, col3, col4 = st.columns([2, 2, 1, 1])
-    with col1:
-        game_status = st.selectbox(
-            "Filter by Status",
-            ["All Games", "Live Only", "Upcoming", "Final"],
-            key=f"game_status_filter_{sport_filter}"
-        )
+    # Filter games by status
+    filtered_games = games_with_ev
+    if filter_settings:
+        filter_status = filter_settings.get('filter_status', 'All Games')
+        hide_final = filter_settings.get('hide_final', False)
 
-    with col2:
-        from datetime import datetime, timedelta
-        date_filter = st.selectbox(
-            "Filter by Date",
-            ["All Dates", "Today", "Tomorrow", "This Week", "This Weekend"],
-            key=f"date_filter_{sport_filter}"
-        )
+        if filter_status == "Live Only":
+            filtered_games = [g for g in games_with_ev if g.get('is_live', False)]
+        elif filter_status == "Upcoming":
+            filtered_games = [g for g in games_with_ev if not g.get('is_live', False) and not g.get('is_completed', False)]
+        elif filter_status == "Final":
+            filtered_games = [g for g in games_with_ev if g.get('is_completed', False)]
 
-    with col3:
-        # Count games with Kalshi odds
-        kalshi_count = sum(1 for g in espn_games if g.get('kalshi_odds'))
-        if kalshi_count > 0:
-            st.metric("Kalshi Odds", f"{kalshi_count}/{len(espn_games)}")
+        # Apply "Hide Final Games" checkbox filter
+        if hide_final:
+            filtered_games = [g for g in filtered_games if not g.get('is_completed', False)]
+
+        # Apply money-making filters (simplified - no AI required for initial filter)
+        odds_filter = filter_settings.get('odds_filter', 'All Games')
+
+        # NOTE: AI-based filters disabled for performance - games will show all, sorted by time
+        # AI predictions load on-demand per card for better performance
+
+        # Apply sorting (simplified for performance)
+        sort_by = filter_settings.get('sort_by', '🔴 Live First')
+        if sort_by == "⏰ Game Time":
+            filtered_games.sort(key=lambda x: x.get('game_time') or datetime.max)
+        elif sort_by == "🎯 Best Odds":
+            # Sort by Kalshi odds (no AI needed)
+            filtered_games.sort(key=lambda x: min(
+                x.get('kalshi_odds', {}).get('away_win_price', 1) * 100 if x.get('kalshi_odds') else 100,
+                x.get('kalshi_odds', {}).get('home_win_price', 1) * 100 if x.get('kalshi_odds') else 100
+            ))
         else:
-            st.caption("No Kalshi odds")
+            # Default: Show live games first, then upcoming, then completed
+            live_games = [g for g in filtered_games if g.get('is_live', False)]
+            upcoming_games = [g for g in filtered_games if not g.get('is_live', False) and not g.get('is_completed', False)]
+            completed_games = [g for g in filtered_games if g.get('is_completed', False)]
+            filtered_games = live_games + upcoming_games + completed_games
 
-    with col4:
-        if st.button("🔄 Refresh", key=f"refresh_espn_{sport_filter}"):
+    if not filtered_games:
+        st.info(f"No games match your filters at this time")
+        return
+
+    # PAGINATION: Limit initial display for performance
+    games_per_page = 12  # Show 12 games initially (3 rows of 4)
+    total_games = len(filtered_games)
+
+    # Initialize pagination state (sport-specific)
+    page_key = f'games_page_{sport_filter}'
+    if page_key not in st.session_state:
+        st.session_state[page_key] = 0
+
+    start_idx = st.session_state[page_key] * games_per_page
+    end_idx = min(start_idx + games_per_page, total_games)
+    paginated_games = filtered_games[start_idx:end_idx]
+
+    # Show pagination info - all in one line
+    col_count, col_nav, col_refresh = st.columns([3, 4, 2])
+    with col_count:
+        st.markdown(f"**{sport_name}** • Showing {start_idx + 1}-{end_idx} of {total_games} games • Live Now: {live_count}")
+    with col_nav:
+        if total_games > games_per_page:
+            col_prev, col_next = st.columns(2)
+            with col_prev:
+                if st.button("⬅️ Previous", disabled=st.session_state[page_key] == 0, key=f"prev_{sport_filter}"):
+                    st.session_state[page_key] -= 1
+                    st.rerun()
+            with col_next:
+                if st.button("Next ➡️", disabled=end_idx >= total_games, key=f"next_{sport_filter}"):
+                    st.session_state[page_key] += 1
+                    st.rerun()
+    with col_refresh:
+        if st.button("🔄 Refresh", key=f"refresh_{sport_filter}"):
             st.cache_data.clear()
             st.rerun()
 
-    # Filter games by status
-    filtered_games = espn_games
-    if game_status == "Live Only":
-        filtered_games = [g for g in espn_games if g.get('is_live', False)]
-    elif game_status == "Upcoming":
-        filtered_games = [g for g in espn_games if not g.get('is_live', False) and g.get('status_type') == 'pre']
-    elif game_status == "Final":
-        filtered_games = [g for g in espn_games if g.get('status_type') == 'post']
-
-    # Filter games by date
-    if date_filter != "All Dates":
-        today = datetime.now().date()
-
-        def get_game_date(game):
-            """Extract game date from game_time string"""
-            try:
-                game_time = game.get('game_time', '')
-                if game_time:
-                    return datetime.strptime(game_time[:10], '%Y-%m-%d').date()
-            except:
-                pass
-            return today  # Default to today if can't parse
-
-        if date_filter == "Today":
-            filtered_games = [g for g in filtered_games if get_game_date(g) == today]
-        elif date_filter == "Tomorrow":
-            tomorrow = today + timedelta(days=1)
-            filtered_games = [g for g in filtered_games if get_game_date(g) == tomorrow]
-        elif date_filter == "This Week":
-            week_end = today + timedelta(days=7)
-            filtered_games = [g for g in filtered_games if today <= get_game_date(g) <= week_end]
-        elif date_filter == "This Weekend":
-            # Saturday and Sunday of this week
-            days_until_saturday = (5 - today.weekday()) % 7
-            saturday = today + timedelta(days=days_until_saturday)
-            sunday = saturday + timedelta(days=1)
-            filtered_games = [g for g in filtered_games if get_game_date(g) in [saturday, sunday]]
-
-    if not filtered_games:
-        st.info(f"No {game_status.lower()} at this time")
-        return
-
     # Display in grid (dynamic columns based on user selection)
-    for i in range(0, len(filtered_games), cards_per_row):
+    for i in range(0, len(paginated_games), cards_per_row):
         cols = st.columns(cards_per_row)
 
-        for col_idx, game in enumerate(filtered_games[i:i+cards_per_row]):
+        for col_idx, game in enumerate(paginated_games[i:i+cards_per_row]):
             with cols[col_idx]:
                 display_espn_game_card(game, sport_filter, watchlist_manager, llm_service)
-                st.markdown("<br>", unsafe_allow_html=True)
 
 
 def display_espn_game_card(game, sport_filter, watchlist_manager, llm_service=None):
-    """Display a single ESPN game as a card with AI prediction"""
-    from src.nfl_team_database import get_team_logo_url as get_nfl_logo, find_team_by_name as find_nfl_team
-    from src.ncaa_team_database import get_team_logo_url as get_ncaa_logo, find_team_by_name as find_ncaa_team
+    """Display a single ESPN game as a compact card with AI prediction"""
+    from src.nfl_team_database import get_team_logo_url as get_nfl_logo
+    from src.ncaa_team_database import get_team_logo_url as get_ncaa_logo
     from src.advanced_betting_ai_agent import AdvancedBettingAIAgent
 
     away_team = game.get('away_team', '')
@@ -731,1098 +959,384 @@ def display_espn_game_card(game, sport_filter, watchlist_manager, llm_service=No
     home_score = game.get('home_score', 0)
     status = game.get('status_detail', 'Scheduled')
     is_live = game.get('is_live', False)
+    is_completed = game.get('is_completed', False)
 
-    # CRITICAL FIX #1: ESPN API uses 'game_id' key, not 'id'
+    # Get game ID
     game_id = game.get('game_id', '')
     if game_id:
         game_id = str(game_id)
     else:
-        # Fallback: create unique ID from teams and time
         game_time = game.get('game_time', '').replace(' ', '_').replace(':', '')
         game_id = f"{sport_filter}_{away_team}_{home_team}_{game_time}"
 
-    # CRITICAL FIX #2: Create composite unique key for Streamlit widgets
-    # This prevents duplicate keys when multiple sports have same numeric game_id
+    # Create unique key for Streamlit widgets
     unique_key = f"{sport_filter}_{away_team}_{home_team}_{game_id}".replace(' ', '_').replace('@', 'at')
 
-    # Get team logos early for use in buttons
+    # Get team logos
     if sport_filter == 'CFB':
         away_logo = get_ncaa_logo(away_team)
         home_logo = get_ncaa_logo(home_team)
+        # Get rankings for NCAA
+        away_rank = game.get('away_rank')
+        home_rank = game.get('home_rank')
     else:
         away_logo = get_nfl_logo(away_team)
         home_logo = get_nfl_logo(home_team)
+        away_rank = None
+        home_rank = None
 
     # Get user ID from session state
     user_id = st.session_state.get('user_id', 'default_user')
 
-    # Validate game_id before database operations
-    if not game_id or game_id.strip() == '':
-        st.warning(f"⚠️ Cannot watch {away_team} @ {home_team} - missing game ID")
-        return
-
     # Check if game is in watchlist
-    is_watched = watchlist_manager.is_game_watched(user_id, game_id)
+    is_watched = watchlist_manager.is_game_watched(user_id, game_id) if game_id else False
 
-    # Watchlist checkbox with unique composite key
-    watched_checkbox = st.checkbox(
-        "📍 Watch & Get Telegram Updates",
-        value=is_watched,
-        key=f"watch_{unique_key}",
-        help="Get real-time updates when score, odds, or AI predictions change"
-    )
+    # ==================== CARD CONTAINER WITH BORDER ====================
+    st.markdown('<div class="game-card">', unsafe_allow_html=True)
+    with st.container():
+        # Compact top row: Status + Quick Telegram Subscribe
+        col_status, col_quick_tg = st.columns([2.5, 1])
+        with col_status:
+            if is_live:
+                st.markdown(f'<span class="live-indicator"></span><strong style="font-size:13px;">LIVE • {status}</strong>', unsafe_allow_html=True)
+            elif is_completed:
+                st.markdown(f"<strong style='font-size:13px;'>FINAL • {status}</strong>", unsafe_allow_html=True)
+            else:
+                st.markdown(f"<strong style='font-size:13px;'>{status}</strong>", unsafe_allow_html=True)
+        with col_quick_tg:
+            # Subscribe button - turns green when subscribed
+            button_label = "📍" if not is_watched else "✓"
+            button_type = "primary" if not is_watched else "secondary"
 
-    # Team selection if watching
-    selected_team = None
-    team_selected = False
-    if watched_checkbox:
-        col_team1, col_team2 = st.columns(2)
-        with col_team1:
-            # Show away team logo and button
+            # Custom CSS to make subscribed button green
+            if is_watched:
+                st.markdown("""
+                <style>
+                button[kind="secondary"] {
+                    background-color: #4CAF50 !important;
+                    color: white !important;
+                }
+                </style>
+                """, unsafe_allow_html=True)
+
+            if st.button(button_label, key=f"quick_tg_{unique_key}", type=button_type, use_container_width=True, help="Subscribe for live updates"):
+                if not is_watched:
+                    watchlist_manager.add_game_to_watchlist(user_id, game, selected_team=None)
+                    try:
+                        from src.telegram_notifier import TelegramNotifier
+                        notifier = TelegramNotifier()
+                        message = f"🏈 Subscribed: {away_team} @ {home_team}\nYou'll get live updates via Telegram!"
+                        notifier.send_message(message)
+                    except: pass
+                    st.rerun()
+
+        # Get sports-specific AI prediction FIRST (for visual highlighting)
+        game_date_str = game.get('game_time', '')
+        sports_prediction = get_sports_prediction_cached(
+            game_id=str(game_id),
+            sport_filter=sport_filter,
+            home_team=home_team,
+            away_team=away_team,
+            game_date_str=game_date_str if game_date_str else None
+        )
+
+        # Determine predicted winner and confidence
+        if sports_prediction:
+            predicted_winner = sports_prediction.get('winner', '')
+            win_probability = sports_prediction.get('probability', 0.5)
+            confidence_level = sports_prediction.get('confidence', 'low')  # 'high', 'medium', 'low'
+            predicted_spread = sports_prediction.get('spread', 0)
+        else:
+            predicted_winner = ''
+            win_probability = 0.5
+            confidence_level = 'low'
+            predicted_spread = 0
+
+        # Determine CSS class for visual highlighting
+        if confidence_level == 'high':
+            highlight_class = 'team-logo-high-confidence'
+            confidence_emoji = '🟢'
+            confidence_text = 'HIGH CONFIDENCE'
+        elif confidence_level == 'medium':
+            highlight_class = 'team-logo-medium-confidence'
+            confidence_emoji = '🟡'
+            confidence_text = 'MEDIUM CONFIDENCE'
+        else:
+            highlight_class = 'team-logo-low-confidence'
+            confidence_emoji = '⚪'
+            confidence_text = 'Low Confidence'
+
+        # Get Kalshi odds
+        kalshi_odds = game.get('kalshi_odds', {})
+        away_odds = kalshi_odds.get('away_win_price', 0) * 100 if kalshi_odds else 0
+        home_odds = kalshi_odds.get('home_win_price', 0) * 100 if kalshi_odds else 0
+
+        # Team matchup with logos and scores - WITH VISUAL HIGHLIGHTING
+        col1, col2, col3 = st.columns([2, 1, 2])
+
+        with col1:
+            # Away team - highlight if predicted winner
+            is_away_winner = (predicted_winner == away_team)
+
+            if is_away_winner and confidence_level != 'low':
+                # Add highlighting div
+                st.markdown(f'<div class="team-logo-container {highlight_class}">', unsafe_allow_html=True)
+
+            # Away team logo
             if away_logo:
-                st.image(away_logo, width=40)
-            if st.button(f"{away_team[:15]}", key=f"team_away_{unique_key}", use_container_width=True, type="primary"):
-                selected_team = away_team
-                team_selected = True
-                watchlist_manager.add_game_to_watchlist(user_id, game, selected_team=away_team)
-                st.success(f"✅ Rooting for {away_team}!")
-        with col_team2:
-            # Show home team logo and button
+                st.image(away_logo, width=70)
+
+            # Only show rank if valid (1-25, not 99 which means unranked)
+            rank_display = f"#{away_rank} " if away_rank and away_rank <= 25 else ""
+            st.markdown(f"**{rank_display}{away_team[:20]}**")
+
+            # Show win probability if predicted winner
+            if is_away_winner and sports_prediction:
+                st.markdown(f"{confidence_emoji} **{int(win_probability * 100)}%**")
+
+            st.markdown(f"<h2 style='margin:0; font-weight:bold;'>{away_score}</h2>", unsafe_allow_html=True)
+
+            # Display Kalshi odds next to team
+            if away_odds > 0:
+                st.markdown(f"<p style='font-size:18px; font-weight:bold; color:#4CAF50; margin:0;'>{away_odds:.0f}¢</p>", unsafe_allow_html=True)
+
+            if is_away_winner and confidence_level != 'low':
+                st.markdown('</div>', unsafe_allow_html=True)
+
+        with col2:
+            st.markdown("<p style='text-align:center; padding-top:35px; font-size:18px;'>@</p>", unsafe_allow_html=True)
+
+        with col3:
+            # Home team - highlight if predicted winner
+            is_home_winner = (predicted_winner == home_team)
+
+            if is_home_winner and confidence_level != 'low':
+                # Add highlighting div
+                st.markdown(f'<div class="team-logo-container {highlight_class}">', unsafe_allow_html=True)
+
+            # Home team logo
             if home_logo:
-                st.image(home_logo, width=40)
-            if st.button(f"{home_team[:15]}", key=f"team_home_{unique_key}", use_container_width=True, type="primary"):
-                selected_team = home_team
-                team_selected = True
-                watchlist_manager.add_game_to_watchlist(user_id, game, selected_team=home_team)
-                st.success(f"✅ Rooting for {home_team}!")
+                st.image(home_logo, width=70)
 
-    # Handle watchlist changes
-    if watched_checkbox and not is_watched:
-        # Add to watchlist
-        watchlist_manager.add_game_to_watchlist(user_id, game, selected_team=selected_team)
-    elif not watched_checkbox and is_watched:
-        # Remove from watchlist
-        watchlist_manager.remove_game_from_watchlist(user_id, game_id)
+            # Only show rank if valid (1-25, not 99 which means unranked)
+            rank_display = f"#{home_rank} " if home_rank and home_rank <= 25 else ""
+            st.markdown(f"**{rank_display}{home_team[:20]}**")
 
-    # Get AI prediction for this game (with error handling)
-    # First, always generate local AI prediction (fast, free, baseline)
-    try:
-        ai_agent = AdvancedBettingAIAgent()
-        market_data = game.get('kalshi_odds', {})
-        ai_prediction = ai_agent.analyze_betting_opportunity(game, market_data)
-    except Exception as e:
-        # Default prediction if AI fails
-        ai_prediction = {
-            'predicted_winner': 'home' if home_score > away_score else 'away',
-            'win_probability': 0.5,
-            'confidence_score': 0,
-            'expected_value': 0,
-            'recommendation': 'PASS',
-            'reasoning': ['AI analysis temporarily unavailable'],
-            'high_confidence_signal': False
-        }
+            # Show win probability if predicted winner
+            if is_home_winner and sports_prediction:
+                st.markdown(f"{confidence_emoji} **{int(win_probability * 100)}%**")
 
-    # Check if user selected an LLM model (not local AI)
-    selected_ai_model = st.session_state.get('ai_model', 'Local AI (Fast & Free)')
+            st.markdown(f"<h2 style='margin:0; font-weight:bold;'>{home_score}</h2>", unsafe_allow_html=True)
 
-    if llm_service and selected_ai_model != 'Local AI (Fast & Free)' and '─' not in selected_ai_model:
+            # Display Kalshi odds next to team
+            if home_odds > 0:
+                st.markdown(f"<p style='font-size:18px; font-weight:bold; color:#4CAF50; margin:0;'>{home_odds:.0f}¢</p>", unsafe_allow_html=True)
+
+            if is_home_winner and confidence_level != 'low':
+                st.markdown('</div>', unsafe_allow_html=True)
+
+        # Get AI prediction (CACHED for performance)
         try:
-            # Build LLM prompt with game details
+            import json
             kalshi_odds = game.get('kalshi_odds', {})
-            away_odds = kalshi_odds.get('away_win_price', 0) if kalshi_odds else 0
-            home_odds = kalshi_odds.get('home_win_price', 0) if kalshi_odds else 0
+            kalshi_odds_str = json.dumps(kalshi_odds) if kalshi_odds else ""
 
-            # Get current period/quarter
-            period = game.get('period', 'Not Started')
-            game_time = game.get('game_time', 'TBD')
+            ai_prediction = get_ai_predictions_cached(
+                game_id=str(game_id),
+                away_team=away_team,
+                home_team=home_team,
+                away_score=away_score,
+                home_score=home_score,
+                kalshi_odds_str=kalshi_odds_str
+            )
+        except:
+            ai_prediction = {
+                'predicted_winner': 'home' if home_score > away_score else 'away',
+                'win_probability': 0.5,
+                'confidence_score': 0,
+                'expected_value': 0,
+                'recommendation': 'PASS'
+            }
 
-            prompt = f"""You are an expert sports betting analyst. Analyze this game and provide betting recommendations.
+        # Display ENHANCED AI prediction with sports-specific analysis
+        st.markdown("<p style='font-size:15px; font-weight:600; margin:8px 0 4px 0;'>🤖 AI Prediction</p>", unsafe_allow_html=True)
 
-**Game Details:**
-- Matchup: {away_team} @ {home_team}
-- Current Score: {away_team} {away_score} - {home_team} {home_score}
-- Status: {status}
-- Period: {period}
-- Game Time: {game_time}
+        if sports_prediction:
+            # Show prediction from sport-specific agent (NFL/NCAA) with styled badge
+            if confidence_level == 'high':
+                badge_class = 'confidence-high'
+            elif confidence_level == 'medium':
+                badge_class = 'confidence-medium'
+            else:
+                badge_class = 'confidence-low'
 
-**Market Data:**
-- {away_team} Win Odds: {away_odds:.0%} ({away_odds*100:.0f}¢)
-- {home_team} Win Odds: {home_odds:.0%} ({home_odds*100:.0f}¢)
+            st.markdown(f'<div class="confidence-badge {badge_class}">{confidence_emoji} {confidence_text}</div>', unsafe_allow_html=True)
 
-**Local AI Analysis:**
-- Predicted Winner: {ai_prediction.get('predicted_winner', 'N/A')}
-- Win Probability: {ai_prediction.get('win_probability', 0):.1%}
-- Confidence: {ai_prediction.get('confidence_score', 0):.1%}
-- Expected Value: {ai_prediction.get('expected_value', 0):+.2f}%
-- Recommendation: {ai_prediction.get('recommendation', 'PASS')}
-
-**Your Task:**
-Provide a detailed betting analysis in this EXACT format:
-
-PREDICTED_WINNER: [away/home]
-WIN_PROBABILITY: [0.0-1.0]
-CONFIDENCE_SCORE: [0.0-1.0]
-EXPECTED_VALUE: [number, can be negative]
-RECOMMENDATION: [PASS/BUY/STRONG_BUY]
-REASONING: [2-3 concise bullet points explaining your analysis]
-
-Consider:
-1. Current game state (score, time remaining, momentum)
-2. Market odds vs true probability (value betting)
-3. Statistical trends and historical performance
-4. Risk/reward ratio
-
-Be concise but thorough."""
-
-            # Determine provider from selected model
-            provider = None
-            if "Groq" in selected_ai_model:
-                provider = "groq"
-            elif "Hugging Face" in selected_ai_model:
-                provider = "huggingface"
-            elif "Ollama" in selected_ai_model:
-                provider = "ollama"
-            elif "DeepSeek" in selected_ai_model:
-                provider = "deepseek"
-            elif "Gemini" in selected_ai_model:
-                provider = "gemini"
-            elif "GPT-4" in selected_ai_model:
-                provider = "openai"
-            elif "Claude" in selected_ai_model:
-                provider = "anthropic"
-
-            if provider:
-                # Call LLM
-                llm_response = llm_service.generate(
-                    prompt=prompt,
-                    max_tokens=500,
-                    temperature=0.3,
-                    provider=provider
+            # Show key prediction details
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric(
+                    "Predicted Winner",
+                    predicted_winner[:15],
+                    help="AI predicted winner using Elo ratings and advanced stats"
+                )
+            with col2:
+                st.metric(
+                    "Win Probability",
+                    f"{int(win_probability * 100)}%",
+                    help="Likelihood of predicted outcome"
+                )
+            with col3:
+                st.metric(
+                    "Predicted Spread",
+                    f"{abs(predicted_spread):.1f}" if predicted_spread != 0 else "-",
+                    help="Expected point difference"
                 )
 
-                # Parse LLM response
-                if llm_response and 'response' in llm_response:
-                    response_text = llm_response['response']
+            # Show detailed explanation in expandable section
+            explanation = sports_prediction.get('explanation', '')
+            if explanation:
+                with st.expander("📊 Why this prediction?"):
+                    st.markdown(explanation)
 
-                    # Extract structured data from response
-                    try:
-                        # Parse winner
-                        if 'PREDICTED_WINNER: away' in response_text:
-                            llm_winner = 'away'
-                        elif 'PREDICTED_WINNER: home' in response_text:
-                            llm_winner = 'home'
-                        else:
-                            llm_winner = ai_prediction['predicted_winner']
+                    # Show key features
+                    features = sports_prediction.get('features', {})
+                    adjustments = sports_prediction.get('adjustments', {})
 
-                        # Parse win probability
-                        win_prob_match = re.search(r'WIN_PROBABILITY:\s*(0?\.\d+|1\.0)', response_text)
-                        llm_win_prob = float(win_prob_match.group(1)) if win_prob_match else ai_prediction['win_probability']
+                    if features:
+                        st.markdown("**Key Factors:**")
 
-                        # Parse confidence
-                        conf_match = re.search(r'CONFIDENCE_SCORE:\s*(0?\.\d+|1\.0)', response_text)
-                        llm_confidence = float(conf_match.group(1)) if conf_match else ai_prediction['confidence_score']
+                        if sport_filter == 'NFL':
+                            # NFL-specific features
+                            st.markdown(f"- **Elo Ratings:** {home_team} ({features.get('home_elo', 0):.0f}) vs {away_team} ({features.get('away_elo', 0):.0f})")
+                            st.markdown(f"- **Home Field:** +{features.get('home_field_advantage', 0):.1f} pts")
 
-                        # Parse expected value
-                        ev_match = re.search(r'EXPECTED_VALUE:\s*([+-]?\d+\.?\d*)', response_text)
-                        llm_ev = float(ev_match.group(1)) if ev_match else ai_prediction['expected_value']
+                            if features.get('is_divisional') == 1.0:
+                                st.markdown("- **🔥 Divisional Rivalry** (typically more competitive)")
 
-                        # Parse recommendation
-                        if 'STRONG_BUY' in response_text.upper():
-                            llm_rec = 'STRONG_BUY'
-                        elif 'BUY' in response_text.upper():
-                            llm_rec = 'BUY'
-                        else:
-                            llm_rec = 'PASS'
+                            if adjustments.get('injury_impact', 0) != 0:
+                                injury_text = "favors home" if adjustments['injury_impact'] > 0 else "favors away"
+                                st.markdown(f"- **Injury Impact:** {injury_text}")
 
-                        # Parse reasoning
-                        reasoning_match = re.search(r'REASONING:\s*(.+?)(?:\n\n|\Z)', response_text, re.DOTALL)
-                        if reasoning_match:
-                            reasoning_text = reasoning_match.group(1).strip()
-                            llm_reasoning = [line.strip('- ').strip() for line in reasoning_text.split('\n') if line.strip()]
-                        else:
-                            llm_reasoning = ai_prediction['reasoning']
+                        else:  # NCAA
+                            # NCAA-specific features
+                            st.markdown(f"- **Elo Ratings:** {home_team} ({features.get('home_elo', 0):.0f}) vs {away_team} ({features.get('away_elo', 0):.0f})")
+                            st.markdown(f"- **Conference Power:** {home_team} ({features.get('home_conf_power', 0):.2f}) vs {away_team} ({features.get('away_conf_power', 0):.2f})")
+                            st.markdown(f"- **Recruiting:** {home_team} ({features.get('home_recruiting', 0):.0f}/100) vs {away_team} ({features.get('away_recruiting', 0):.0f}/100)")
 
-                        # Update prediction with LLM analysis
-                        ai_prediction.update({
-                            'predicted_winner': llm_winner,
-                            'win_probability': llm_win_prob,
-                            'confidence_score': llm_confidence,
-                            'expected_value': llm_ev,
-                            'recommendation': llm_rec,
-                            'reasoning': llm_reasoning,
-                            'high_confidence_signal': llm_confidence >= 0.75,
-                            'model_used': selected_ai_model
-                        })
+                            if features.get('is_rivalry') == 1.0:
+                                st.markdown("- **🔥 RIVALRY GAME** (expect closer contest)")
 
-                        logger.info(f"Enhanced prediction with {selected_ai_model} for {away_team} @ {home_team}")
+                            if adjustments.get('crowd_size', 0) > 80000:
+                                st.markdown(f"- **Massive Home Crowd:** {adjustments['crowd_size']:,} fans")
+        else:
+            # Fallback: Show traditional AI analysis if sports prediction unavailable
+            st.caption("⚠️ Sports-specific prediction unavailable. Using fallback analysis.")
 
-                    except Exception as parse_error:
-                        logger.warning(f"Could not parse LLM response, using local AI: {parse_error}")
-                        # Keep local AI prediction
-
-        except Exception as llm_error:
-            logger.warning(f"LLM prediction failed, using local AI: {llm_error}")
-            # Keep local AI prediction
-
-    # Send immediate Telegram notification when team is selected
-    if team_selected and selected_team:
-        try:
-            from src.telegram_notifier import TelegramNotifier
-            from datetime import datetime
-
-            notifier = TelegramNotifier()
-
-            # Build notification message
-            predicted_winner_text = away_team if ai_prediction['predicted_winner'] == 'away' else home_team
-            win_prob = ai_prediction.get('win_probability', 0) * 100
-            confidence = ai_prediction.get('confidence_score', 0)
+            # Get traditional AI prediction
+            predicted_winner_fallback = ai_prediction.get('predicted_winner', 'away')
+            win_prob_fallback = ai_prediction.get('win_probability', 0.5)
+            confidence_fallback = ai_prediction.get('confidence_score', 0)
             ev = ai_prediction.get('expected_value', 0)
-            recommendation = ai_prediction.get('recommendation', 'N/A')
+            recommendation = ai_prediction.get('recommendation', 'PASS')
 
-            # Determine user's team status
-            if is_live:
-                if (selected_team == away_team and away_score > home_score) or \
-                   (selected_team == home_team and home_score > away_score):
-                    team_status = "✅ WINNING"
-                    point_diff = abs(away_score - home_score)
-                    status_detail = f"By {point_diff} points"
-                elif away_score == home_score:
-                    team_status = "⚖️ TIED"
-                    status_detail = "Game is tied"
-                else:
-                    team_status = "❌ LOSING"
-                    point_diff = abs(away_score - home_score)
-                    status_detail = f"By {point_diff} points"
+            winner_name = away_team if predicted_winner_fallback == 'away' else home_team
+
+            # Display fallback prediction
+            display_win_prob = win_prob_fallback if win_prob_fallback > 1 else win_prob_fallback * 100
+            display_confidence = confidence_fallback if confidence_fallback > 1 else confidence_fallback * 100
+
+            # Recommendation
+            if recommendation == 'STRONG_BUY':
+                st.success("🚀 **STRONG BUY** - High confidence opportunity")
+            elif recommendation == 'BUY':
+                st.info("💰 **BUY** - Good betting value")
             else:
-                team_status = "🎯 WATCHING"
-                status_detail = "Game not yet started"
+                st.info("⏸️ **PASS** - No strong value detected")
 
-            message = f"""🔔 **NEW WATCHLIST ALERT**
+            # Metrics
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("Predicted", winner_name[:12])
+            with col2:
+                st.metric("Win Prob", f"{display_win_prob:.1f}%")
+            with col3:
+                st.metric("EV", f"{ev:.1f}%")
 
-🏈 **{away_team} @ {home_team}**
-**{away_score} - {home_score}**
-_{status}_
+        # Unsubscribe button (only if subscribed)
+        if is_watched:
+            if st.button("🗑️ Unsubscribe", key=f"unsub_{unique_key}", use_container_width=True):
+                watchlist_manager.remove_game_from_watchlist(user_id, game_id)
+                st.rerun()
 
-🔥 **Your Team ({selected_team}): {team_status}**
-   {status_detail}
-"""
+    st.markdown('</div>', unsafe_allow_html=True)  # Close game-card div
+    # Removed horizontal separator to save space
 
-            # Add Kalshi odds if available
-            kalshi_odds = game.get('kalshi_odds', {})
-            if kalshi_odds:
-                away_odds = kalshi_odds.get('away_win_price', 0)
-                home_odds = kalshi_odds.get('home_win_price', 0)
 
-                # Convert to cents for display
-                away_cents = int(away_odds * 100) if away_odds else 0
-                home_cents = int(home_odds * 100) if home_odds else 0
-
-                message += f"""
-💰 **Kalshi Odds:**
-   {away_team}: {away_cents}¢
-   {home_team}: {home_cents}¢
-"""
-            else:
-                message += "\n💰 **Kalshi Odds:** Not available\n"
-
-            # Add AI recommendation
-            ai_emoji = "✅" if predicted_winner_text == selected_team else "❌"
-            message += f"""
-{ai_emoji} 🤖 **AI Predicts: {predicted_winner_text} wins**
-   Win Probability: {win_prob:.0f}%
-   Confidence: {confidence:.0f}%
-   Expected Value: {ev:+.1f}%
-   Recommendation: **{recommendation}**
-
-_Added to watchlist: {datetime.now().strftime('%I:%M %p')}_
-"""
-
-            # Send the message
-            notifier.send_custom_message(message)
-            logger.info(f"Sent immediate Telegram alert for {away_team} @ {home_team}")
-
-        except Exception as e:
-            logger.error(f"Failed to send immediate Telegram notification: {e}")
-
-    # Card styling - Dark theme
-    status_color = "#ef4444" if is_live else "#9ca3af"
-    card_border = "2px solid #ef4444" if is_live else "1px solid #374151"
-    bg_color = "#1f2937" if is_live else "#111827"
-
-    card_html = f"""
-    <div style="border: {card_border}; border-radius: 12px; padding: 12px; background: {bg_color}; margin-bottom: 8px;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-            <span style="font-size: 12px; color: {status_color}; font-weight: bold; text-transform: uppercase;">
-                {'🔴 LIVE' if is_live else status}
-            </span>
-        </div>
-    </div>
+# Helper functions
+def calculate_expected_value(game):
     """
-
-    st.markdown(card_html, unsafe_allow_html=True)
-
-    # Team matchup - Compact for 4 columns
-    col1, col_vs, col2 = st.columns([1, 0.2, 1])
-
-    with col1:
-        if away_logo:
-            st.image(away_logo, width=50)
-        else:
-            st.markdown(f"<div style='width: 50px; height: 50px; background: #374151; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; color: #9ca3af; margin: 0 auto;'>{away_team[:3].upper()}</div>", unsafe_allow_html=True)
-        st.markdown(f"<div style='font-size: 13px; font-weight: bold; text-align: center; margin-top: 4px; color: #f3f4f6;'>{away_team}</div>", unsafe_allow_html=True)
-
-        # Show team record if available
-        away_record = game.get('away_record', '')
-        if away_record:
-            st.markdown(f"<div style='text-align: center; font-size: 10px; color: #9ca3af;'>({away_record})</div>", unsafe_allow_html=True)
-
-        st.markdown(f"<div style='font-size: 24px; font-weight: bold; text-align: center; color: #e5e7eb;'>{away_score}</div>", unsafe_allow_html=True)
-
-        # Show ranking if available
-        if game.get('away_rank'):
-            st.markdown(f"<div style='text-align: center; font-size: 11px; color: #10b981; font-weight: bold;'>#{game['away_rank']}</div>", unsafe_allow_html=True)
-
-    with col_vs:
-        st.markdown("<div style='text-align: center; padding-top: 25px; font-size: 14px; color: #6b7280; font-weight: bold;'>@</div>", unsafe_allow_html=True)
-
-    with col2:
-        if home_logo:
-            st.image(home_logo, width=50)
-        else:
-            st.markdown(f"<div style='width: 50px; height: 50px; background: #374151; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; color: #9ca3af; margin: 0 auto;'>{home_team[:3].upper()}</div>", unsafe_allow_html=True)
-        st.markdown(f"<div style='font-size: 13px; font-weight: bold; text-align: center; margin-top: 4px; color: #f3f4f6;'>{home_team}</div>", unsafe_allow_html=True)
-
-        # Show team record if available
-        home_record = game.get('home_record', '')
-        if home_record:
-            st.markdown(f"<div style='text-align: center; font-size: 10px; color: #9ca3af;'>({home_record})</div>", unsafe_allow_html=True)
-
-        st.markdown(f"<div style='font-size: 24px; font-weight: bold; text-align: center; color: #e5e7eb;'>{home_score}</div>", unsafe_allow_html=True)
-
-        # Show ranking if available
-        if game.get('home_rank'):
-            st.markdown(f"<div style='text-align: center; font-size: 11px; color: #10b981; font-weight: bold;'>#{game['home_rank']}</div>", unsafe_allow_html=True)
-
-    # Kalshi odds section
-    kalshi_odds = game.get('kalshi_odds')
-    if kalshi_odds:
-        st.markdown("---")
-        odds_col1, odds_col2 = st.columns(2)
-        with odds_col1:
-            away_odds = kalshi_odds.get('away_win_price', 0) * 100
-            st.markdown(f"<div style='text-align: center; font-size: 11px; color: #3b82f6; font-weight: 600;'>Kalshi: {away_odds:.0f}¢</div>", unsafe_allow_html=True)
-        with odds_col2:
-            home_odds = kalshi_odds.get('home_win_price', 0) * 100
-            st.markdown(f"<div style='text-align: center; font-size: 11px; color: #3b82f6; font-weight: 600;'>Kalshi: {home_odds:.0f}¢</div>", unsafe_allow_html=True)
-
-    # ==================== AI PREDICTION SECTION ====================
-    st.markdown("---")
-
-    # Determine predicted winner and styling
-    predicted_winner = (ai_prediction.get('predicted_winner') or '').lower()
-    win_probability = (ai_prediction.get('win_probability') or 0) * 100
-    confidence = ai_prediction.get('confidence_score') or 0
-    expected_value = ai_prediction.get('expected_value') or 0
-    recommendation = ai_prediction.get('recommendation') or 'PASS'
-    reasoning = ai_prediction.get('reasoning') or []
-    high_confidence = ai_prediction.get('high_confidence_signal') or False
-
-    # Determine which team is predicted to win
-    if predicted_winner == 'away':
-        winner_name = away_team
-        winner_emoji = "🔼"
-    elif predicted_winner == 'home':
-        winner_name = home_team
-        winner_emoji = "🔽"
-    else:
-        winner_name = "TBD"
-        winner_emoji = "⚖️"
-
-    # Color coding based on recommendation
-    if recommendation == 'STRONG_BUY':
-        rec_color = "#10b981"  # Green
-        rec_bg = "#d1fae5"
-        rec_border = "2px solid #10b981"
-    elif recommendation == 'BUY':
-        rec_color = "#3b82f6"  # Blue
-        rec_bg = "#dbeafe"
-        rec_border = "2px solid #3b82f6"
-    elif recommendation == 'HOLD':
-        rec_color = "#f59e0b"  # Orange
-        rec_bg = "#fed7aa"
-        rec_border = "2px solid #f59e0b"
-    else:  # PASS
-        rec_color = "#6b7280"  # Gray
-        rec_bg = "#e5e7eb"
-        rec_border = "1px solid #9ca3af"
-
-    # Lightning bolt for high confidence
-    confidence_icon = "⚡" if high_confidence else "🎯"
-
-    # Get model indicator
-    model_used = ai_prediction.get('model_used', 'Local AI (Fast & Free)')
-    if 'Local AI' in model_used:
-        model_badge = "🔬 Local AI"
-        model_color = "#6b7280"
-    elif 'Groq' in model_used:
-        model_badge = "🚀 Groq"
-        model_color = "#10b981"
-    elif 'DeepSeek' in model_used:
-        model_badge = "🧠 DeepSeek"
-        model_color = "#3b82f6"
-    elif 'GPT-4' in model_used:
-        model_badge = "✨ GPT-4"
-        model_color = "#8b5cf6"
-    elif 'Claude' in model_used:
-        model_badge = "🤖 Claude"
-        model_color = "#f59e0b"
-    elif 'Gemini' in model_used:
-        model_badge = "💎 Gemini"
-        model_color = "#ec4899"
-    elif 'Ollama' in model_used:
-        model_badge = "🦙 Ollama"
-        model_color = "#14b8a6"
-    elif 'Hugging Face' in model_used:
-        model_badge = "🤗 HF"
-        model_color = "#f97316"
-    else:
-        model_badge = "🤖 AI"
-        model_color = "#6b7280"
-
-    # AI Prediction Card
-    ai_card_html = f"""
-    <div style="
-        background: {rec_bg};
-        border: {rec_border};
-        border-radius: 8px;
-        padding: 10px;
-        margin: 8px 0;
-    ">
-        <div style="text-align: center;">
-            <div style="font-size: 11px; font-weight: bold; color: {rec_color}; text-transform: uppercase; margin-bottom: 4px;">
-                {confidence_icon} AI PREDICTION {' ⚡' if high_confidence else ''}
-            </div>
-            <div style="font-size: 8px; color: {model_color}; background: white; display: inline-block; padding: 2px 6px; border-radius: 4px; margin-bottom: 4px;">
-                {model_badge}
-            </div>
-            <div style="font-size: 16px; font-weight: bold; color: #1f2937; margin: 6px 0;">
-                {winner_emoji} {winner_name} TO WIN
-            </div>
-            <div style="display: flex; justify-content: space-around; margin-top: 8px; gap: 8px;">
-                <div style="flex: 1; background: white; padding: 6px; border-radius: 6px;">
-                    <div style="font-size: 9px; color: #6b7280; text-transform: uppercase;">Win Prob</div>
-                    <div style="font-size: 14px; font-weight: bold; color: {rec_color};">{win_probability:.0f}%</div>
-                </div>
-                <div style="flex: 1; background: white; padding: 6px; border-radius: 6px;">
-                    <div style="font-size: 9px; color: #6b7280; text-transform: uppercase;">Confidence</div>
-                    <div style="font-size: 14px; font-weight: bold; color: {rec_color};">{confidence:.0f}%</div>
-                </div>
-                <div style="flex: 1; background: white; padding: 6px; border-radius: 6px;">
-                    <div style="font-size: 9px; color: #6b7280; text-transform: uppercase;">EV</div>
-                    <div style="font-size: 14px; font-weight: bold; color: {rec_color};">{expected_value:+.1f}%</div>
-                </div>
-            </div>
-            <div style="margin-top: 8px; padding: 6px; background: white; border-radius: 6px;">
-                <div style="font-size: 10px; font-weight: bold; color: {rec_color}; margin-bottom: 4px;">
-                    {recommendation.replace('_', ' ')}
-                </div>
-            </div>
-        </div>
-    </div>
+    Calculate Expected Value (EV) for a game
+    EV = (Win Probability × Payout) - (Loss Probability × Stake)
     """
-    st.markdown(ai_card_html, unsafe_allow_html=True)
+    confidence = game.get('confidence', 50) / 100
+    yes_price = game.get('yes_price', 0.5)
+    no_price = game.get('no_price', 0.5)
 
-    # Reasoning (expandable for space savings)
-    if reasoning:
-        with st.expander("💡 Why this prediction?", expanded=False):
-            for reason in reasoning:
-                st.markdown(f"• {reason}", unsafe_allow_html=True)
+    if game.get('predicted', '').upper() == 'YES':
+        bet_price = yes_price
+    else:
+        bet_price = no_price
 
-    # Additional info
-    info_items = []
-    if game.get('clock') and game.get('period'):
-        info_items.append(f"⏱️ {game['clock']} Q{game['period']}")
-    if game.get('tv_network'):
-        info_items.append(f"📺 {game['tv_network']}")
-    if game.get('venue'):
-        info_items.append(f"📍 {game['venue']}")
+    if bet_price == 0 or bet_price == 1:
+        return 0
 
-    if info_items:
-        st.caption(" • ".join(info_items))
+    stake = 100
+    payout = stake * (1 / bet_price - 1)
+    ev = (confidence * payout) - ((1 - confidence) * stake)
+
+    return (ev / stake) * 100
 
 
 def fetch_games_grouped(db, min_confidence=70, sport='NFL'):
-    """Fetch games grouped by matchup with sport filter"""
-
-    # Get markets with predictions
-    query = """
-    SELECT
-        m.ticker,
-        m.title,
-        m.close_time,
-        m.yes_price,
-        m.no_price,
-        m.volume,
-        m.market_type,
-        p.confidence_score,
-        p.predicted_outcome,
-        p.edge_percentage,
-        p.reasoning
-    FROM kalshi_markets m
-    LEFT JOIN kalshi_predictions p ON m.id = p.market_id
-    WHERE m.status = 'active'
-        AND m.close_time IS NOT NULL
-        AND (p.confidence_score >= %s OR p.confidence_score IS NULL)
-        AND (m.market_type LIKE %s OR m.title LIKE %s)
-    ORDER BY m.close_time ASC
-    """
-
-    # Sport filter patterns
-    sport_patterns = {
-        'NFL': ('%nfl%', '%NFL%'),
-        'CFB': ('%cfb%', '%college%football%')
-    }
-
-    sport_pattern = sport_patterns.get(sport, ('%nfl%', '%NFL%'))
-
-    # Execute query using direct connection
+    """Fetch games from Kalshi database (fallback)"""
     try:
         conn = db.get_connection()
         cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-        cur.execute(query, (min_confidence, sport_pattern[0], sport_pattern[1]))
+
+        query = """
+            SELECT *
+            FROM kalshi_markets
+            WHERE status = 'active'
+            AND ticker LIKE %s
+            ORDER BY close_time ASC
+        """
+
+        cur.execute(query, (f'%{sport}%',))
         markets = cur.fetchall()
         cur.close()
         conn.close()
+
+        return markets
     except Exception as e:
-        logger.error(f"Error fetching games: {e}")
+        logger.error(f"Error fetching Kalshi markets: {e}")
         return []
 
-    if not markets:
-        return []
 
-    # Group by game time and extract teams
-    games_dict = {}
+def find_matching_live_game(market, live_scores):
+    """Match Kalshi market to live ESPN game"""
+    # Simple team name matching
+    market_title = market.get('title', '').lower()
 
-    for market in markets:
-        close_time = market.get('close_time')
-        if not close_time:
-            continue
+    for game_id, game in live_scores.items():
+        away = game.get('away_team', '').lower()
+        home = game.get('home_team', '').lower()
 
-        # Parse time
-        if isinstance(close_time, str):
-            close_time_fixed = re.sub(r'([-+]\d{2})$', r'\1:00', close_time)
-            close_dt = datetime.fromisoformat(close_time_fixed)
-        else:
-            close_dt = close_time
-
-        # Extract teams from title (pass sport to avoid collisions like Tennessee/Washington)
-        title = market.get('title', '')
-        sport_name = 'NCAA' if sport == 'CFB' else sport
-        teams = extract_teams_from_title(title, sport=sport_name)
-
-        if not teams or len(teams) < 2:
-            continue  # Skip if we can't identify 2 teams
-
-        # Use first 2 teams as the matchup
-        team1, team2 = sorted(teams)[:2]
-        game_key = f"{close_dt.strftime('%Y%m%d%H%M')}_{team1}_{team2}"
-
-        if game_key not in games_dict:
-            now_utc = datetime.now(timezone.utc)
-            close_dt_utc = close_dt.astimezone(timezone.utc) if close_dt.tzinfo else close_dt.replace(tzinfo=timezone.utc)
-            minutes_until = max(0, int((close_dt_utc - now_utc).total_seconds() / 60))
-            is_live = -30 < (close_dt_utc - now_utc).total_seconds() / 60 < 210
-
-            games_dict[game_key] = {
-                'team1': team1,
-                'team2': team2,
-                'game_time': close_dt,
-                'game_time_str': close_dt.strftime('%a %b %d, %I:%M %p'),
-                'minutes_until': minutes_until,
-                'is_live': is_live,
-                'markets': [],
-                'best_confidence': 0,
-                'best_edge': 0,
-                'total_volume': 0
-            }
-
-        # Add market to game
-        confidence = float(market.get('confidence_score', 0) or 0)
-        edge = float(market.get('edge_percentage', 0) or 0)
-        volume = float(market.get('volume', 0) or 0)
-
-        games_dict[game_key]['markets'].append({
-            'ticker': market.get('ticker'),
-            'title': title,
-            'yes_price': float(market.get('yes_price', 0) or 0),
-            'no_price': float(market.get('no_price', 0) or 0),
-            'volume': volume,
-            'confidence': confidence,
-            'predicted': market.get('predicted_outcome', 'unknown'),
-            'edge': edge,
-            'reasoning': market.get('reasoning', 'No analysis')
-        })
-
-        # Update best metrics
-        games_dict[game_key]['best_confidence'] = max(games_dict[game_key]['best_confidence'], confidence)
-        games_dict[game_key]['best_edge'] = max(games_dict[game_key]['best_edge'], edge)
-        games_dict[game_key]['total_volume'] += volume
-
-    # Convert to list and sort by time
-    games = sorted(games_dict.values(), key=lambda x: x['game_time'])
-
-    return games
-
-
-def extract_teams_from_title(title, sport='NFL'):
-    """
-    Extract team names from market title based on sport context
-
-    Args:
-        title: Market title string
-        sport: 'NFL' or 'NCAA' to avoid team name collisions
-
-    Returns:
-        List of team names found in title
-    """
-    teams = set()
-
-    # Select correct logo dict based on sport to avoid collisions (Tennessee, Washington, etc.)
-    logo_dict = NCAA_LOGOS if sport == 'NCAA' else TEAM_LOGOS
-
-    # Case-insensitive matching
-    title_lower = title.lower()
-
-    for team in logo_dict.keys():
-        if team.lower() in title_lower:
-            teams.add(team)
-
-    # Handle NFL abbreviations (only for NFL sport)
-    if sport == 'NFL':
-        if 'LA ' in title or 'L.A.' in title:
-            if 'Chargers' in title:
-                teams.add('Los Angeles Chargers')
-            elif 'Rams' in title:
-                teams.add('Los Angeles Rams')
-
-        if 'NY ' in title or 'N.Y.' in title:
-            if 'Giants' in title:
-                teams.add('New York Giants')
-            elif 'Jets' in title:
-                teams.add('New York Jets')
-
-    return list(teams)
-
-
-def find_matching_live_game(game, live_scores):
-    """Find matching ESPN live game for a Kalshi market game"""
-
-    team1 = game['team1']
-    team2 = game['team2']
-
-    for game_id, live_game in live_scores.items():
-        home_team = live_game.get('home_team', '')
-        away_team = live_game.get('away_team', '')
-
-        # Check if both teams match
-        if (team1 in home_team or team1 in away_team) and \
-           (team2 in home_team or team2 in away_team):
-            return live_game
+        if away in market_title and home in market_title:
+            return game
 
     return None
 
 
-def display_ranked_game_card(game, rank, ranking_mode):
-    """Display a compact ranked game card focused on win/lose and profit potential"""
-
-    team1 = game['team1']
-    team2 = game['team2']
-    game_time_str = game['game_time_str']
-    confidence = game.get('confidence', 0)
-    edge = game.get('edge', 0)
-    ev = game.get('expected_value', 0)
-    predicted = game.get('predicted', 'N/A')
-    yes_price = game.get('yes_price', 0)
-    no_price = game.get('no_price', 0)
-
-    # Get correct logo dictionary based on sport
-    sport = st.session_state.get('selected_sport', 'NFL')
-    logo_dict = NCAA_LOGOS if sport == 'NCAA' else TEAM_LOGOS
-
-    # Calculate win probabilities for each team (from odds)
-    # Convert odds to implied probability
-    team1_win_prob = (yes_price / (yes_price + no_price)) * 100 if (yes_price + no_price) > 0 else 50
-    team2_win_prob = (no_price / (yes_price + no_price)) * 100 if (yes_price + no_price) > 0 else 50
-
-    # Determine rank badge
-    if rank == 1:
-        rank_emoji = "🥇"
-    elif rank == 2:
-        rank_emoji = "🥈"
-    elif rank == 3:
-        rank_emoji = "🥉"
-    else:
-        rank_emoji = f"#{rank}"
-
-    # Compact header with rank and EV
-    st.markdown(f"""
-    <div style="
-        border: 1px solid #{"10b981" if ev > 0 else "ef4444"};
-        border-radius: 6px;
-        padding: 6px;
-        background: #f8f9fa;
-        margin-bottom: 6px;
-    ">
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-            <span style="font-size: 14px; font-weight: bold;">{rank_emoji} #{rank}</span>
-            <span style="background: {"#10b981" if ev > 0 else "#ef4444"}; color: white; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: bold;">
-                EV: {ev:+.1f}%
-            </span>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-
-    # Compact teams with logos and win rates
-    col1, col_vs, col2 = st.columns([1, 0.2, 1])
-
-    with col1:
-        # Dynamic logo fetching for NCAA teams
-        if sport == 'NCAA':
-            logo1 = logo_dict.get(team1) or get_team_logo_url(team1)
-        else:
-            logo1 = logo_dict.get(team1, '')
-
-        if logo1:
-            st.image(logo1, width=50)
-        elif team1:  # Show placeholder if logo not found
-            st.markdown(f"<div style='width: 50px; height: 50px; background: #e5e7eb; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 10px; color: #6b7280; margin: 0 auto;'>{team1[:3].upper()}</div>", unsafe_allow_html=True)
-        st.markdown(f"<div style='font-size: 13px; font-weight: bold; text-align: center;'>{team1}</div>", unsafe_allow_html=True)
-        # WIN RATE below logo
-        win_color = "#10b981" if predicted == 'YES' else "#6b7280"
-        st.markdown(f"<div style='font-size: 12px; text-align: center; color: {win_color}; font-weight: bold;'>Win: {team1_win_prob:.0f}%</div>", unsafe_allow_html=True)
-        st.caption(f"Odds: {yes_price:.2f}")
-
-    with col_vs:
-        st.markdown("<div style='text-align: center; padding-top: 20px; font-size: 18px; font-weight: bold;'>VS</div>", unsafe_allow_html=True)
-
-    with col2:
-        # Dynamic logo fetching for NCAA teams
-        if sport == 'NCAA':
-            logo2 = logo_dict.get(team2) or get_team_logo_url(team2)
-        else:
-            logo2 = logo_dict.get(team2, '')
-
-        if logo2:
-            st.image(logo2, width=50)
-        elif team2:  # Show placeholder if logo not found
-            st.markdown(f"<div style='width: 50px; height: 50px; background: #e5e7eb; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 10px; color: #6b7280; margin: 0 auto;'>{team2[:3].upper()}</div>", unsafe_allow_html=True)
-        st.markdown(f"<div style='font-size: 13px; font-weight: bold; text-align: center;'>{team2}</div>", unsafe_allow_html=True)
-        # WIN RATE below logo
-        win_color = "#10b981" if predicted == 'NO' else "#6b7280"
-        st.markdown(f"<div style='font-size: 12px; text-align: center; color: {win_color}; font-weight: bold;'>Win: {team2_win_prob:.0f}%</div>", unsafe_allow_html=True)
-        st.caption(f"Odds: {no_price:.2f}")
-
-    # Compact prediction
-    winner = team1 if predicted == 'YES' else team2
-    st.markdown(f"<div style='background: #dcfce7; padding: 4px; border-radius: 4px; text-align: center; font-size: 13px; font-weight: bold; margin: 4px 0;'>🎯 BET: {winner} TO WIN</div>", unsafe_allow_html=True)
-
-    # Compact metrics
-    met_col1, met_col2, met_col3 = st.columns(3)
-    with met_col1:
-        st.markdown(f"<div style='text-align: center; font-size: 11px;'><b>Conf</b><br>{confidence:.0f}%</div>", unsafe_allow_html=True)
-    with met_col2:
-        st.markdown(f"<div style='text-align: center; font-size: 11px;'><b>Edge</b><br>{edge:.1f}%</div>", unsafe_allow_html=True)
-    with met_col3:
-        roi = ((1 / (yes_price if predicted == 'YES' else no_price)) - 1) * 100
-        st.markdown(f"<div style='text-align: center; font-size: 11px;'><b>ROI</b><br>{roi:.1f}%</div>", unsafe_allow_html=True)
-
-    st.caption(f"⏰ {game_time_str}")
-
-    # Compact expandable details
-    with st.expander("📊 Details", expanded=False):
-        reasoning = game.get('reasoning', 'No analysis available')
-        st.caption(reasoning)
-        st.caption(f"**$100 bet** → Profit: ${roi:.2f} | EV: {ev:+.1f}%")
-
-
-def display_game_card(game, index):
-    """Display a visual game card"""
-
-    team1 = game['team1']
-    team2 = game['team2']
-    game_time_str = game['game_time_str']
-    minutes_until = game['minutes_until']
-    is_live = game['is_live']
-    markets = game['markets']
-    best_conf = game['best_confidence']
-    best_edge = game['best_edge']
-    total_vol = game['total_volume']
-    live_data = game.get('live_data')
-
-    # Card styling (override with live data if available)
-    if live_data and live_data.get('is_live'):
-        border_color = "#ff4444"
-        status_text = f"🔴 LIVE - {live_data.get('clock', '')} Q{live_data.get('period', '')}"
-        is_live = True
-    elif live_data and live_data.get('is_completed'):
-        border_color = "#888888"
-        status_text = "✅ FINAL"
-    elif is_live:
-        border_color = "#ff4444"
-        status_text = "🔴 LIVE"
-    elif minutes_until < 180:
-        border_color = "#ff9900"
-        status_text = "⚡ SOON"
-    else:
-        border_color = "#4444ff"
-        status_text = "📅 UPCOMING"
-
-    # Time display
-    if minutes_until < 60:
-        time_str = f"{minutes_until}m"
-    elif minutes_until < 1440:
-        time_str = f"{minutes_until // 60}h {minutes_until % 60}m"
-    else:
-        time_str = f"{minutes_until // 1440}d"
-
-    # Card container
-    card_html = f"""
-    <div style="
-        border: 3px solid {border_color};
-        border-radius: 15px;
-        padding: 20px;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        margin-bottom: 20px;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-    ">
-        <div style="text-align: center; margin-bottom: 15px;">
-            <h3 style="margin: 0; color: white;">{status_text}</h3>
-            <p style="margin: 5px 0; font-size: 14px;">{game_time_str}</p>
-            <p style="margin: 0; font-size: 12px; opacity: 0.9;">in {time_str}</p>
-        </div>
-    </div>
-    """
-
-    st.markdown(card_html, unsafe_allow_html=True)
-
-    # Team logos and scores - use correct logo dict based on sport
-    sport = st.session_state.get('selected_sport', 'NFL')
-    logo_dict = NCAA_LOGOS if sport == 'NCAA' else TEAM_LOGOS
-
-    # Dynamic logo fetching for NCAA teams
-    if sport == 'NCAA':
-        logo1 = logo_dict.get(team1) or get_team_logo_url(team1)
-        logo2 = logo_dict.get(team2) or get_team_logo_url(team2)
-    else:
-        logo1 = logo_dict.get(team1, '')
-        logo2 = logo_dict.get(team2, '')
-
-    # Get live scores if available
-    if live_data:
-        # Match team names to determine which is home/away
-        if team1 in live_data.get('home_team', ''):
-            team1_score = live_data.get('home_score', 0)
-            team2_score = live_data.get('away_score', 0)
-        else:
-            team1_score = live_data.get('away_score', 0)
-            team2_score = live_data.get('home_score', 0)
-    else:
-        team1_score = None
-        team2_score = None
-
-    col1, col2, col3 = st.columns([2, 1, 2])
-
-    with col1:
-        if logo1:
-            st.image(logo1, width=80)
-        if team1_score is not None:
-            st.markdown(f"**{TEAM_SHORT_NAMES.get(team1, team1)} - {team1_score}**", unsafe_allow_html=True)
-        else:
-            st.markdown(f"**{TEAM_SHORT_NAMES.get(team1, team1)}**")
-
-    with col2:
-        st.markdown("<h2 style='text-align: center;'>VS</h2>", unsafe_allow_html=True)
-
-    with col3:
-        if logo2:
-            st.image(logo2, width=80)
-        if team2_score is not None:
-            st.markdown(f"**{TEAM_SHORT_NAMES.get(team2, team2)} - {team2_score}**", unsafe_allow_html=True)
-        else:
-            st.markdown(f"**{TEAM_SHORT_NAMES.get(team2, team2)}**")
-
-    # Quick stats
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.metric("Best Conf", f"{best_conf:.0f}%")
-    with col2:
-        st.metric("Best Edge", f"{best_edge:.0f}%")
-    with col3:
-        st.metric("Markets", len(markets))
-
-    # Expandable details
-    with st.expander(f"📊 {len(markets)} Betting Opportunities", expanded=False):
-
-        # Show top 5 markets
-        sorted_markets = sorted(markets, key=lambda x: x['confidence'], reverse=True)
-
-        for i, market in enumerate(sorted_markets[:5], 1):
-            display_market_detail(market, i)
-
-        if len(markets) > 5:
-            st.caption(f"... and {len(markets) - 5} more markets")
-
-        # Summary table
-        if markets:
-            df = pd.DataFrame([{
-                'Confidence': f"{m['confidence']:.0f}%",
-                'Edge': f"{m['edge']:.0f}%",
-                'YES Price': f"{m['yes_price']:.2f}",
-                'NO Price': f"{m['no_price']:.2f}",
-                'Volume': f"${m['volume']:.0f}",
-                'Prediction': m['predicted'].upper() if m['predicted'] else 'N/A'
-            } for m in sorted_markets])
-
-            st.dataframe(df, use_container_width=True, hide_index=True)
-
-
-def display_market_detail(market, num):
-    """Display detailed market information"""
-
-    title = market['title']
-    confidence = market['confidence']
-    edge = market['edge']
-    yes_price = market['yes_price']
-    no_price = market['no_price']
-    predicted = market['predicted']
-    reasoning = market['reasoning']
-
-    # Confidence color
-    if confidence >= 85:
-        conf_badge = "🟢"
-    elif confidence >= 70:
-        conf_badge = "🟡"
-    else:
-        conf_badge = "🔴"
-
-    # Recommendation
-    if predicted == 'yes':
-        rec = "✅ BUY YES"
-        rec_color = "green"
-    elif predicted == 'no':
-        rec = "❌ BUY NO"
-        rec_color = "red"
-    else:
-        rec = "⏸️ PASS"
-        rec_color = "gray"
-
-    st.markdown(f"### {num}. {conf_badge} {title[:100]}...")
-
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.markdown(f"**Confidence:** {confidence:.0f}%")
-        st.markdown(f"**Edge:** {edge:.1f}%")
-    with col2:
-        st.markdown(f"**YES:** {yes_price:.2%}")
-        st.markdown(f"**NO:** {no_price:.2%}")
-    with col3:
-        st.markdown(f":{rec_color}[**{rec}**]")
-
-    with st.expander("🤖 AI Analysis"):
-        st.write(reasoning)
-
-    st.markdown("---")
-
-
-def show():
-    """Entry point for dashboard integration"""
-    show_game_cards()
-
-
 if __name__ == "__main__":
     show_game_cards()
-
-
-"""
-==================== DATA SOURCES & VERIFICATION ====================
-
-This module uses the following verified data sources for maximum accuracy:
-
-1. **ODDS DATA** (Highest Priority for Making Money):
-   - Primary: OddsAPI (https://the-odds-api.com/)
-     • Real-time odds from 100+ sportsbooks
-     • Updates every 30 seconds
-     • Accuracy: 99.9% verified against actual sportsbook sites
-
-   - Secondary: OddsJam (https://oddsjam.com/)
-     • Processes 1M+ odds per second
-     • Covers FanDuel, DraftKings, BetMGM, Pinnacle
-     • Industry standard for odds verification
-
-2. **LIVE SCORES & GAME DATA**:
-   - ESPN Hidden API (site.api.espn.com)
-     • Real-time scores and game status
-     • Play-by-play data
-     • Free, unofficial but highly reliable
-
-   - College Football Data (api.collegefootballdata.com)
-     • Official NCAA stats and schedules
-     • Team rankings and advanced metrics
-
-3. **PREDICTIONS & ANALYSIS**:
-   - Kalshi Markets Database
-     • Prediction market consensus
-     • Crowd-sourced probability estimates
-     • Historical accuracy tracking
-
-   - Internal ML Models
-     • Elo ratings
-     • Statistical regression
-     • Historical performance analysis
-
-4. **DATA VERIFICATION PROCESS**:
-   a) Cross-reference odds across multiple sportsbooks
-   b) Verify game times against official league schedules
-   c) Compare predictions against market consensus
-   d) Track historical accuracy and adjust confidence
-   e) Flag discrepancies > 10% for manual review
-
-5. **EXPECTED VALUE (EV) CALCULATION**:
-   Formula: EV = (Win_Probability × Payout) - (Loss_Probability × Stake)
-
-   For a $100 bet:
-   - If predicted to win at 70% confidence with odds of 0.45:
-   - Payout = $100 × (1/0.45 - 1) = $122.22
-   - EV = (0.70 × $122.22) - (0.30 × $100) = $55.55
-   - EV% = 55.55%
-
-   Positive EV = Profitable bet over time
-   Negative EV = Losing bet over time
-
-6. **RANKING METHODOLOGY**:
-   - Expected Value (EV): Best for long-term profit
-   - Highest Edge: Best for aggressive betting
-   - Best Odds: Best for value hunting
-   - High Confidence: Best for conservative betting
-   - Volume: Best for liquid markets
-
-7. **RECOMMENDED USAGE**:
-   - For consistent profits: Focus on EV > 5% with Confidence > 70%
-   - For safe bets: Use High Confidence ranking with Edge > 10%
-   - For value hunting: Use Best Odds ranking with multiple sportsbook comparison
-
-8. **DATA REFRESH RATES**:
-   - Odds: Every 30 seconds (during games)
-   - Live Scores: Every 60 seconds
-   - Predictions: Every 5 minutes
-   - Market Data: Every 15 minutes
-
-9. **ACCURACY TRACKING**:
-   All predictions are tracked for accuracy:
-   - Historical win rate displayed per confidence level
-   - ROI tracked per ranking method
-   - Continuous model improvement based on outcomes
-
-==================== END DATA DOCUMENTATION ====================
-"""

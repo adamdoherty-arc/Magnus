@@ -25,6 +25,9 @@ dist/
 .pytest_cache/
 .coverage
 *.log
+venv/
+env/
+ENV/
 
 # IDEs
 .vscode/
