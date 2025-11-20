@@ -28,14 +28,91 @@ from src.xtrades_scraper import XtradesScraper, LoginFailedException, ProfileNot
 from src.telegram_notifier import TelegramNotifier
 
 
+# ============================================================================
+# PERFORMANCE: Connection Pooling & Caching
+# ============================================================================
+
+@st.cache_resource
+def get_xtrades_db_manager():
+    """Cached database manager - singleton pattern for connection pooling"""
+    return XtradesDBManager()
+
+
+@st.cache_data(ttl=60)  # 1-minute cache for active trades
+def get_active_trades_cached(limit=500):
+    """Fetch active trades with caching"""
+    db_manager = get_xtrades_db_manager()
+    return db_manager.get_all_trades(status='open', limit=limit)
+
+
+@st.cache_data(ttl=60)  # 1-minute cache for closed trades
+def get_closed_trades_cached(limit=500):
+    """Fetch closed and expired trades with caching"""
+    db_manager = get_xtrades_db_manager()
+    closed = db_manager.get_all_trades(status='closed', limit=limit)
+    expired = db_manager.get_all_trades(status='expired', limit=limit)
+    return closed + expired
+
+
+@st.cache_data(ttl=300)  # 5-minute cache for profiles (don't change often)
+def get_active_profiles_cached():
+    """Fetch active profiles with caching"""
+    db_manager = get_xtrades_db_manager()
+    return db_manager.get_active_profiles()
+
+
+@st.cache_data(ttl=300)  # 5-minute cache
+def get_all_profiles_cached(include_inactive=False):
+    """Fetch all profiles with caching"""
+    db_manager = get_xtrades_db_manager()
+    return db_manager.get_all_profiles(include_inactive=include_inactive)
+
+
+@st.cache_data(ttl=300)  # 5-minute cache for stats
+def get_overall_stats_cached():
+    """Fetch overall statistics with caching"""
+    db_manager = get_xtrades_db_manager()
+    return db_manager.get_overall_stats()
+
+
+@st.cache_data(ttl=300)  # 5-minute cache for profile stats
+def get_profile_stats_cached(profile_id):
+    """Fetch individual profile statistics with caching"""
+    db_manager = get_xtrades_db_manager()
+    return db_manager.get_profile_stats(profile_id)
+
+
+@st.cache_data(ttl=120)  # 2-minute cache for sync history
+def get_sync_history_cached(limit=50):
+    """Fetch sync history with caching"""
+    db_manager = get_xtrades_db_manager()
+    return db_manager.get_sync_history(limit=limit)
+
+
+@st.cache_data(ttl=60)  # 1-minute cache for profile lookups
+def get_profile_by_id_cached(profile_id):
+    """Fetch profile by ID with caching (avoids repeated lookups in loops)"""
+    db_manager = get_xtrades_db_manager()
+    return db_manager.get_profile_by_id(profile_id)
+
+
 def show_xtrades_page():
     """Main Xtrades Watchlists page with tabs"""
 
     st.title("📱 Xtrades Watchlists")
     st.caption("Monitor option trades from Discord-connected Xtrades.net profiles")
+    
+    # Sync status widget
+    from src.components.sync_status_widget import SyncStatusWidget
+    sync_widget = SyncStatusWidget()
+    sync_widget.display(
+        table_name="xtrades",
+        title="Xtrades Sync",
+        compact=True
+    )
 
-    # Initialize database manager
-    db_manager = XtradesDBManager()
+    # PERFORMANCE: Use cached database manager (singleton)
+    db_manager = get_xtrades_db_manager()
 
     # Create tabs
     tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
@@ -55,8 +132,8 @@ def show_xtrades_page():
         st.caption("Open option positions currently being monitored")
 
         try:
-            # Get all active trades
-            active_trades = db_manager.get_all_trades(status='open', limit=500)
+            # PERFORMANCE: Use cached active trades query
+            active_trades = get_active_trades_cached(limit=500)
 
             if not active_trades:
                 st.info("No active trades found. Sync profiles to load trades.")
@@ -84,8 +161,8 @@ def show_xtrades_page():
                 col_f1, col_f2, col_f3, col_f4 = st.columns(4)
 
                 with col_f1:
-                    # Get all profiles for filter
-                    all_profiles = db_manager.get_active_profiles()
+                    # PERFORMANCE: Use cached profiles query
+                    all_profiles = get_active_profiles_cached()
                     profile_names = ['All'] + [p['username'] for p in all_profiles]
                     selected_profile = st.selectbox("Profile", profile_names, key="active_profile_filter")
 
@@ -132,8 +209,8 @@ def show_xtrades_page():
                     display_data = []
 
                     for trade in filtered_trades:
-                        # Get profile info
-                        profile = db_manager.get_profile_by_id(trade['profile_id'])
+                        # PERFORMANCE: Use cached profile lookup (avoids repeated DB calls in loop)
+                        profile = get_profile_by_id_cached(trade['profile_id'])
                         profile_name = profile['display_name'] or profile['username'] if profile else 'Unknown'
 
                         # Calculate days open
@@ -214,10 +291,8 @@ def show_xtrades_page():
         st.caption("Completed trades with profit/loss calculations")
 
         try:
-            # Get closed trades
-            closed_trades = db_manager.get_all_trades(status='closed', limit=500)
-            expired_trades = db_manager.get_all_trades(status='expired', limit=500)
-            all_closed = closed_trades + expired_trades
+            # PERFORMANCE: Use cached closed trades query
+            all_closed = get_closed_trades_cached(limit=500)
 
             if not all_closed:
                 st.info("No closed trades found yet. Trades will appear here once they are closed or expire.")
@@ -255,7 +330,8 @@ def show_xtrades_page():
                 col_f1, col_f2, col_f3 = st.columns(3)
 
                 with col_f1:
-                    all_profiles = db_manager.get_active_profiles()
+                    # PERFORMANCE: Use cached profiles query
+                    all_profiles = get_active_profiles_cached()
                     profile_names = ['All'] + [p['username'] for p in all_profiles]
                     selected_profile = st.selectbox("Profile", profile_names, key="closed_profile_filter")
 
@@ -297,7 +373,8 @@ def show_xtrades_page():
                     display_data = []
 
                     for trade in filtered_closed:
-                        profile = db_manager.get_profile_by_id(trade['profile_id'])
+                        # PERFORMANCE: Use cached profile lookup
+                        profile = get_profile_by_id_cached(trade['profile_id'])
                         profile_name = profile['display_name'] or profile['username'] if profile else 'Unknown'
 
                         # Calculate duration
@@ -378,8 +455,8 @@ def show_xtrades_page():
         st.caption("Analyze performance by profile, strategy, and ticker")
 
         try:
-            # Get overall stats
-            overall_stats = db_manager.get_overall_stats()
+            # PERFORMANCE: Use cached overall stats
+            overall_stats = get_overall_stats_cached()
 
             st.markdown("### 🎯 Overall Performance")
             col1, col2, col3, col4 = st.columns(4)
@@ -400,13 +477,15 @@ def show_xtrades_page():
             # Performance by Profile
             st.markdown("### 👥 Performance by Profile")
 
-            all_profiles = db_manager.get_active_profiles()
+            # PERFORMANCE: Use cached profiles query
+            all_profiles = get_active_profiles_cached()
 
             if all_profiles:
                 profile_perf = []
 
                 for profile in all_profiles:
-                    stats = db_manager.get_profile_stats(profile['id'])
+                    # PERFORMANCE: Use cached profile stats lookup
+                    stats = get_profile_stats_cached(profile['id'])
                     profile_perf.append({
                         'Profile': profile['display_name'] or profile['username'],
                         'Total Trades': stats['total_trades'],
@@ -446,9 +525,8 @@ def show_xtrades_page():
             # Performance by Strategy
             st.markdown("### 📈 Performance by Strategy")
 
-            closed_trades = db_manager.get_all_trades(status='closed', limit=1000)
-            expired_trades = db_manager.get_all_trades(status='expired', limit=1000)
-            all_closed = closed_trades + expired_trades
+            # PERFORMANCE: Reuse cached closed trades
+            all_closed = get_closed_trades_cached(limit=1000)
 
             if all_closed:
                 strategy_stats = {}
@@ -570,8 +648,8 @@ def show_xtrades_page():
         st.subheader("👥 Manage Profiles")
         st.caption("Add, activate, deactivate, and sync Xtrades.net profiles")
 
-        # Get all profiles
-        all_profiles = db_manager.get_all_profiles(include_inactive=True)
+        # PERFORMANCE: Use cached profiles query (includes inactive)
+        all_profiles = get_all_profiles_cached(include_inactive=True)
 
         # Add new profile section
         st.markdown("### ➕ Add New Profile")
@@ -697,7 +775,8 @@ def show_xtrades_page():
         st.caption("Recent synchronization operations and their results")
 
         try:
-            sync_logs = db_manager.get_sync_history(limit=50)
+            # PERFORMANCE: Use cached sync history
+            sync_logs = get_sync_history_cached(limit=50)
 
             if not sync_logs:
                 st.info("No sync history yet. Sync profiles to see history here.")

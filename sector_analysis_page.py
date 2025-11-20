@@ -7,22 +7,31 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 from src.tradingview_db_manager import TradingViewDBManager
+from src.components.pagination_component import paginate_dataframe
 import logging
 
 logger = logging.getLogger(__name__)
 
 st.set_page_config(page_title="Sector Analysis", layout="wide")
 
-def display_sector_analysis_page():
-    st.title("🏭 Sector Analysis - Wheel Strategy Edition")
-    st.caption("AI-powered sector insights for cash-secured puts and covered calls")
 
-    # Get database connection
-    tv_manager = TradingViewDBManager()
+# ========================================================================
+# PERFORMANCE OPTIMIZATION: Cached Database Queries
+# ========================================================================
+
+@st.cache_resource
+def get_sector_tv_manager():
+    """Cached database manager for connection pooling"""
+    return TradingViewDBManager()
+
+
+@st.cache_data(ttl=300)  # 5-minute cache
+def check_sector_tables_exist():
+    """Cached check for sector analysis tables"""
+    tv_manager = get_sector_tv_manager()
     conn = tv_manager.get_connection()
     cur = conn.cursor()
 
-    # Check if tables exist
     cur.execute("""
         SELECT EXISTS (
             SELECT FROM information_schema.tables
@@ -30,6 +39,123 @@ def display_sector_analysis_page():
         )
     """)
     tables_exist = cur.fetchone()[0]
+    cur.close()
+    conn.close()
+
+    return tables_exist
+
+
+@st.cache_data(ttl=300)  # 5-minute cache for sector data
+def get_sector_data_cached():
+    """Cached query for sector analysis data"""
+    tv_manager = get_sector_tv_manager()
+    conn = tv_manager.get_connection()
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT
+            sector,
+            stock_count,
+            avg_premium_yield,
+            avg_monthly_return,
+            overall_score,
+            trend_direction,
+            recommended_etf,
+            ai_recommendation,
+            best_strategy,
+            risk_level,
+            top_stocks
+        FROM sector_analysis
+        WHERE stock_count > 0
+        ORDER BY overall_score DESC
+    """)
+
+    sector_data = cur.fetchall()
+    cur.close()
+    conn.close()
+
+    return sector_data
+
+
+@st.cache_data(ttl=60)  # 1-minute cache for sector stocks
+def get_sector_stocks_cached(sector):
+    """Cached query for stocks in a specific sector with premium data"""
+    tv_manager = get_sector_tv_manager()
+    conn = tv_manager.get_connection()
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT DISTINCT ON (sp.symbol)
+            ss.symbol,
+            sd.current_price as stock_price,
+            ss.market_cap,
+            sp.strike_price,
+            sp.premium,
+            sp.delta,
+            sp.monthly_return,
+            sp.annualized_return,
+            sp.implied_volatility as iv
+        FROM stock_sectors ss
+        LEFT JOIN stock_data sd ON ss.symbol = sd.symbol
+        LEFT JOIN stock_premiums sp ON ss.symbol = sp.symbol
+            AND sp.dte BETWEEN 28 AND 32
+            AND sp.option_type = 'put'
+        WHERE ss.sector = %s
+        ORDER BY sp.symbol, sp.monthly_return DESC
+        LIMIT 50
+    """, (sector,))
+
+    stocks = cur.fetchall()
+    cur.close()
+    conn.close()
+
+    return stocks
+
+
+@st.cache_data(ttl=600)  # 10-minute cache for ETF data (static reference)
+def get_sector_etfs_cached():
+    """Cached query for sector ETF data"""
+    tv_manager = get_sector_tv_manager()
+    conn = tv_manager.get_connection()
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT
+            se.etf_symbol,
+            se.etf_name,
+            se.sector,
+            se.expense_ratio,
+            se.description,
+            sa.overall_score,
+            sa.avg_monthly_return
+        FROM sector_etfs se
+        LEFT JOIN sector_analysis sa ON se.sector = sa.sector
+        ORDER BY sa.overall_score DESC
+    """)
+
+    etf_data = cur.fetchall()
+    cur.close()
+    conn.close()
+
+    return etf_data
+
+
+def display_sector_analysis_page():
+    st.title("🏭 Sector Analysis - Wheel Strategy Edition")
+    st.caption("AI-powered sector insights for cash-secured puts and covered calls")
+    
+    # Sync status widget
+    from src.components.sync_status_widget import SyncStatusWidget
+    sync_widget = SyncStatusWidget()
+    sync_widget.display(
+        table_name="stock_data",
+        title="Sector Data Sync",
+        compact=True
+    )
+
+    # PERFORMANCE: Use cached manager and queries
+    tv_manager = get_sector_tv_manager()
+    tables_exist = check_sector_tables_exist()
 
     if not tables_exist:
         st.warning("⚠️ Sector Analysis tables not yet created. Run migration first.")
@@ -53,30 +179,10 @@ def display_sector_analysis_page():
                 except Exception as e:
                     st.error(f"Migration failed: {e}")
 
-        cur.close()
-        conn.close()
         return
 
-    # Get sector data
-    cur.execute("""
-        SELECT
-            sector,
-            stock_count,
-            avg_premium_yield,
-            avg_monthly_return,
-            overall_score,
-            trend_direction,
-            recommended_etf,
-            ai_recommendation,
-            best_strategy,
-            risk_level,
-            top_stocks
-        FROM sector_analysis
-        WHERE stock_count > 0
-        ORDER BY overall_score DESC
-    """)
-
-    sector_data = cur.fetchall()
+    # Get sector data (PERFORMANCE: Use cached query)
+    sector_data = get_sector_data_cached()
 
     if not sector_data:
         st.info("📊 No sector data yet. Let's classify your stocks!")
@@ -94,8 +200,6 @@ def display_sector_analysis_page():
         with col2:
             st.caption("This will fetch sector info from Yahoo Finance for your stocks")
 
-        cur.close()
-        conn.close()
         return
 
     # Create tabs
@@ -154,8 +258,11 @@ def display_sector_analysis_page():
             'Avg Monthly Return', 'Trend', 'Best Strategy', 'Risk Level'
         ]].copy()
 
+        # PERFORMANCE: Add pagination for sector comparison
+        paginated_sectors = paginate_dataframe(display_df, page_size=25, key_prefix="sector_comparison")
+
         st.dataframe(
-            display_df,
+            paginated_sectors,
             hide_index=True,
             width='stretch',
             column_config={
@@ -198,29 +305,8 @@ def display_sector_analysis_page():
         )
 
         if selected_sector:
-            # Get stocks for sector with premium data
-            cur.execute("""
-                SELECT DISTINCT ON (sp.symbol)
-                    ss.symbol,
-                    sd.current_price as stock_price,
-                    ss.market_cap,
-                    sp.strike_price,
-                    sp.premium,
-                    sp.delta,
-                    sp.monthly_return,
-                    sp.annualized_return,
-                    sp.implied_volatility as iv
-                FROM stock_sectors ss
-                LEFT JOIN stock_data sd ON ss.symbol = sd.symbol
-                LEFT JOIN stock_premiums sp ON ss.symbol = sp.symbol
-                    AND sp.dte BETWEEN 28 AND 32
-                    AND sp.option_type = 'put'
-                WHERE ss.sector = %s
-                ORDER BY sp.symbol, sp.monthly_return DESC
-                LIMIT 50
-            """, (selected_sector,))
-
-            stocks = cur.fetchall()
+            # Get stocks for sector with premium data (PERFORMANCE: Use cached query)
+            stocks = get_sector_stocks_cached(selected_sector)
 
             if stocks:
                 df_stocks = pd.DataFrame(stocks, columns=[
@@ -243,9 +329,12 @@ def display_sector_analysis_page():
                     avg_iv = df_stocks['IV'].mean() * 100
                     st.metric("Avg IV", f"{avg_iv:.1f}%")
 
+                # PERFORMANCE: Add pagination for sector stocks
+                paginated_stocks = paginate_dataframe(df_stocks, page_size=25, key_prefix="sector_stocks")
+
                 # Display table
                 st.dataframe(
-                    df_stocks,
+                    paginated_stocks,
                     hide_index=True,
                     width='stretch',
                     column_config={
@@ -267,21 +356,8 @@ def display_sector_analysis_page():
     with tab3:
         st.subheader("📈 Sector ETF Explorer")
 
-        cur.execute("""
-            SELECT
-                se.etf_symbol,
-                se.etf_name,
-                se.sector,
-                se.expense_ratio,
-                se.description,
-                sa.overall_score,
-                sa.avg_monthly_return
-            FROM sector_etfs se
-            LEFT JOIN sector_analysis sa ON se.sector = sa.sector
-            ORDER BY sa.overall_score DESC
-        """)
-
-        etf_data = cur.fetchall()
+        # PERFORMANCE: Use cached query
+        etf_data = get_sector_etfs_cached()
 
         if etf_data:
             df_etfs = pd.DataFrame(etf_data, columns=[
@@ -289,8 +365,11 @@ def display_sector_analysis_page():
                 'Description', 'Sector Score', 'Sector Monthly Return'
             ])
 
+            # PERFORMANCE: Add pagination for ETF table
+            paginated_etfs = paginate_dataframe(df_etfs, page_size=25, key_prefix="sector_etfs")
+
             st.dataframe(
-                df_etfs,
+                paginated_etfs,
                 hide_index=True,
                 width='stretch',
                 column_config={
@@ -356,8 +435,6 @@ def display_sector_analysis_page():
             for _, row in bottom_3.iterrows():
                 st.write(f"❌ {row['Sector']} (Score: {row['Overall Score']:.1f})")
 
-    cur.close()
-    conn.close()
 
 if __name__ == "__main__":
     display_sector_analysis_page()

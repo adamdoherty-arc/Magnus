@@ -18,22 +18,30 @@ import numpy as np
 from src.options_flow_tracker import OptionsFlowTracker, get_popular_optionable_symbols
 from src.ai_flow_analyzer import AIFlowAnalyzer
 from src.tradingview_db_manager import TradingViewDBManager
+from src.components.pagination_component import paginate_dataframe
 
 logger = logging.getLogger(__name__)
 
 
-def display_premium_flow_page():
-    """Main function to display Premium Options Flow page"""
+# ========================================================================
+# PERFORMANCE OPTIMIZATION: Cached Database Connection Manager
+# ========================================================================
 
-    st.title("💸 Premium Options Flow - Institutional Money Tracking")
-    st.caption("Track institutional options flow and identify high-probability wheel strategy opportunities")
+@st.cache_resource
+def get_tv_manager():
+    """
+    Cached database manager to avoid creating multiple connections.
+    Connection pooling for better performance.
+    """
+    return TradingViewDBManager()
 
-    # Initialize components
-    tracker = OptionsFlowTracker()
-    analyzer = AIFlowAnalyzer()
-    tv_manager = TradingViewDBManager()
 
-    # Check if tables exist
+@st.cache_data(ttl=300)  # 5-minute cache
+def check_tables_exist():
+    """
+    Cached check for table existence to avoid repeated queries.
+    """
+    tv_manager = get_tv_manager()
     conn = tv_manager.get_connection()
     cur = conn.cursor()
 
@@ -46,6 +54,95 @@ def display_premium_flow_page():
     tables_exist = cur.fetchone()[0]
     cur.close()
     conn.close()
+
+    return tables_exist
+
+
+@st.cache_data(ttl=60)  # 1-minute cache for flow summary
+def get_market_flow_summary_cached(tracker):
+    """Cached wrapper for market flow summary"""
+    return tracker.get_market_flow_summary()
+
+
+@st.cache_data(ttl=60)  # 1-minute cache for top symbols
+def get_top_symbols_flow_cached():
+    """Cached query for top 10 symbols by net flow"""
+    tv_manager = get_tv_manager()
+    conn = tv_manager.get_connection()
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT
+            symbol,
+            net_premium_flow,
+            put_call_ratio,
+            flow_sentiment,
+            total_volume,
+            call_premium,
+            put_premium
+        FROM options_flow
+        WHERE flow_date = CURRENT_DATE
+        ORDER BY ABS(net_premium_flow) DESC
+        LIMIT 10
+    """)
+
+    top_symbols = cur.fetchall()
+    cur.close()
+    conn.close()
+
+    return top_symbols
+
+
+@st.cache_data(ttl=60)  # 1-minute cache for unusual activity
+def get_unusual_activity_cached():
+    """Cached query for unusual activity alerts"""
+    tv_manager = get_tv_manager()
+    conn = tv_manager.get_connection()
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT
+            symbol,
+            total_volume,
+            net_premium_flow,
+            flow_sentiment,
+            put_call_ratio
+        FROM options_flow
+        WHERE flow_date = CURRENT_DATE
+            AND unusual_activity = true
+        ORDER BY total_volume DESC
+        LIMIT 10
+    """)
+
+    unusual = cur.fetchall()
+    cur.close()
+    conn.close()
+
+    return unusual
+
+
+def display_premium_flow_page():
+    """Main function to display Premium Options Flow page"""
+
+    st.title("💸 Premium Options Flow - Institutional Money Tracking")
+    st.caption("Track institutional options flow and identify high-probability wheel strategy opportunities")
+
+    # Sync status widget
+    from src.components.sync_status_widget import SyncStatusWidget
+    sync_widget = SyncStatusWidget()
+    sync_widget.display(
+        table_name="stock_premiums",
+        title="Options Flow Data Sync",
+        compact=True
+    )
+
+    # Initialize components (use cached manager)
+    tracker = OptionsFlowTracker()
+    analyzer = AIFlowAnalyzer()
+    tv_manager = get_tv_manager()  # PERFORMANCE: Use cached manager
+
+    # Check if tables exist (PERFORMANCE: Use cached check)
+    tables_exist = check_tables_exist()
 
     if not tables_exist:
         st.warning("⚠️ Premium Options Flow tables not yet created. Run migration first.")
@@ -141,8 +238,8 @@ def display_flow_overview(tracker: OptionsFlowTracker, tv_manager: TradingViewDB
 
     st.subheader("📊 Market-Wide Options Flow Overview")
 
-    # Get market summary
-    summary = tracker.get_market_flow_summary()
+    # Get market summary (PERFORMANCE: Use cached version)
+    summary = get_market_flow_summary_cached(tracker)
 
     if not summary or summary.get('total_symbols', 0) == 0:
         st.info("📊 No flow data available yet. Click 'Refresh Flow Data' to fetch data.")
@@ -250,27 +347,8 @@ def display_flow_overview(tracker: OptionsFlowTracker, tv_manager: TradingViewDB
     # Top 10 symbols by net flow
     st.subheader("🔥 Top 10 Symbols by Net Premium Flow")
 
-    conn = tv_manager.get_connection()
-    cur = conn.cursor()
-
-    cur.execute("""
-        SELECT
-            symbol,
-            net_premium_flow,
-            put_call_ratio,
-            flow_sentiment,
-            total_volume,
-            call_premium,
-            put_premium
-        FROM options_flow
-        WHERE flow_date = CURRENT_DATE
-        ORDER BY ABS(net_premium_flow) DESC
-        LIMIT 10
-    """)
-
-    top_symbols = cur.fetchall()
-    cur.close()
-    conn.close()
+    # PERFORMANCE: Use cached query
+    top_symbols = get_top_symbols_flow_cached()
 
     if top_symbols:
         df = pd.DataFrame(top_symbols, columns=[
@@ -284,7 +362,9 @@ def display_flow_overview(tracker: OptionsFlowTracker, tv_manager: TradingViewDB
         df['Call Premium'] = df['Call Premium'].apply(lambda x: f"${x/1e6:.2f}M")
         df['Put Premium'] = df['Put Premium'].apply(lambda x: f"${x/1e6:.2f}M")
 
-        st.dataframe(df, width=None, height=400)
+        # PERFORMANCE: Add pagination for large tables
+        paginated_df = paginate_dataframe(df, page_size=50, key_prefix="premium_flow_top_symbols")
+        st.dataframe(paginated_df, width=None, height=400)
     else:
         st.info("No data available")
 
@@ -292,26 +372,8 @@ def display_flow_overview(tracker: OptionsFlowTracker, tv_manager: TradingViewDB
     st.markdown("---")
     st.subheader("⚠️ Unusual Activity Alerts")
 
-    conn = tv_manager.get_connection()
-    cur = conn.cursor()
-
-    cur.execute("""
-        SELECT
-            symbol,
-            total_volume,
-            net_premium_flow,
-            flow_sentiment,
-            put_call_ratio
-        FROM options_flow
-        WHERE flow_date = CURRENT_DATE
-            AND unusual_activity = true
-        ORDER BY total_volume DESC
-        LIMIT 10
-    """)
-
-    unusual = cur.fetchall()
-    cur.close()
-    conn.close()
+    # PERFORMANCE: Use cached query
+    unusual = get_unusual_activity_cached()
 
     if unusual:
         cols = st.columns(min(len(unusual), 3))
@@ -433,7 +495,9 @@ def display_flow_opportunities(tracker: OptionsFlowTracker, analyzer: AIFlowAnal
 
     styled_df = display_df.style.applymap(color_score, subset=['Score'])
 
-    st.dataframe(styled_df, width=None, height=500)
+    # PERFORMANCE: Add pagination for opportunities table
+    paginated_opp_df = paginate_dataframe(display_df, page_size=50, key_prefix="premium_flow_opportunities")
+    st.dataframe(paginated_opp_df, width=None, height=500)
 
     # Detailed opportunity cards
     st.markdown("---")
@@ -738,7 +802,9 @@ def display_flow_analysis(tracker: OptionsFlowTracker, analyzer: AIFlowAnalyzer,
             df_similar['Net Flow'] = df_similar['Net Flow'].apply(lambda x: f"${x/1e6:.2f}M")
             df_similar['Volume'] = df_similar['Volume'].apply(lambda x: f"{x:,}")
 
-            st.dataframe(df_similar, width=None)
+            # PERFORMANCE: Add pagination for similar patterns
+            paginated_similar = paginate_dataframe(df_similar, page_size=25, key_prefix="premium_flow_similar")
+            st.dataframe(paginated_similar, width=None)
         else:
             st.info("No similar patterns found")
 

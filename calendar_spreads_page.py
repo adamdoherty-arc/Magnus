@@ -12,6 +12,38 @@ from src.tradingview_db_manager import TradingViewDBManager
 from src.calendar_spread_analyzer import CalendarSpreadAnalyzer
 import plotly.graph_objects as go
 
+# PERFORMANCE: Cached database manager - singleton pattern
+@st.cache_resource
+def get_tradingview_db_manager():
+    """Cached TradingView database manager"""
+    return TradingViewDBManager()
+
+# PERFORMANCE: Cached calendar spread analyzer - singleton pattern
+@st.cache_resource
+def get_calendar_spread_analyzer():
+    """Cached calendar spread analyzer"""
+    return CalendarSpreadAnalyzer()
+
+# PERFORMANCE: Cached watchlists query
+@st.cache_data(ttl=300)
+def get_watchlists_cached(_tv_manager):
+    """Get watchlists with 5-minute cache"""
+    return _tv_manager.get_all_symbols_dict()
+
+# PERFORMANCE: Cached stock price query
+@st.cache_data(ttl=60)
+def get_stock_price_cached(symbol):
+    """Get stock price with 1-minute cache"""
+    quote = rh.get_latest_price(symbol)
+    if quote and quote[0]:
+        return float(quote[0])
+    return None
+
+# PERFORMANCE: Cached calendar spread analysis
+@st.cache_data(ttl=60)
+def analyze_calendar_spreads_cached(_analyzer, symbol, stock_price):
+    """Analyze calendar spreads with 1-minute cache"""
+    return _analyzer.analyze_symbol(symbol, stock_price)
 
 def show_calendar_spreads():
     """Display calendar spreads analysis page"""
@@ -54,12 +86,12 @@ def show_calendar_spreads():
                 st.error(f"Failed to connect to Robinhood: {e}")
                 return
 
-    # Initialize managers
-    tv_manager = TradingViewDBManager()
-    analyzer = CalendarSpreadAnalyzer()
+    # PERFORMANCE: Initialize managers with cached singletons
+    tv_manager = get_tradingview_db_manager()
+    analyzer = get_calendar_spread_analyzer()
 
-    # Get watchlists
-    watchlists = tv_manager.get_all_symbols_dict()
+    # PERFORMANCE: Get cached watchlists
+    watchlists = get_watchlists_cached(tv_manager)
 
     if not watchlists:
         st.warning("No watchlists found. Please sync watchlists from TradingView Watchlists page first.")
@@ -120,15 +152,13 @@ def show_calendar_spreads():
             progress_bar.progress((idx + 1) / len(symbols_to_analyze))
 
             try:
-                # Get stock price
-                quote = rh.get_latest_price(symbol)
-                if not quote or not quote[0]:
+                # PERFORMANCE: Get cached stock price
+                stock_price = get_stock_price_cached(symbol)
+                if not stock_price:
                     continue
 
-                stock_price = float(quote[0])
-
-                # Analyze for calendar spreads
-                opportunities = analyzer.analyze_symbol(symbol, stock_price)
+                # PERFORMANCE: Analyze for calendar spreads with caching
+                opportunities = analyze_calendar_spreads_cached(analyzer, symbol, stock_price)
 
                 # Filter by score and type
                 for opp in opportunities:

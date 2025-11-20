@@ -1,15 +1,9 @@
 """AVA - Advanced Options Trading Platform"""
 
+# Core imports only - Heavy imports moved to lazy loading for performance
 import streamlit as st
 import pandas as pd
-import plotly.graph_objects as go
-import plotly.express as px
 from datetime import datetime, timedelta
-import math
-import redis
-import json
-import yfinance as yf
-import asyncio
 import os
 import time
 from typing import List, Dict, Any
@@ -18,19 +12,45 @@ from dotenv import load_dotenv
 # Load environment variables at the very start
 load_dotenv()
 
-# Import agents
-from src.agents.runtime.market_data_agent import MarketDataAgent
-from src.agents.runtime.wheel_strategy_agent import WheelStrategyAgent
-from src.agents.runtime.risk_management_agent import RiskManagementAgent
+# Optional date parser
+try:
+    from dateutil import parser
+except ImportError:
+    parser = None
 
-# Import TradingView Database Manager
-from src.tradingview_db_manager import TradingViewDBManager
-
-# Import safe yfinance utilities
-from src.yfinance_utils import safe_get_info, safe_get_current_price
-
-# Import Omnipresent AVA - Enhanced Version with Intelligent Question-Asking
+# Import Omnipresent AVA (used in main flow)
 from src.ava.omnipresent_ava_enhanced import show_enhanced_ava as show_omnipresent_ava
+
+# Lazy import helpers (loaded on-demand for better performance)
+_plotly_go = None
+_plotly_px = None
+_yfinance = None
+_redis_client = None
+_agents_initialized = False
+
+def get_plotly_go():
+    """Lazy load plotly graph_objects"""
+    global _plotly_go
+    if _plotly_go is None:
+        import plotly.graph_objects as go
+        _plotly_go = go
+    return _plotly_go
+
+def get_plotly_px():
+    """Lazy load plotly express"""
+    global _plotly_px
+    if _plotly_px is None:
+        import plotly.express as px
+        _plotly_px = px
+    return _plotly_px
+
+def get_yfinance():
+    """Lazy load yfinance"""
+    global _yfinance
+    if _yfinance is None:
+        import yfinance as yf
+        _yfinance = yf
+    return _yfinance
 
 # Page config
 st.set_page_config(
@@ -39,6 +59,66 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
+
+# ============================================================================
+# PERFORMANCE: Cache Warming System
+# ============================================================================
+
+@st.cache_resource
+def warm_critical_caches():
+    """
+    Pre-populate critical caches on dashboard startup for instant page loads.
+    Runs in background thread to avoid blocking UI.
+    """
+    import threading
+    import logging
+
+    logger = logging.getLogger(__name__)
+
+    def background_warm():
+        """Warm caches in background"""
+        try:
+            logger.info("🔥 Starting cache warming...")
+
+            # Warm positions cache (most frequently accessed)
+            try:
+                from positions_page_improved import get_closed_trades_cached
+                get_closed_trades_cached(days_back=7)
+                logger.info("✅ Positions cache warmed")
+            except Exception as e:
+                logger.warning(f"Positions cache warming failed: {e}")
+
+            # Warm xtrades cache
+            try:
+                from xtrades_watchlists_page import get_active_trades_cached, get_active_profiles_cached
+                get_active_trades_cached(limit=100)
+                get_active_profiles_cached()
+                logger.info("✅ XTrades cache warmed")
+            except Exception as e:
+                logger.warning(f"XTrades cache warming failed: {e}")
+
+            # Warm Kalshi cache
+            try:
+                from kalshi_nfl_markets_page import get_all_markets
+                get_all_markets()
+                logger.info("✅ Kalshi cache warmed")
+            except Exception as e:
+                logger.warning(f"Kalshi cache warming failed: {e}")
+
+            logger.info("🎉 Cache warming complete!")
+
+        except Exception as e:
+            logger.error(f"Cache warming error: {e}")
+
+    # Start warming in background (non-blocking)
+    thread = threading.Thread(target=background_warm, daemon=True)
+    thread.start()
+    return True
+
+# Warm caches on startup (called once)
+if 'caches_warmed' not in st.session_state:
+    warm_critical_caches()
+    st.session_state.caches_warmed = True
 
 # Custom CSS
 st.markdown("""
@@ -126,9 +206,10 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Initialize Redis connection
+# Initialize Redis connection (lazy - only when needed)
 @st.cache_resource
 def init_redis():
+    import redis
     return redis.Redis(
         host='localhost',
         port=6379,
@@ -136,17 +217,24 @@ def init_redis():
         decode_responses=True
     )
 
-redis_client = init_redis()
-
-# Initialize agents
+# Initialize agents (lazy - only when needed)
 @st.cache_resource
 def init_agents():
+    from src.agents.runtime.market_data_agent import MarketDataAgent
+    from src.agents.runtime.wheel_strategy_agent import WheelStrategyAgent
+    from src.agents.runtime.risk_management_agent import RiskManagementAgent
+
+    redis_client = init_redis()
     market_agent = MarketDataAgent(redis_client, max_price=50.0)
     strategy_agent = WheelStrategyAgent(redis_client)
     risk_agent = RiskManagementAgent(redis_client)
     return market_agent, strategy_agent, risk_agent
 
-market_agent, strategy_agent, risk_agent = init_agents()
+# Don't initialize immediately - let pages call init_agents() when needed
+# This saves 1-2 seconds on initial dashboard load
+def get_agents():
+    """Get initialized agents (lazy loading)"""
+    return init_agents()
 
 # Sidebar - Add prominent AVA Platform header at very top (compact)
 st.sidebar.markdown("""
@@ -184,13 +272,13 @@ if st.sidebar.button("🗄️ Database Scan", width='stretch'):
     st.session_state.page = "Database Scan"
 if st.sidebar.button("📅 Earnings Calendar", width='stretch'):
     st.session_state.page = "Earnings Calendar"
-if st.sidebar.button("📱 Xtrades Watchlists", width='stretch'):
-    st.session_state.page = "Xtrades Watchlists"
+if st.sidebar.button("📱 XTrade Messages", width='stretch'):
+    st.session_state.page = "XTrade Messages"
 if st.sidebar.button("📊 Supply/Demand Zones", width='stretch'):
     st.session_state.page = "Supply/Demand Zones"
 if st.sidebar.button("🎯 Options Analysis", width='stretch'):
     st.session_state.page = "Options Analysis"
-# Keep original pages for functionality verification
+# Legacy pages - kept for analysis (will be removed after review)
 if st.sidebar.button("🤖 AI Options Agent", width='stretch'):
     st.session_state.page = "AI Options Agent"
 if st.sidebar.button("🎯 Comprehensive Strategy Analysis", width='stretch'):
@@ -200,19 +288,25 @@ st.sidebar.markdown("---")
 
 # ==================== PREDICTION MARKETS ====================
 st.sidebar.markdown("### 🎲 Prediction Markets")
+if st.sidebar.button("🎯 AVA Betting Picks", width='stretch'):
+    st.session_state.page = "AVA Betting Picks"
+if st.sidebar.button("🏟️ Sports Game Cards", width='stretch'):
+    st.session_state.page = "Sports Game Cards"
+if st.sidebar.button("🏈 Game-by-Game Analysis", width='stretch'):
+    st.session_state.page = "Game-by-Game Analysis"
 if st.sidebar.button("🎯 AI Sports Predictions", width='stretch'):
     st.session_state.page = "AI Sports Predictions"
 if st.sidebar.button("🎲 Kalshi Markets", width='stretch'):
     st.session_state.page = "Prediction Markets"
-if st.sidebar.button("🏈 Game-by-Game Analysis", width='stretch'):
-    st.session_state.page = "Game-by-Game Analysis"
-if st.sidebar.button("🏟️ Sports Game Cards", width='stretch'):
-    st.session_state.page = "Sports Game Cards"
 
 st.sidebar.markdown("---")
 
 # ==================== AVA MANAGEMENT ====================
 st.sidebar.markdown("### 🤖 AVA Management")
+if st.sidebar.button("🤖 Agent Management", width='stretch'):
+    st.session_state.page = "Agent Management"
+if st.sidebar.button("🔍 Cache Metrics", width='stretch'):
+    st.session_state.page = "Cache Metrics"
 if st.sidebar.button("⚙️ Settings", width='stretch'):
     st.session_state.page = "Settings"
 if st.sidebar.button("🔧 Enhancement Agent", width='stretch'):
@@ -470,6 +564,15 @@ elif page == "Positions":
 
 elif page == "TradingView Watchlists":
     st.title("📊 My Watchlists - Premium Analysis")
+    
+    # Sync status widget
+    from src.components.sync_status_widget import SyncStatusWidget
+    sync_widget = SyncStatusWidget()
+    sync_widget.display(
+        table_name="tradingview",
+        title="Watchlist Sync",
+        compact=True
+    )
 
     # Import modules
     # TradingView Database Manager is already imported at the top
@@ -896,6 +999,7 @@ elif page == "TradingView Watchlists":
 
     with tab5:
         st.subheader("🎯 Quick Scan")
+        st.info("📊 **Watchlist Premium Scanner** - Scans only symbols in selected watchlist (vs Database Scanner which scans all 1,205 stocks)")
 
         st.info("No predefined lists available. Please use 'Import Watchlist' or 'Database Scan' to load stocks.")
 
@@ -1326,18 +1430,67 @@ elif page == "Database Scan":
     with tab1:
         st.subheader("Database Overview")
 
-        # Show last update time
-        if 'last_db_update_time' in st.session_state:
-            time_since = (datetime.now() - st.session_state['last_db_update_time']).seconds // 60
-            if time_since < 60:
-                st.info(f"📅 Prices last updated: {time_since} minutes ago")
-            else:
-                hours_since = time_since // 60
-                st.info(f"📅 Prices last updated: {hours_since} hours ago")
-        else:
-            st.warning("⚠️ Prices have not been updated today. Click 'Update All Prices' below or wait for pre-market auto-update.")
-
         if scanner.connect():
+            # Get actual sync status from database
+            try:
+                scanner.cursor.execute("""
+                    SELECT 
+                        MAX(last_updated) as last_sync,
+                        COUNT(*) as total_stocks,
+                        COUNT(CASE WHEN last_updated > NOW() - INTERVAL '24 hours' THEN 1 END) as synced_today,
+                        COUNT(CASE WHEN last_updated > NOW() - INTERVAL '7 days' THEN 1 END) as synced_this_week,
+                        MIN(last_updated) as oldest_sync
+                    FROM stock_data
+                """)
+                sync_status = scanner.cursor.fetchone()
+                
+                if sync_status and sync_status['last_sync']:
+                    last_sync = sync_status['last_sync']
+                    if isinstance(last_sync, str):
+                        from dateutil import parser
+                        last_sync = parser.parse(last_sync)
+                    
+                    # Calculate freshness
+                    hours_ago = (datetime.now() - last_sync.replace(tzinfo=None)).total_seconds() / 3600
+                    
+                    if hours_ago < 1:
+                        status_color = "🟢"
+                        status_text = f"Fresh ({int(hours_ago * 60)} minutes ago)"
+                    elif hours_ago < 24:
+                        status_color = "🟡"
+                        status_text = f"Recent ({int(hours_ago)} hours ago)"
+                    else:
+                        status_color = "🔴"
+                        days_ago = int(hours_ago / 24)
+                        status_text = f"Stale ({days_ago} day{'s' if days_ago > 1 else ''} ago)"
+                    
+                    # Display sync status metrics
+                    col_sync1, col_sync2, col_sync3, col_sync4 = st.columns(4)
+                    with col_sync1:
+                        st.metric("Last Sync Status", f"{status_color} {status_text}")
+                    with col_sync2:
+                        st.metric("Synced Today", f"{sync_status['synced_today']}/{sync_status['total_stocks']}")
+                    with col_sync3:
+                        st.metric("Synced This Week", f"{sync_status['synced_this_week']}/{sync_status['total_stocks']}")
+                    with col_sync4:
+                        if last_sync:
+                            st.caption(f"Last sync: {last_sync.strftime('%Y-%m-%d %H:%M:%S')}")
+                    
+                    st.markdown("---")
+                else:
+                    st.warning("⚠️ No sync data found. Run sync to populate stock data.")
+            except Exception as e:
+                st.warning(f"⚠️ Could not fetch sync status: {e}")
+                # Fallback to session state
+                if 'last_db_update_time' in st.session_state:
+                    time_since = (datetime.now() - st.session_state['last_db_update_time']).seconds // 60
+                    if time_since < 60:
+                        st.info(f"📅 Prices last updated: {time_since} minutes ago (from session)")
+                    else:
+                        hours_since = time_since // 60
+                        st.info(f"📅 Prices last updated: {hours_since} hours ago (from session)")
+                else:
+                    st.warning("⚠️ Prices have not been updated today. Click 'Update All Prices' below or wait for pre-market auto-update.")
             try:
                 # Create tables if needed
                 scanner.create_tables()
@@ -1381,6 +1534,56 @@ elif page == "Database Scan":
                     # Display stocks table
                     df = pd.DataFrame(stocks)
                     if not df.empty:
+                        # Add last synced column with relative time formatting
+                        def format_relative_time(dt):
+                            """Format datetime as relative time"""
+                            if not dt or pd.isna(dt):
+                                return "Never"
+                            
+                            if isinstance(dt, str):
+                                from dateutil import parser
+                                dt = parser.parse(dt)
+                            
+                            now = datetime.now()
+                            if hasattr(dt, 'tzinfo') and dt.tzinfo:
+                                dt = dt.replace(tzinfo=None)
+                            
+                            diff = now - dt
+                            hours = diff.total_seconds() / 3600
+                            
+                            if hours < 1:
+                                minutes = int(diff.total_seconds() / 60)
+                                return f"{minutes}m ago"
+                            elif hours < 24:
+                                return f"{int(hours)}h ago"
+                            else:
+                                days = int(hours / 24)
+                                return f"{days}d ago"
+                        
+                        # Get last_updated from stock_data table for each stock
+                        if 'symbol' in df.columns:
+                            try:
+                                # Join with stock_data to get actual last_updated
+                                symbols_list = df['symbol'].tolist()
+                                placeholders = ','.join(['%s'] * len(symbols_list))
+                                scanner.cursor.execute(f"""
+                                    SELECT symbol, last_updated
+                                    FROM stock_data
+                                    WHERE symbol IN ({placeholders})
+                                """, symbols_list)
+                                stock_data_times = {row['symbol']: row['last_updated'] for row in scanner.cursor.fetchall()}
+                                
+                                # Add last_synced column
+                                df['last_synced'] = df['symbol'].apply(
+                                    lambda s: format_relative_time(stock_data_times.get(s))
+                                )
+                            except Exception as e:
+                                # Fallback to stocks table last_updated
+                                if 'last_updated' in df.columns:
+                                    df['last_synced'] = df['last_updated'].apply(format_relative_time)
+                                else:
+                                    df['last_synced'] = "Unknown"
+                        
                         # Create a display dataframe with proper column selection
                         display_columns = []
                         if 'symbol' in df.columns:
@@ -1407,6 +1610,8 @@ elif page == "Database Scan":
                             df['avg_volume'] = df['avg_volume'].apply(
                                 lambda x: f"{x/1e6:.2f}M" if x and x > 0 else "N/A"
                             )
+                        if 'last_synced' in df.columns:
+                            display_columns.append('last_synced')
 
                         if display_columns:
                             st.dataframe(df[display_columns], width='stretch', height=400)
@@ -1988,16 +2193,33 @@ elif page == "Database Scan":
                     # Sector distribution
                     st.subheader("Stocks by Sector")
                     sector_counts = df['sector'].value_counts()
-                    st.bar_chart(sector_counts)
+                    if len(sector_counts) > 0 and not sector_counts.empty:
+                        # Use plotly to avoid Vega-Lite warnings
+                        import plotly.express as px
+                        fig = px.bar(x=sector_counts.index, y=sector_counts.values, labels={'x': 'Sector', 'y': 'Count'})
+                        fig.update_layout(showlegend=False, height=300)
+                        st.plotly_chart(fig, use_container_width=True)
+                    else:
+                        st.info("No sector data available")
 
                 with col2:
                     # Price distribution
                     st.subheader("Price Distribution")
-                    price_ranges = pd.cut(df['current_price'],
-                                        bins=[0, 10, 25, 50, 100, 500, float('inf')],
-                                        labels=['<$10', '$10-25', '$25-50', '$50-100', '$100-500', '>$500'])
-                    price_dist = price_ranges.value_counts().sort_index()
-                    st.bar_chart(price_dist)
+                    if 'current_price' in df.columns and len(df) > 0:
+                        price_ranges = pd.cut(df['current_price'],
+                                            bins=[0, 10, 25, 50, 100, 500, float('inf')],
+                                            labels=['<$10', '$10-25', '$25-50', '$50-100', '$100-500', '>$500'])
+                        price_dist = price_ranges.value_counts().sort_index()
+                        if len(price_dist) > 0 and not price_dist.empty:
+                            # Use plotly to avoid Vega-Lite warnings
+                            import plotly.express as px
+                            fig = px.bar(x=price_dist.index.astype(str), y=price_dist.values, labels={'x': 'Price Range', 'y': 'Count'})
+                            fig.update_layout(showlegend=False, height=300)
+                            st.plotly_chart(fig, use_container_width=True)
+                        else:
+                            st.info("No price data available")
+                    else:
+                        st.info("No price data available")
 
                 # Top movers would go here if we track price changes
                 st.subheader("Database Stats")
@@ -2031,9 +2253,9 @@ elif page == "Earnings Calendar":
 #     from calendar_spreads_page import show_calendar_spreads
 #     show_calendar_spreads()
 
-elif page == "Xtrades Watchlists":
-    from xtrades_watchlists_page import show_xtrades_page
-    show_xtrades_page()
+elif page == "XTrade Messages":
+    from discord_messages_page import main as show_xtrade_messages
+    show_xtrade_messages()
 
 elif page == "AI Sports Predictions":
     from prediction_markets_enhanced import show_prediction_markets_enhanced
@@ -2050,6 +2272,10 @@ elif page == "Game-by-Game Analysis":
 elif page == "Sports Game Cards":
     from game_cards_visual_page import show_game_cards
     show_game_cards()
+
+elif page == "AVA Betting Picks":
+    from ava_betting_recommendations_page import main as show_ava_betting_picks
+    show_ava_betting_picks()
 
 elif page == "Supply/Demand Zones":
     from supply_demand_zones_page import show_supply_demand_zones
@@ -2072,6 +2298,25 @@ elif page == "AVA Chatbot":
 elif page == "Comprehensive Strategy Analysis":
     from comprehensive_strategy_page import render_comprehensive_strategy_page
     render_comprehensive_strategy_page()
+
+elif page == "Agent Management":
+    if AGENT_MANAGEMENT_AVAILABLE:
+        try:
+            # Import and run agent management page
+            import sys
+            import os
+            sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+            from agent_management_page import main
+            main()
+        except Exception as e:
+            st.error(f"❌ Error loading Agent Management page: {e}")
+            import traceback
+            with st.expander("Error Details"):
+                st.code(traceback.format_exc())
+            st.info("Please ensure agent_management_page.py exists and all dependencies are installed")
+    else:
+        st.error("❌ Agent Management page not available")
+        st.info("Please ensure agent_management_page.py exists in the project root")
 
 elif page == "Settings":
     st.title("⚙️ Settings")
@@ -2174,6 +2419,10 @@ elif page == "Enhancement Agent":
 elif page == "Enhancement Manager":
     from enhancement_manager_page import render_enhancement_manager_page
     render_enhancement_manager_page()
+
+elif page == "Cache Metrics":
+    from cache_metrics_page import show_cache_metrics
+    show_cache_metrics()
 
 # Footer
 st.markdown("---")

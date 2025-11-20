@@ -4,24 +4,147 @@ Earnings Calendar Page - User-Friendly UI with buttons
 import streamlit as st
 import pandas as pd
 import os
+import time
 from src.tradingview_db_manager import TradingViewDBManager
 import robin_stocks.robinhood as rh
+from src.components.pagination_component import paginate_dataframe
 
 
-def show_earnings_calendar():
-    """Display earnings calendar with user-friendly UI"""
-    st.title("📅 Earnings Calendar")
+# ========================================================================
+# PERFORMANCE OPTIMIZATION: Cached Database Queries
+# ========================================================================
 
-    tv = TradingViewDBManager()
+@st.cache_resource
+def get_tv_db_manager():
+    """Cached database manager for connection pooling"""
+    return TradingViewDBManager()
+
+
+@st.cache_data(ttl=300)  # 5-minute cache
+def check_earnings_table_exists():
+    """Cached check for earnings table existence"""
+    tv = get_tv_db_manager()
     conn = tv.get_connection()
     cur = conn.cursor()
 
-    # Check if earnings_events table exists
     cur.execute("""
         SELECT COUNT(*) FROM information_schema.tables
         WHERE table_name = 'earnings_events'
     """)
     table_exists = cur.fetchone()[0] > 0
+    cur.close()
+    conn.close()
+
+    return table_exists
+
+
+@st.cache_data(ttl=300)  # 5-minute cache for earnings count
+def get_earnings_count():
+    """Cached query for total earnings count"""
+    tv = get_tv_db_manager()
+    conn = tv.get_connection()
+    cur = conn.cursor()
+
+    cur.execute("SELECT COUNT(*) FROM earnings_events")
+    count = cur.fetchone()[0]
+
+    cur.close()
+    conn.close()
+
+    return count
+
+
+@st.cache_data(ttl=60)  # 1-minute cache for earnings data
+def get_earnings_data_cached(date_filter, time_filter, result_filter):
+    """
+    Cached query for earnings data with filters
+    Returns DataFrame ready for display
+    """
+    tv = get_tv_db_manager()
+    conn = tv.get_connection()
+    cur = conn.cursor()
+
+    query = """
+        SELECT
+            e.symbol,
+            e.earnings_date,
+            e.earnings_time,
+            e.eps_estimate,
+            e.eps_actual,
+            e.revenue_estimate,
+            e.revenue_actual,
+            CASE
+                WHEN e.eps_actual > e.eps_estimate THEN 'Beat'
+                WHEN e.eps_actual < e.eps_estimate THEN 'Miss'
+                WHEN e.eps_actual = e.eps_estimate THEN 'Meet'
+                ELSE 'Pending'
+            END as result,
+            s.name as company_name,
+            s.sector
+        FROM earnings_events e
+        LEFT JOIN stocks s ON e.symbol = s.ticker
+        WHERE 1=1
+    """
+
+    params = []
+
+    # Date filter
+    if date_filter == "This Week":
+        query += " AND e.earnings_date >= NOW() AND e.earnings_date <= NOW() + INTERVAL '7 days'"
+    elif date_filter == "Next Week":
+        query += " AND e.earnings_date >= NOW() + INTERVAL '7 days' AND e.earnings_date <= NOW() + INTERVAL '14 days'"
+    elif date_filter == "This Month":
+        query += " AND e.earnings_date >= NOW() AND e.earnings_date <= NOW() + INTERVAL '30 days'"
+    elif date_filter == "Next Month":
+        query += " AND e.earnings_date >= NOW() + INTERVAL '30 days' AND e.earnings_date <= NOW() + INTERVAL '60 days'"
+
+    # Time filter
+    if time_filter != "All":
+        query += " AND e.earnings_time = %s"
+        params.append(time_filter)
+
+    query += " ORDER BY e.earnings_date DESC LIMIT 200"
+
+    cur.execute(query, params)
+    rows = cur.fetchall()
+
+    cur.close()
+    conn.close()
+
+    if rows:
+        df = pd.DataFrame(rows, columns=[
+            'Symbol', 'Date', 'Time', 'EPS Est', 'EPS Act',
+            'Rev Est', 'Rev Act', 'Result', 'Company', 'Sector'
+        ])
+
+        # Format date
+        df['Date'] = pd.to_datetime(df['Date']).dt.strftime('%Y-%m-%d %H:%M')
+
+        # Filter by result if needed
+        if result_filter != "All":
+            df = df[df['Result'] == result_filter]
+
+        return df
+    else:
+        return None
+
+
+def show_earnings_calendar():
+    """Display earnings calendar with user-friendly UI"""
+    st.title("📅 Earnings Calendar")
+    
+    # Sync status widget (earnings data doesn't have dedicated sync, show stock_data)
+    from src.components.sync_status_widget import SyncStatusWidget
+    sync_widget = SyncStatusWidget()
+    sync_widget.display(
+        table_name="stock_data",
+        title="Earnings Data Sync",
+        compact=True
+    )
+
+    # PERFORMANCE: Use cached manager and queries
+    tv = get_tv_db_manager()
+    table_exists = check_earnings_table_exists()
 
     # Setup section - if tables don't exist
     if not table_exists:
@@ -83,31 +206,35 @@ def show_earnings_calendar():
     col_s1, col_s2, col_s3 = st.columns([2, 1, 1])
 
     with col_s1:
-        cur.execute("SELECT COUNT(*) FROM earnings_events")
-        count = cur.fetchone()[0]
+        # PERFORMANCE: Use cached count
+        count = get_earnings_count()
         st.metric("📊 Earnings Events", f"{count:,}")
 
     with col_s2:
         if st.button("🔄 Sync Earnings", type="primary", width='stretch'):
+            # Get fresh connection for sync operation
+            conn = tv.get_connection()
+            cur = conn.cursor()
             sync_earnings_from_robinhood(conn, cur)
+            cur.close()
+            conn.close()
+            # Clear cache after sync
+            get_earnings_count.clear()
+            get_earnings_data_cached.clear()
 
     with col_s3:
         st.caption("💡 Auto-syncs daily at 6 AM")
 
     st.markdown("---")
 
-    # Display earnings data
-    cur.execute("SELECT COUNT(*) FROM earnings_events")
-    count = cur.fetchone()[0]
+    # Display earnings data (PERFORMANCE: Use cached count)
+    count = get_earnings_count()
 
     if count > 0:
-        display_earnings_table(conn, cur)
+        display_earnings_table()
     else:
         st.warning("📭 No earnings data yet")
         st.info("👆 Click 'Sync Earnings' to fetch data from Robinhood (takes 2-3 minutes for 100 stocks)")
-
-    cur.close()
-    conn.close()
 
 
 def sync_earnings_from_robinhood(conn, cur):
@@ -187,8 +314,8 @@ def sync_earnings_from_robinhood(conn, cur):
             conn.rollback()
 
 
-def display_earnings_table(conn, cur):
-    """Display earnings data in a table"""
+def display_earnings_table():
+    """Display earnings data in a table - PERFORMANCE OPTIMIZED"""
     # Filters
     col_f1, col_f2, col_f3 = st.columns(3)
 
@@ -213,63 +340,10 @@ def display_earnings_table(conn, cur):
             key="earn_result_filter"
         )
 
-    # Build query
-    query = """
-        SELECT
-            e.symbol,
-            e.earnings_date,
-            e.earnings_time,
-            e.eps_estimate,
-            e.eps_actual,
-            e.revenue_estimate,
-            e.revenue_actual,
-            CASE
-                WHEN e.eps_actual > e.eps_estimate THEN 'Beat'
-                WHEN e.eps_actual < e.eps_estimate THEN 'Miss'
-                WHEN e.eps_actual = e.eps_estimate THEN 'Meet'
-                ELSE 'Pending'
-            END as result,
-            s.name as company_name,
-            s.sector
-        FROM earnings_events e
-        LEFT JOIN stocks s ON e.symbol = s.ticker
-        WHERE 1=1
-    """
+    # PERFORMANCE: Use cached query with filters as parameters
+    df = get_earnings_data_cached(date_filter, time_filter, result_filter)
 
-    params = []
-
-    # Date filter
-    if date_filter == "This Week":
-        query += " AND e.earnings_date >= NOW() AND e.earnings_date <= NOW() + INTERVAL '7 days'"
-    elif date_filter == "Next Week":
-        query += " AND e.earnings_date >= NOW() + INTERVAL '7 days' AND e.earnings_date <= NOW() + INTERVAL '14 days'"
-    elif date_filter == "This Month":
-        query += " AND e.earnings_date >= NOW() AND e.earnings_date <= NOW() + INTERVAL '30 days'"
-    elif date_filter == "Next Month":
-        query += " AND e.earnings_date >= NOW() + INTERVAL '30 days' AND e.earnings_date <= NOW() + INTERVAL '60 days'"
-
-    # Time filter
-    if time_filter != "All":
-        query += " AND e.earnings_time = %s"
-        params.append(time_filter)
-
-    query += " ORDER BY e.earnings_date DESC LIMIT 200"
-
-    cur.execute(query, params)
-    rows = cur.fetchall()
-
-    if rows:
-        df = pd.DataFrame(rows, columns=[
-            'Symbol', 'Date', 'Time', 'EPS Est', 'EPS Act',
-            'Rev Est', 'Rev Act', 'Result', 'Company', 'Sector'
-        ])
-
-        # Format date
-        df['Date'] = pd.to_datetime(df['Date']).dt.strftime('%Y-%m-%d %H:%M')
-
-        # Filter by result if needed
-        if result_filter != "All":
-            df = df[df['Result'] == result_filter]
+    if df is not None and not df.empty:
 
         # Summary metrics
         col1, col2, col3, col4 = st.columns(4)
@@ -287,9 +361,12 @@ def display_earnings_table(conn, cur):
 
         st.markdown("### 📊 Earnings Calendar")
 
+        # PERFORMANCE: Add pagination for large tables
+        paginated_df = paginate_dataframe(df, page_size=50, key_prefix="earnings_calendar")
+
         # Display table
         st.dataframe(
-            df,
+            paginated_df,
             hide_index=True,
             width='stretch',
             column_config={
@@ -317,7 +394,3 @@ def display_earnings_table(conn, cur):
 
     else:
         st.info("📭 No earnings found for selected filters")
-
-
-# Add time import
-import time

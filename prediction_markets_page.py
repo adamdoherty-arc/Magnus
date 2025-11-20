@@ -9,15 +9,33 @@ from datetime import datetime
 from src.kalshi_db_manager import KalshiDBManager
 from src.kalshi_ai_evaluator import KalshiAIEvaluator
 
+# PERFORMANCE: Cached database manager - singleton pattern
+@st.cache_resource
+def get_kalshi_db_manager():
+    """Cached Kalshi database manager"""
+    return KalshiDBManager()
+
+# PERFORMANCE: Cached AI evaluator - singleton pattern
+@st.cache_resource
+def get_kalshi_ai_evaluator():
+    """Cached AI evaluator"""
+    return KalshiAIEvaluator()
+
+# PERFORMANCE: Cached database stats query
+@st.cache_data(ttl=300)
+def get_db_stats_cached(_db):
+    """Get database stats with 5-minute cache"""
+    return _db.get_stats()
+
 def show_prediction_markets():
     """Main function to display prediction markets page"""
 
     st.title("🎲 Prediction Markets")
     st.caption("AI-powered event contract opportunities from Kalshi")
 
-    # Initialize integrations
-    db = KalshiDBManager()
-    evaluator = KalshiAIEvaluator()
+    # Initialize integrations with cached singletons
+    db = get_kalshi_db_manager()
+    evaluator = get_kalshi_ai_evaluator()
 
     # Filters in sidebar-style columns
     col1, col2, col3, col4 = st.columns([2, 1, 1, 1])
@@ -48,8 +66,8 @@ def show_prediction_markets():
         st.warning("No markets found in database.")
         st.info("💡 Run the sync script to pull NFL markets: `python pull_nfl_games.py`")
 
-        # Show database stats
-        stats = db.get_stats()
+        # PERFORMANCE: Show cached database stats
+        stats = get_db_stats_cached(db)
         st.write(f"**Database Status:** {stats.get('total_markets', 0)} total markets, {stats.get('active_markets', 0)} active")
         return
 
@@ -85,7 +103,7 @@ def show_prediction_markets():
     for market in filtered_markets[:20]:  # Show top 20
         display_market_card(market)
 
-@st.cache_data(ttl=300)  # Cache for 5 minutes
+@st.cache_data(ttl=300)  # PERFORMANCE: Cache for 5 minutes - slow-changing data
 def fetch_and_score_markets(_db, _evaluator, category, limit=50):
     """Fetch markets from database with AI predictions"""
     try:
@@ -94,7 +112,7 @@ def fetch_and_score_markets(_db, _evaluator, category, limit=50):
         if category == "Sports":
             market_type = "nfl"  # We only have NFL for now
 
-        # Get markets with predictions (already scored by AI)
+        # PERFORMANCE: Get markets with predictions (already scored by AI)
         markets_with_predictions = _db.get_top_opportunities(limit=limit)
 
         if markets_with_predictions:
