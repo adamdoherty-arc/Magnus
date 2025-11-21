@@ -29,8 +29,51 @@ from src.yfinance_utils import safe_get_history, safe_get_current_price
 from src.recovery_strategies_tab import display_recovery_strategies_tab
 from src.portfolio_balance_display import display_portfolio_balance_dashboard
 from src.auto_balance_recorder import AutoBalanceRecorder
+from src.components.sync_status_widget import SyncStatusWidget
 
 logger = logging.getLogger(__name__)
+
+
+# ========================================================================
+# PERFORMANCE OPTIMIZATION: Cached Database Queries
+# ========================================================================
+
+@st.cache_data(ttl=300)  # 5-minute cache
+def get_closed_trades_cached(days_back=None):
+    """
+    Cached wrapper for get_closed_trades_from_db to avoid repeated database queries.
+
+    Args:
+        days_back: Number of days to look back, None for all trades
+
+    Returns:
+        List of trade dictionaries from database
+    """
+    sync_service = TradeHistorySyncService()
+    return sync_service.get_closed_trades_from_db(days_back)
+
+
+@st.cache_data(ttl=60)  # 1-minute cache for stock prices
+def get_stock_prices_batch(symbols):
+    """
+    Fetch current stock prices for multiple symbols with caching.
+    Much faster than fetching one at a time in a loop.
+
+    Args:
+        symbols: List of stock ticker symbols
+
+    Returns:
+        Dictionary mapping symbol -> current price
+    """
+    prices = {}
+    for symbol in symbols:
+        try:
+            price = safe_get_current_price(symbol, suppress_warnings=True)
+            prices[symbol] = price
+        except Exception as e:
+            logger.warning(f"Failed to fetch price for {symbol}: {e}")
+            prices[symbol] = None
+    return prices
 
 
 def display_news_section(symbols):
@@ -133,6 +176,14 @@ def show_positions_page():
 
     st.title("💼 Active Positions")
     st.caption("Live option positions from Robinhood with auto-refresh")
+    
+    # Sync status widget
+    sync_widget = SyncStatusWidget()
+    sync_widget.display(
+        table_name="stock_data",
+        title="Position Data Sync",
+        compact=True
+    )
 
     # Auto-Refresh Controls and Navigation
     col1, col2, col3, col4 = st.columns([1, 1, 2, 2])
@@ -1013,10 +1064,10 @@ Get comprehensive expert analysis for any position:
             st.warning(f"Could not load news section: {e}")
 
     # === TRADE HISTORY ===
-    # Initialize sync service to get count for expander title
-    sync_service_temp = TradeHistorySyncService()
-    db_trades_temp = sync_service_temp.get_closed_trades_from_db(days_back=365)
+    # Use cached function to get count for expander title (PERFORMANCE OPTIMIZATION)
+    db_trades_temp = get_closed_trades_cached()  # Cached 5-minute TTL (default: 365 days)
     trade_count = len(db_trades_temp) if db_trades_temp else 0
+    sync_service_temp = TradeHistorySyncService()
     last_sync_temp = sync_service_temp.get_last_sync_time()
     sync_info = f" - Last sync: {last_sync_temp.strftime('%I:%M %p')}" if last_sync_temp else ""
 
@@ -1025,7 +1076,7 @@ Get comprehensive expert analysis for any position:
     with st.expander(f"📊 Trade History ({trade_count} trades{sync_info})", expanded=False):
         col1, col2 = st.columns([3, 1])
         with col1:
-            st.caption("Closed trades with P/L calculations (loaded from database)")
+            st.caption("Complete trade history with P/L calculations (all trades from database)")
         with col2:
             if st.button("🔄 Sync Now", key="sync_trades"):
                 with st.spinner("Syncing trades from Robinhood..."):
@@ -1037,9 +1088,8 @@ Get comprehensive expert analysis for any position:
                         st.error(f"Sync failed: {e}")
 
         try:
-            # Use fast database query instead of slow Robinhood API
-            sync_service = TradeHistorySyncService()
-            db_trades = sync_service.get_closed_trades_from_db(days_back=365)
+            # Use cached database query (PERFORMANCE: Avoids duplicate DB call)
+            db_trades = get_closed_trades_cached(days_back=None)  # Reuses cache from above
 
             # Convert to format expected by display code
             from datetime import timezone
@@ -1067,16 +1117,12 @@ Get comprehensive expert analysis for any position:
                     'close_timestamp': close_timestamp  # For performance analytics filtering
                 })
 
-            # Fetch current stock prices for after-hours display
+            # Fetch current stock prices using cached batch function (PERFORMANCE)
             if closed_trades:
                 unique_symbols = list(set([t['Symbol'] for t in closed_trades]))
-                current_prices = {}
 
-                with st.spinner("Fetching current stock prices..."):
-                    for symbol in unique_symbols:
-                        # Use safe wrapper to handle delisted symbols gracefully
-                        price = safe_get_current_price(symbol, suppress_warnings=True)
-                        current_prices[symbol] = price
+                # Batch fetch with caching - much faster than individual calls
+                current_prices = get_stock_prices_batch(tuple(unique_symbols))  # Tuple for hashable cache key
 
                 # Add current prices to trades
                 for trade in closed_trades:
@@ -1101,8 +1147,35 @@ Get comprehensive expert analysis for any position:
                 with col4:
                     st.metric("Avg P/L", f'${avg_pl:.2f}')
 
-                # Display trades table with color coding
-                df_history = pd.DataFrame(closed_trades[:50])  # Show last 50
+                # PERFORMANCE: Pagination for large trade histories
+                PAGE_SIZE = 50
+                if 'trade_history_page' not in st.session_state:
+                    st.session_state.trade_history_page = 0
+
+                total_trades = len(closed_trades)
+                total_pages = (total_trades + PAGE_SIZE - 1) // PAGE_SIZE  # Ceiling division
+
+                # Pagination controls
+                if total_pages > 1:
+                    col_prev, col_info, col_next = st.columns([1, 2, 1])
+                    with col_prev:
+                        if st.button("← Previous", key="prev_trades") and st.session_state.trade_history_page > 0:
+                            st.session_state.trade_history_page -= 1
+                            st.rerun()
+                    with col_info:
+                        st.caption(f"Page {st.session_state.trade_history_page + 1} of {total_pages} ({total_trades} total trades)")
+                    with col_next:
+                        if st.button("Next →", key="next_trades") and st.session_state.trade_history_page < total_pages - 1:
+                            st.session_state.trade_history_page += 1
+                            st.rerun()
+
+                # Slice trades for current page
+                start_idx = st.session_state.trade_history_page * PAGE_SIZE
+                end_idx = min(start_idx + PAGE_SIZE, total_trades)
+                paginated_trades = closed_trades[start_idx:end_idx]
+
+                # Display paginated trades
+                df_history = pd.DataFrame(paginated_trades)
 
                 # Add TradingView links
                 df_history['TradingView'] = df_history['Symbol'].apply(

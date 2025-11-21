@@ -28,6 +28,13 @@ _yfinance = None
 _redis_client = None
 _agents_initialized = False
 
+# Check agent management page availability
+try:
+    import agent_management_page
+    AGENT_MANAGEMENT_AVAILABLE = True
+except ImportError:
+    AGENT_MANAGEMENT_AVAILABLE = False
+
 def get_plotly_go():
     """Lazy load plotly graph_objects"""
     global _plotly_go
@@ -83,7 +90,7 @@ def warm_critical_caches():
             # Warm positions cache (most frequently accessed)
             try:
                 from positions_page_improved import get_closed_trades_cached
-                get_closed_trades_cached(days_back=7)
+                get_closed_trades_cached()  # Uses default: 365 days
                 logger.info("✅ Positions cache warmed")
             except Exception as e:
                 logger.warning(f"Positions cache warming failed: {e}")
