@@ -1,0 +1,7 @@
+{
+  "requesting_agent": "ai-engineer",
+  "request_type": "get_task_briefing",
+  "payload": {
+    "query": "Initial briefing required for enhancing NFL and NCAA prediction agents. Provide overview of existing prediction agent implementation, team data sources, and relevant prediction algorithm files."
+  }
+}

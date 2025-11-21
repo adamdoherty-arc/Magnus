@@ -1,0 +1,278 @@
+# ============================================================================
+# AVA Telegram Bot - Docker Compose Configuration
+# ============================================================================
+# This docker-compose file sets up the complete AVA Telegram bot stack:
+# - Webhook server (FastAPI)
+# - Message workers (RQ workers)
+# - Redis (message queue and cache)
+# - PostgreSQL (already running separately)
+# - Prometheus (metrics)
+# - Grafana (dashboards)
+#
+# Usage:
+#   docker-compose -f docker/docker-compose.ava.yml up -d
+#   docker-compose -f docker/docker-compose.ava.yml down
+#   docker-compose -f docker/docker-compose.ava.yml logs -f webhook
+# ============================================================================
+
+version: '3.8'
+
+services:
+  # ==========================================================================
+  # Webhook Server (FastAPI + Uvicorn)
+  # ==========================================================================
+  webhook:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.ava-webhook
+    container_name: ava-webhook
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      # Telegram
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_WEBHOOK_SECRET_TOKEN=${TELEGRAM_WEBHOOK_SECRET_TOKEN}
+      - TELEGRAM_USE_WEBHOOKS=true
+
+      # Redis
+      - REDIS_URL=redis://redis:6379/0
+
+      # Database
+      - DATABASE_URL=${DATABASE_URL}
+
+      # Logging
+      - LOG_LEVEL=info
+      - PYTHONUNBUFFERED=1
+
+    depends_on:
+      - redis
+    volumes:
+      - ../src:/app/src:ro
+      - ../logs:/app/logs
+    networks:
+      - ava-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+
+  # ==========================================================================
+  # Message Workers (RQ Workers)
+  # ==========================================================================
+  worker:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.ava-worker
+    container_name: ava-worker-${WORKER_ID:-1}
+    restart: unless-stopped
+    environment:
+      # Telegram
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+
+      # Redis
+      - REDIS_URL=redis://redis:6379/0
+
+      # Database
+      - DATABASE_URL=${DATABASE_URL}
+
+      # API Keys
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - ROBINHOOD_USERNAME=${ROBINHOOD_USERNAME}
+      - ROBINHOOD_PASSWORD=${ROBINHOOD_PASSWORD}
+      - TRADINGVIEW_SESSION_ID=${TRADINGVIEW_SESSION_ID}
+
+      # Worker config
+      - WORKER_ID=${WORKER_ID:-1}
+      - QUEUE_NAMES=ava:messages:high,ava:messages:normal,ava:messages:low
+      - WORKER_TIMEOUT=300
+      - LOG_LEVEL=info
+      - PYTHONUNBUFFERED=1
+
+    depends_on:
+      - redis
+      - webhook
+    volumes:
+      - ../src:/app/src:ro
+      - ../logs:/app/logs
+      - whisper-models:/root/.cache/whisper
+    networks:
+      - ava-network
+    deploy:
+      replicas: 4  # Run 4 worker instances
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+
+  # ==========================================================================
+  # Redis (Message Queue + Cache)
+  # ==========================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: ava-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: >
+      redis-server
+      --appendonly yes
+      --appendfsync everysec
+      --maxmemory 512mb
+      --maxmemory-policy allkeys-lru
+    volumes:
+      - redis-data:/data
+    networks:
+      - ava-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+
+  # ==========================================================================
+  # RQ Dashboard (Web UI for monitoring queues)
+  # ==========================================================================
+  rq-dashboard:
+    image: eoranged/rq-dashboard:latest
+    container_name: ava-rq-dashboard
+    restart: unless-stopped
+    ports:
+      - "9181:9181"
+    environment:
+      - RQ_DASHBOARD_REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - redis
+    networks:
+      - ava-network
+
+  # ==========================================================================
+  # Prometheus (Metrics Collection)
+  # ==========================================================================
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: ava-prometheus
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=30d'
+      - '--web.enable-lifecycle'
+    volumes:
+      - ../config/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    networks:
+      - ava-network
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--tries=1", "--spider", "http://localhost:9090/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ==========================================================================
+  # Grafana (Dashboards)
+  # ==========================================================================
+  grafana:
+    image: grafana/grafana:latest
+    container_name: ava-grafana
+    restart: unless-stopped
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
+      - GF_INSTALL_PLUGINS=redis-datasource
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - ../config/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ../config/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    networks:
+      - ava-network
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ==========================================================================
+  # Nginx Reverse Proxy (Optional, for production)
+  # ==========================================================================
+  # nginx:
+  #   image: nginx:alpine
+  #   container_name: ava-nginx
+  #   restart: unless-stopped
+  #   ports:
+  #     - "443:443"
+  #     - "80:80"
+  #   volumes:
+  #     - ../config/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+  #     - ../config/nginx/ssl:/etc/nginx/ssl:ro
+  #   depends_on:
+  #     - webhook
+  #   networks:
+  #     - ava-network
+
+# =============================================================================
+# Networks
+# =============================================================================
+networks:
+  ava-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+# =============================================================================
+# Volumes
+# =============================================================================
+volumes:
+  redis-data:
+    driver: local
+  prometheus-data:
+    driver: local
+  grafana-data:
+    driver: local
+  whisper-models:
+    driver: local
+
+# =============================================================================
+# Notes
+# =============================================================================
+# 1. Make sure to set all required environment variables in .env file:
+#    - TELEGRAM_BOT_TOKEN
+#    - TELEGRAM_WEBHOOK_SECRET_TOKEN
+#    - DATABASE_URL
+#    - ANTHROPIC_API_KEY
+#    - ROBINHOOD_USERNAME, ROBINHOOD_PASSWORD
+#    - TRADINGVIEW_SESSION_ID
+#
+# 2. For production, uncomment the nginx service and configure SSL certificates
+#
+# 3. Access services:
+#    - Webhook API: http://localhost:8000
+#    - RQ Dashboard: http://localhost:9181
+#    - Prometheus: http://localhost:9090
+#    - Grafana: http://localhost:3001 (admin/admin)
+#
+# 4. To scale workers:
+#    docker-compose -f docker/docker-compose.ava.yml up -d --scale worker=8
+#
+# 5. To view logs:
+#    docker-compose -f docker/docker-compose.ava.yml logs -f webhook
+#    docker-compose -f docker/docker-compose.ava.yml logs -f worker
+#
+# 6. To backup Redis data:
+#    docker exec ava-redis redis-cli BGSAVE
+#    docker cp ava-redis:/data/dump.rdb ./backups/
+# =============================================================================

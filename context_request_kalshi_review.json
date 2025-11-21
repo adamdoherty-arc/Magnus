@@ -1,0 +1,7 @@
+{
+  "requesting_agent": "python-pro",
+  "request_type": "get_task_briefing",
+  "payload": {
+    "query": "Initial briefing required for Kalshi prediction markets integration review. Provide overview of Kalshi integration architecture, NFL/NCAA football prediction markets implementation, database schemas, sync workflows, authentication methods, and any known issues or recent changes to the Kalshi client code."
+  }
+}

@@ -1,0 +1,36 @@
+# HuggingFace Models for NFL/NCAA Sports Prediction
+# Install: pip install -r requirements_huggingface.txt
+
+# Core HuggingFace libraries
+transformers==4.36.0
+sentence-transformers==2.3.1
+accelerate==0.25.0
+datasets==2.16.1
+
+# PyTorch (CPU version - use CUDA version if GPU available)
+torch==2.1.2
+torchvision==0.16.2
+
+# Model optimization
+optimum==1.16.0
+bitsandbytes==0.41.3
+
+# Sentence embeddings utilities
+scikit-learn==1.4.0
+numpy==1.26.2
+scipy==1.11.4
+
+# Optional: AutoGluon for TabPFN (tabular foundation model)
+# Uncomment if you want zero-shot tabular predictions
+# autogluon==1.0.0
+# autogluon.tabular==1.0.0
+
+# Optional: Time series forecasting
+# Uncomment if you want time series trend analysis
+# chronos-forecasting==0.1.0
+
+# Progress bars and utilities
+tqdm==4.66.1
+
+# Logging
+loguru==0.7.2

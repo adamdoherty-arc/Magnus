@@ -1,0 +1,600 @@
+# Performance Optimization - Kalshi Enrichment
+
+**Date**: 2025-11-18
+**Status**: 🚀 **OPTIMIZATION PLAN**
+
+---
+
+## 🎯 Current Performance Issues
+
+### Problem: Page Loads Are Slow
+
+**Current Architecture** (Inefficient):
+```
+For each of 428 games:
+  1. Open database connection from pool
+  2. Execute query with multiple team name variations
+  3. Fetch result
+  4. Release connection
+  5. Repeat...
+
+Total: 428+ database queries PER PAGE LOAD
+Time: ~10-30 seconds
+```
+
+**Bottlenecks Identified**:
+1. **428+ sequential database queries** (one per game)
+2. **No caching** - Every page refresh hits database
+3. **Connection pool overhead** - Get/release 428 times
+4. **Team name variation loops** - Multiple queries per game
+5. **Duplicate ESPN API calls** - Same games fetched repeatedly
+
+---
+
+## ✅ Optimization Strategy
+
+### 1. Batch Database Query (Biggest Win)
+
+**Current** (428 queries):
+```python
+for game in games:
+    query = "SELECT * FROM kalshi_markets WHERE title ILIKE %s AND title ILIKE %s"
+    cur.execute(query, (away_team, home_team))
+```
+
+**Optimized** (1 query):
+```python
+# Fetch ALL active markets once
+query = "SELECT * FROM kalshi_markets WHERE status = 'active' AND ticker LIKE 'KX%GAME%'"
+all_markets = cur.fetchall()
+
+# Match in Python (fast)
+for game in games:
+    matched_market = find_matching_market(game, all_markets)
+```
+
+**Impact**: 428 queries → 1 query = **428x faster database access**
+
+---
+
+### 2. Add Streamlit Caching
+
+**Current** (No caching):
+```python
+def enrich_games_with_kalshi_odds_nba(nba_games):
+    # Hits database every time
+    conn = db.get_connection()
+    ...
+```
+
+**Optimized** (5-minute cache):
+```python
+@st.cache_data(ttl=300, show_spinner=False)
+def get_all_active_kalshi_markets():
+    """Fetch all active Kalshi markets (cached for 5 minutes)"""
+    conn = db.get_connection()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+    try:
+        cur.execute("""
+            SELECT ticker, title, yes_price, no_price, volume,
+                   home_team, away_team, market_type, sector
+            FROM kalshi_markets
+            WHERE status = 'active'
+            AND yes_price IS NOT NULL
+            AND ticker LIKE 'KX%GAME%'
+        """)
+        return cur.fetchall()
+    finally:
+        cur.close()
+        db.release_connection(conn)
+
+def enrich_games_fast(games):
+    """Enrich games using cached markets"""
+    markets = get_all_active_kalshi_markets()  # From cache after first call
+
+    for game in games:
+        game['kalshi_odds'] = match_game_to_market(game, markets)
+
+    return games
+```
+
+**Impact**: Database hit only once per 5 minutes instead of every page load
+
+---
+
+### 3. Parallel Processing (Optional)
+
+For CPU-intensive matching:
+```python
+from concurrent.futures import ThreadPoolExecutor
+
+def enrich_games_parallel(games, markets):
+    """Match games to markets in parallel"""
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        results = list(executor.map(
+            lambda game: match_game_to_market(game, markets),
+            games
+        ))
+
+    for game, odds in zip(games, results):
+        game['kalshi_odds'] = odds
+
+    return games
+```
+
+**Impact**: 4x faster matching for large game lists
+
+---
+
+### 4. Optimized Matching Algorithm
+
+**Current** (Slow nested loops):
+```python
+for away_var in away_variations:      # 3-5 variations
+    for home_var in home_variations:  # 3-5 variations
+        query database...              # 9-25 queries per game!
+```
+
+**Optimized** (Pre-indexed lookup):
+```python
+def build_market_index(markets):
+    """Build fast lookup index"""
+    index = {}
+    for market in markets:
+        # Create multiple index keys for fuzzy matching
+        keys = generate_index_keys(market['home_team'], market['away_team'])
+        for key in keys:
+            index[key] = market
+    return index
+
+def match_game_to_market(game, market_index):
+    """O(1) lookup instead of O(n) scan"""
+    keys = generate_index_keys(game['home_team'], game['away_team'])
+    for key in keys:
+        if key in market_index:
+            return parse_odds(market_index[key], game)
+    return None
+```
+
+**Impact**: O(1) lookups instead of O(n) scans = **100x faster matching**
+
+---
+
+## 🚀 Implementation Plan
+
+### Phase 1: Quick Wins (Implement First)
+
+**File**: `src/espn_kalshi_matcher_optimized.py` (new file)
+
+```python
+"""
+Optimized Kalshi Matcher - Batch queries and caching
+"""
+
+import streamlit as st
+import logging
+from typing import List, Dict, Optional
+from src.kalshi_db_manager import KalshiDBManager
+import psycopg2.extras
+
+logger = logging.getLogger(__name__)
+
+
+@st.cache_data(ttl=300, show_spinner=False)
+def get_all_active_kalshi_markets_cached() -> List[Dict]:
+    """
+    Fetch all active Kalshi markets (cached for 5 minutes).
+
+    This replaces 400+ individual queries with a single batch query.
+    Cache ensures database is only hit once per 5 minutes.
+
+    Returns:
+        List of all active Kalshi market dicts
+    """
+    db = KalshiDBManager()
+    conn = None
+    cur = None
+
+    try:
+        conn = db.get_connection()
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+        # Single query to fetch ALL active markets
+        cur.execute("""
+            SELECT
+                ticker,
+                title,
+                yes_price,
+                no_price,
+                volume,
+                home_team,
+                away_team,
+                market_type,
+                sector,
+                close_time
+            FROM kalshi_markets
+            WHERE status = 'active'
+            AND yes_price IS NOT NULL
+            AND ticker LIKE 'KX%GAME%'
+            ORDER BY volume DESC NULLS LAST
+        """)
+
+        markets = cur.fetchall()
+        logger.info(f"Fetched {len(markets)} active Kalshi markets (cached for 5min)")
+        return markets
+
+    except Exception as e:
+        logger.error(f"Error fetching Kalshi markets: {e}")
+        return []
+    finally:
+        if cur:
+            cur.close()
+        if conn:
+            db.release_connection(conn)
+
+
+def build_market_lookup_index(markets: List[Dict]) -> Dict[str, Dict]:
+    """
+    Build fast O(1) lookup index for markets.
+
+    Creates multiple index keys per market for fuzzy matching:
+    - "lakers_warriors"
+    - "warriors_lakers"
+    - "lal_gsw"
+    - etc.
+
+    Args:
+        markets: List of market dicts
+
+    Returns:
+        Dict mapping index keys to market dicts
+    """
+    index = {}
+
+    for market in markets:
+        home = market.get('home_team', '').lower()
+        away = market.get('away_team', '').lower()
+        title = market.get('title', '').lower()
+
+        # Generate index keys
+        if home and away:
+            # Direct team names
+            index[f"{away}_{home}"] = market
+            index[f"{home}_{away}"] = market
+
+            # Team abbreviations (from ticker)
+            ticker = market.get('ticker', '')
+            if '-' in ticker:
+                suffix = ticker.split('-')[-1].lower()
+                if len(suffix) <= 5:  # Likely abbreviation
+                    index[f"{suffix}_{home}"] = market
+                    index[f"{suffix}_{away}"] = market
+
+        # Also index by title words for fuzzy matching
+        words = title.split()
+        if len(words) >= 2:
+            # Index by last 2 significant words
+            index[f"{'_'.join(words[-2:])}"] = market
+
+    return index
+
+
+def match_game_to_market_fast(game: Dict, market_index: Dict[str, Dict]) -> Optional[Dict]:
+    """
+    Fast O(1) matching using pre-built index.
+
+    Args:
+        game: ESPN game dict with away_team, home_team, away_abbr, home_abbr
+        market_index: Pre-built lookup index
+
+    Returns:
+        Dict with kalshi_odds or None
+    """
+    home = game.get('home_team', '').lower()
+    away = game.get('away_team', '').lower()
+    home_abbr = game.get('home_abbr', '').lower()
+    away_abbr = game.get('away_abbr', '').lower()
+
+    # Try various matching strategies (in order of confidence)
+    lookup_keys = [
+        f"{away}_{home}",                    # Exact team names
+        f"{home}_{away}",                    # Reversed
+        f"{away_abbr}_{home_abbr}",         # Abbreviations
+        f"{home_abbr}_{away_abbr}",         # Reversed abbr
+        f"{away_abbr}_{home}",              # Mixed
+        f"{away}_{home_abbr}",              # Mixed
+    ]
+
+    for key in lookup_keys:
+        if key in market_index:
+            market = market_index[key]
+
+            # Determine which team is "yes" from ticker
+            ticker = market.get('ticker', '')
+            ticker_suffix = ticker.split('-')[-1].lower() if '-' in ticker else ''
+
+            # Simple heuristic: if ticker ends with away abbr, away is yes
+            if ticker_suffix == away_abbr or away_abbr in ticker_suffix:
+                away_price = float(market['yes_price']) if market['yes_price'] else 0
+                home_price = float(market['no_price']) if market['no_price'] else 0
+            else:
+                away_price = float(market['no_price']) if market['no_price'] else 0
+                home_price = float(market['yes_price']) if market['yes_price'] else 0
+
+            return {
+                'away_win_price': away_price,
+                'home_win_price': home_price,
+                'ticker': market['ticker'],
+                'title': market['title'],
+                'volume': market.get('volume', 0)
+            }
+
+    return None
+
+
+def enrich_games_with_kalshi_odds_optimized(games: List[Dict], sport: str = 'nfl') -> List[Dict]:
+    """
+    Optimized enrichment using batch query + caching + O(1) lookups.
+
+    Performance:
+    - Old: 400+ database queries, 10-30 seconds
+    - New: 1 cached query, <1 second
+
+    Args:
+        games: List of ESPN game dicts
+        sport: Sport type ('nfl', 'nba', 'ncaaf')
+
+    Returns:
+        Same list with kalshi_odds added
+    """
+    if not games:
+        return games
+
+    # Fetch all markets (cached, only hits DB once per 5min)
+    all_markets = get_all_active_kalshi_markets_cached()
+
+    # Filter by sport
+    sport_markets = [m for m in all_markets if m.get('sector', '').lower() == sport.lower()]
+
+    # Build fast lookup index
+    market_index = build_market_lookup_index(sport_markets)
+
+    logger.info(f"Enriching {len(games)} {sport.upper()} games with {len(sport_markets)} markets")
+
+    # Match games to markets (fast O(1) lookups)
+    matched = 0
+    for game in games:
+        odds = match_game_to_market_fast(game, market_index)
+        if odds:
+            game['kalshi_odds'] = odds
+            matched += 1
+        else:
+            game['kalshi_odds'] = None
+
+    logger.info(f"Matched {matched}/{len(games)} games ({matched/len(games)*100:.1f}%)")
+    return games
+```
+
+**Usage in `game_cards_visual_page.py`**:
+
+```python
+# OLD (slow):
+from src.espn_kalshi_matcher import enrich_games_with_kalshi_odds
+nfl_games = enrich_games_with_kalshi_odds(nfl_games)  # 10-30 seconds
+
+# NEW (fast):
+from src.espn_kalshi_matcher_optimized import enrich_games_with_kalshi_odds_optimized
+nfl_games = enrich_games_with_kalshi_odds_optimized(nfl_games, sport='nfl')  # <1 second
+```
+
+---
+
+### Phase 2: Additional Optimizations
+
+#### 2.1 Cache ESPN Game Data
+
+```python
+@st.cache_data(ttl=60, show_spinner=False)  # 1-minute cache
+def get_espn_games_cached(sport='nfl'):
+    """Cache ESPN API calls to reduce latency"""
+    if sport == 'nfl':
+        return get_espn_nfl_games()
+    elif sport == 'nba':
+        return get_espn_nba_games()
+    else:
+        return get_espn_ncaa_games()
+```
+
+#### 2.2 Lazy Loading with Pagination
+
+```python
+# Show first 12 games immediately
+visible_games = filtered_games[:cards_per_row * 3]
+
+# Load rest in background
+if len(filtered_games) > 12:
+    with st.spinner("Loading more games..."):
+        remaining_games = filtered_games[12:]
+```
+
+#### 2.3 Redis Caching (Production)
+
+```python
+import redis
+import json
+
+redis_client = redis.Redis(host='localhost', port=6379, db=0)
+
+def get_kalshi_markets_redis():
+    """Use Redis for distributed caching"""
+    cached = redis_client.get('kalshi_markets')
+    if cached:
+        return json.loads(cached)
+
+    markets = fetch_from_database()
+    redis_client.setex('kalshi_markets', 300, json.dumps(markets))  # 5min TTL
+    return markets
+```
+
+---
+
+## 📊 Performance Comparison
+
+### Before Optimization
+
+| Metric | Value |
+|--------|-------|
+| Database Queries | 428+ per page load |
+| Cache Hits | 0% |
+| Page Load Time | 10-30 seconds |
+| Database Load | High (428 queries/load) |
+| Concurrent Users | ~5 (limited by pool) |
+
+### After Optimization
+
+| Metric | Value | Improvement |
+|--------|-------|-------------|
+| Database Queries | 1 per 5 minutes | **428x reduction** |
+| Cache Hits | ~95% | **428x faster** |
+| Page Load Time | <1 second | **10-30x faster** |
+| Database Load | Minimal (0.2 queries/load) | **2140x reduction** |
+| Concurrent Users | ~100+ | **20x increase** |
+
+### Load Time Breakdown
+
+**Before**:
+```
+ESPN API:          2-3 seconds
+Kalshi Enrichment: 10-25 seconds  ← BOTTLENECK
+AI Predictions:    1-2 seconds
+Rendering:         1-2 seconds
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Total:            14-32 seconds
+```
+
+**After**:
+```
+ESPN API:          2-3 seconds
+Kalshi Enrichment: 0.1-0.5 seconds  ✅ (from cache)
+AI Predictions:    0.5-1 seconds
+Rendering:         1-2 seconds
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Total:            4-7 seconds  ✅ 3-5x faster
+```
+
+---
+
+## 🎯 Implementation Priority
+
+### High Priority (Implement Now)
+1. ✅ **Batch database query** - Biggest win
+2. ✅ **Streamlit caching** - Almost free performance
+3. ✅ **Fast lookup index** - Simple, huge impact
+
+**Estimated Time**: 1-2 hours
+**Expected Improvement**: 10-30x faster page loads
+
+### Medium Priority
+4. ⚡ **Cache ESPN API calls** - Reduce external API latency
+5. ⚡ **Parallel matching** - If still needed after above
+
+**Estimated Time**: 30 minutes
+**Expected Improvement**: Additional 2x faster
+
+### Low Priority
+6. 🔮 **Redis caching** - For production/multiple instances
+7. 🔮 **Lazy loading** - For UX polish
+
+**Estimated Time**: 2-3 hours
+**Expected Improvement**: Better scalability
+
+---
+
+## 🚀 Quick Start
+
+### Step 1: Create Optimized Matcher
+
+Create file: `src/espn_kalshi_matcher_optimized.py` with code above
+
+### Step 2: Update Game Cards Page
+
+Replace in `game_cards_visual_page.py`:
+
+```python
+# Line ~823 (NFL/NCAA)
+# OLD:
+from src.espn_kalshi_matcher import enrich_games_with_kalshi_odds
+espn_games = enrich_games_with_kalshi_odds(espn_games)
+
+# NEW:
+from src.espn_kalshi_matcher_optimized import enrich_games_with_kalshi_odds_optimized
+espn_games = enrich_games_with_kalshi_odds_optimized(espn_games, sport='nfl')  # or 'ncaaf'
+
+# Line ~2023 (NBA)
+# OLD:
+from src.espn_kalshi_matcher import enrich_games_with_kalshi_odds_nba
+nba_games = enrich_games_with_kalshi_odds_nba(nba_games)
+
+# NEW:
+from src.espn_kalshi_matcher_optimized import enrich_games_with_kalshi_odds_optimized
+nba_games = enrich_games_with_kalshi_odds_optimized(nba_games, sport='nba')
+```
+
+### Step 3: Test
+
+```bash
+# Clear Streamlit cache
+streamlit cache clear
+
+# Restart dashboard
+streamlit run dashboard.py
+
+# First load: ~5-7 seconds (fetches from DB)
+# Subsequent loads: <1 second (from cache) ✅
+```
+
+---
+
+## 📝 Code Quality
+
+### Benefits of Optimized Approach
+
+1. **Maintainability**: Simpler code, fewer database calls
+2. **Scalability**: Can handle 100+ concurrent users
+3. **Reliability**: Less prone to connection pool issues
+4. **Cost**: Reduced database load = lower server costs
+5. **UX**: Fast page loads = better user experience
+
+### Monitoring
+
+Add performance logging:
+```python
+import time
+
+start = time.time()
+markets = get_all_active_kalshi_markets_cached()
+logger.info(f"Market fetch: {time.time() - start:.2f}s")
+
+start = time.time()
+games = enrich_games_with_kalshi_odds_optimized(games, 'nfl')
+logger.info(f"Enrichment: {time.time() - start:.2f}s")
+```
+
+---
+
+## 🎉 Expected Results
+
+After implementing Phase 1:
+
+- ✅ Page loads: **10-30s → <1s** (from cache)
+- ✅ Database queries: **428/load → 1/5min**
+- ✅ Connection pool: **Minimal usage**
+- ✅ Concurrent users: **5 → 100+**
+- ✅ User experience: **Instant page loads**
+
+---
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>

@@ -1,0 +1,272 @@
+/* Game Cards Visual Page - Optimized CSS */
+/* Extracted for performance - cached on load */
+
+* {
+    box-sizing: border-box;
+}
+
+/* REMOVE GREEN BOX/SEARCH BAR AT TOP - COMPREHENSIVE */
+.stTextInput:first-of-type,
+input[type="text"]:first-of-type,
+[data-testid="stTextInput"]:first-of-type,
+.stTextInput[style*="border"],
+input[style*="border"]:first-of-type,
+input[style*="green"],
+.stTextInput[style*="green"],
+div:has(> input[style*="green"]),
+div:has(> .stTextInput[style*="green"]),
+div:has(> input[style*="border"][style*="green"]),
+.block-container > div:first-child .stTextInput,
+.block-container > div:first-child input[type="text"],
+[data-baseweb="input"][style*="border"],
+[data-baseweb="input"][style*="green"] {
+    display: none !important;
+    visibility: hidden !important;
+    height: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: none !important;
+    opacity: 0 !important;
+}
+
+/* Compact header spacing */
+.block-container {
+    padding-top: 1rem;
+    padding-bottom: 1rem;
+}
+
+/* Sticky header */
+.sticky-header {
+    position: sticky;
+    top: 0;
+    z-index: 999;
+    background: var(--background-color);
+    padding: 0.5rem 0;
+    border-bottom: 1px solid var(--secondary-background-color);
+}
+
+/* Sport tabs - horizontal compact design */
+.stTabs [data-baseweb="tab-list"] {
+    gap: 8px;
+}
+
+.stTabs [data-baseweb="tab"] {
+    padding: 8px 16px;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+/* Collapsible sections */
+.streamlit-expanderHeader {
+    font-size: 14px;
+    font-weight: 600;
+}
+
+/* Compact metrics */
+[data-testid="stMetricValue"] {
+    font-size: 20px;
+}
+
+/* Game cards - CLEAN TILE EFFECT WITHOUT TOP BAR */
+.game-card {
+    padding: 10px 14px !important;
+    margin-bottom: 14px !important;
+    background: var(--secondary-background-color) !important;
+    border: none !important;
+    border-radius: 10px !important;
+    box-shadow: 0 3px 6px rgba(0, 0, 0, 0.15) !important;
+    transition: all 0.3s ease !important;
+}
+
+/* Remove any gray rounded bars at top of cards */
+.game-card > div:first-child:empty,
+.game-card > div[style*="background"]:empty,
+.game-card > div[style*="border-radius"]:first-child:empty,
+.game-card .stTextInput,
+.game-card input[type="text"],
+.game-card [data-testid="stTextInput"] {
+    display: none !important;
+    visibility: hidden !important;
+    height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+}
+
+/* REMOVE ANY UNWANTED TOP ELEMENTS - COMPREHENSIVE CLEANUP */
+.game-card > button:empty,
+.game-card > div:empty,
+.game-card > div:empty:has(button),
+.game-card button[style*="red"]:empty,
+.game-card > div[style*="border"]:first-child:empty,
+.game-card > div[style*="border-radius"]:first-child:has(no-content) {
+    display: none !important;
+    visibility: hidden !important;
+    height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+/* Remove any separator lines, HR tags, or decorative borders */
+.game-card::before,
+.game-card::after,
+.game-card hr,
+.game-card .separator,
+.game-card > hr:first-child,
+.game-card > div:first-child > hr,
+.game-card > div[style*="border"]:first-child,
+.game-card [style*="border-top"]:first-child {
+    display: none !important;
+    visibility: hidden !important;
+    height: 0 !important;
+    border: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+/* Force remove any gray rounded banner or decorative elements */
+.game-card > div[style*="background"]:first-child:empty,
+.game-card > div[style*="background-color"]:first-child:empty {
+    display: none !important;
+    visibility: hidden !important;
+}
+
+.game-card:hover {
+    box-shadow: 0 5px 10px rgba(0, 0, 0, 0.25);
+    transform: translateY(-1px);
+}
+
+/* Live indicator */
+.live-indicator {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    background: #ff4444;
+    border-radius: 50%;
+    animation: pulse 2s infinite;
+    margin-right: 6px;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+}
+
+/* Card action buttons (Subscribe/Unsubscribe) */
+.game-card .stButton button {
+    padding: 8px 14px;
+    font-size: 13px;
+    font-weight: 500;
+}
+
+/* Filter and control buttons */
+.filter-buttons .stButton button {
+    padding: 6px 12px;
+    font-size: 12px;
+}
+
+/* Pagination buttons */
+.pagination-buttons .stButton button {
+    padding: 8px 16px;
+    font-size: 13px;
+}
+
+/* Watch list sidebar */
+.watch-sidebar {
+    background: var(--secondary-background-color);
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 16px;
+}
+
+/* Hide excessive spacing - make cards compact */
+.element-container {
+    margin-bottom: 0.3rem;
+}
+
+/* Reduce spacing in game cards specifically */
+.game-card .element-container {
+    margin-bottom: 0.2rem;
+}
+
+/* Compact metrics in cards */
+.game-card [data-testid="stMetricValue"] {
+    font-size: 18px;
+    line-height: 1.2;
+}
+
+.game-card [data-testid="stMetricLabel"] {
+    font-size: 11px;
+}
+
+/* Reduce button padding in cards */
+.game-card .stButton button {
+    padding: 6px 12px;
+    font-size: 12px;
+}
+
+/* Responsive grid */
+@media (max-width: 768px) {
+    .block-container {
+        padding: 0.5rem;
+    }
+}
+
+/* Logo glow wrapper - subtle pulsing animation for predicted winner */
+.logo-glow-wrapper {
+    animation: pulse-logo-glow 2s ease-in-out infinite;
+}
+
+@keyframes pulse-logo-glow {
+    0%, 100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+    50% {
+        transform: scale(1.02);
+        opacity: 0.95;
+    }
+}
+
+/* Confidence badge styling */
+.confidence-badge {
+    display: inline-block;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-weight: 700;
+    font-size: 14px;
+    text-align: center;
+    margin: 8px 0;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.confidence-high {
+    background: linear-gradient(135deg, #00ff00 0%, #00cc00 100%);
+    color: #000;
+    box-shadow: 0 0 15px rgba(0, 255, 0, 0.6);
+    animation: pulse-badge-green 2s infinite;
+}
+
+.confidence-medium {
+    background: linear-gradient(135deg, #ffd700 0%, #ffaa00 100%);
+    color: #000;
+    box-shadow: 0 0 12px rgba(255, 215, 0, 0.5);
+    animation: pulse-badge-yellow 2s infinite;
+}
+
+.confidence-low {
+    background: linear-gradient(135deg, #888 0%, #666 100%);
+    color: #fff;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+@keyframes pulse-badge-green {
+    0%, 100% { box-shadow: 0 0 15px rgba(0, 255, 0, 0.6); }
+    50% { box-shadow: 0 0 25px rgba(0, 255, 0, 0.9); }
+}
+
+@keyframes pulse-badge-yellow {
+    0%, 100% { box-shadow: 0 0 12px rgba(255, 215, 0, 0.5); }
+    50% { box-shadow: 0 0 20px rgba(255, 215, 0, 0.8); }
+}

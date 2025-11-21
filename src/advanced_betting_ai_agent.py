@@ -211,8 +211,9 @@ class AdvancedBettingAIAgent:
         kalshi_odds = game_data.get('kalshi_odds', {})
 
         if kalshi_odds:
-            away_price = kalshi_odds.get('away_win_price', 0.5)
-            home_price = kalshi_odds.get('home_win_price', 0.5)
+            # Convert to float to handle Decimal types from database
+            away_price = float(kalshi_odds.get('away_win_price', 0.5))
+            home_price = float(kalshi_odds.get('home_win_price', 0.5))
 
             # Convert to probabilities
             analysis['away_odds'] = away_price

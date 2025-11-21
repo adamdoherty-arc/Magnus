@@ -1,0 +1,189 @@
+===========================================
+SUPPLY/DEMAND ZONES - QUICK START
+===========================================
+
+WHAT IT DOES
+------------
+Automatically finds buy and sell zones on stocks (like TradingView indicator)
+Sends Telegram alerts when prices hit these zones
+Shows visual dashboard with opportunities
+
+SETUP (3 steps)
+---------------
+1. Database (already done!)
+   - Schema created: sd_zones, sd_zone_tests, sd_alerts, sd_scan_log
+
+2. Telegram (optional - for alerts)
+   - Add to .env:
+     TELEGRAM_BOT_TOKEN=your_bot_token
+     TELEGRAM_CHAT_ID=your_chat_id
+
+3. Ready to use!
+
+QUICK TEST
+----------
+# Test on AAPL
+python supply_demand_scanner_service.py --symbol AAPL
+
+# View in dashboard
+http://localhost:8501 → Click "Supply/Demand Zones" button
+
+WHAT YOU'LL SEE
+---------------
+Dashboard has 5 pages:
+
+1. Active Zones
+   - View all detected zones
+   - Filter by strength, type, status
+   - See price charts with zones
+
+2. Opportunities
+   - Stocks near high-quality zones
+   - Best buying/selling setups right now
+
+3. Statistics
+   - Total zones, fresh zones
+   - Scanner performance logs
+
+4. Alerts
+   - Recent Telegram alerts sent
+   - Alert quality breakdown
+
+5. Scanner
+   - Manually scan any stock
+   - Scan TradingView watchlists
+
+HOW IT WORKS
+------------
+Green Zones (DEMAND) = BUY zones
+- Price dropping to green zone = buying opportunity
+- Like TradingView green zones you mentioned
+
+Red Zones (SUPPLY) = SELL zones
+- Price rising to red zone = selling opportunity
+- Like TradingView yellow zones you mentioned
+
+Strength Score: 0-100
+- 85-100 = Excellent (trade these!)
+- 70-84 = Good
+- 50-69 = Fair (watch only)
+
+COMMON COMMANDS
+---------------
+# Scan single stock
+python supply_demand_scanner_service.py --symbol TSLA
+
+# Scan TradingView watchlist
+python supply_demand_scanner_service.py --watchlist default
+
+# Just monitor existing zones (no detection)
+python supply_demand_scanner_service.py --monitor-only
+
+# Run on schedule (every 5 min)
+python supply_demand_scanner_service.py --scheduled
+
+TELEGRAM ALERTS
+---------------
+You'll get alerts like:
+
+  GREEN BUY OPPORTUNITY
+
+  AAPL @ $178.50
+
+  Price INSIDE demand zone
+
+  Zone: $178.00 - $180.50
+  Strength: 85/100
+  Status: FRESH
+
+  Action:
+  BUY at $178.00-$180.50
+  Target: $189.53 (+5%)
+  Stop: $174.44 (-2%)
+
+6 ALERT TYPES
+-------------
+1. PRICE_AT_DEMAND (green) - BUY NOW
+2. PRICE_ENTERING_DEMAND (yellow) - GET READY TO BUY
+3. PRICE_AT_SUPPLY (red) - SELL NOW
+4. PRICE_ENTERING_SUPPLY (orange) - GET READY TO SELL
+5. ZONE_BOUNCE - Price bounced (confirmation)
+6. ZONE_BREAK - Zone broken (invalidated)
+
+TROUBLESHOOTING
+---------------
+No zones detected?
+→ Stock might not have clear zones yet
+→ Try more volatile stocks (TSLA, NVDA, COIN)
+→ Adjust parameters (see full docs)
+
+No alerts?
+→ Check Telegram token in .env
+→ Test: python src/alert_manager.py
+
+Database error?
+→ Check PostgreSQL running
+→ Password correct in .env
+
+FILES CREATED
+-------------
+Core Classes:
+- src/zone_detector.py (finds zones)
+- src/zone_analyzer.py (scores zones)
+- src/zone_database_manager.py (saves zones)
+- src/price_monitor.py (tracks prices)
+- src/alert_manager.py (sends alerts)
+
+Services:
+- supply_demand_scanner_service.py (main service)
+- supply_demand_zones_page.py (dashboard page)
+
+Database:
+- src/supply_demand_schema.sql (schema)
+
+NEXT STEPS
+----------
+1. Open dashboard: http://localhost:8501
+2. Click "Supply/Demand Zones" in sidebar
+3. Go to Scanner page
+4. Enter a symbol (AAPL, TSLA, etc.)
+5. Click "Scan Symbol"
+6. View detected zones!
+
+WATCH FOR
+---------
+- FRESH zones with 80+ strength = BEST setups
+- Price dropping into green (demand) zones = BUY
+- Price rising into red (supply) zones = SELL
+- Multiple alerts on same stock = Strong signal
+
+INTEGRATION
+-----------
+Works with:
+- TradingView watchlists (scan your watchlists!)
+- Database stocks (scan from stock_data table)
+- Any stock symbol (just enter ticker)
+
+Generates alerts for:
+- Drops into buy zones (demand)
+- Rises into sell zones (supply)
+- Big drops (buying opportunities)
+
+FULL DOCUMENTATION
+------------------
+See: SUPPLY_DEMAND_ZONES_COMPLETE.md
+
+SUMMARY
+-------
+Green Zones = BUY opportunities
+Red Zones = SELL opportunities
+85+ strength = TRADE
+70-84 strength = WATCH
+FRESH status = BEST
+
+Dashboard: http://localhost:8501 → Supply/Demand Zones
+Scanner: python supply_demand_scanner_service.py --symbol AAPL
+
+===========================================
+READY TO FIND TRADING OPPORTUNITIES!
+===========================================

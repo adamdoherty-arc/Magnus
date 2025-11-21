@@ -1,0 +1,43 @@
+# AVA Trading Platform - Default Configuration
+# All settings can be overridden via environment variables: AVA_SECTION_KEY
+# Example: AVA_DATABASE_POOL_MAX=20 overrides database.pool_max
+
+app:
+  name: "AVA - Advanced Trading Platform"
+  version: "2.0"
+  debug: false
+  page_title: "AVA Trading Platform"
+  page_icon: "🤖"
+  layout: "wide"
+
+database:
+  # Connection pool settings
+  pool_min: 2
+  pool_max: 10
+  timeout: 30
+
+  # Query timeouts (seconds)
+  query_timeout: 30
+  connection_timeout: 10
+
+cache:
+  # TTL values in seconds
+  default_ttl: 300      # 5 minutes - general purpose
+  short_ttl: 60         # 1 minute - frequently changing data
+  medium_ttl: 900       # 15 minutes - moderately stable data
+  long_ttl: 3600        # 1 hour - stable data
+  very_long_ttl: 86400  # 24 hours - rarely changing data
+
+  # Cache keys prefix
+  key_prefix: "ava:"
+
+redis:
+  host: "localhost"
+  port: 6379
+  db: 0
+  decode_responses: true
+
+session:
+  # Session timeout in seconds
+  timeout: 3600  # 1 hour
+  refresh_on_activity: true

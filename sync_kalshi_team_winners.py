@@ -16,7 +16,7 @@ if sys.platform == 'win32':
 
 load_dotenv()
 
-from src.kalshi_client import KalshiClient
+from src.kalshi_public_client import KalshiPublicClient
 from src.kalshi_db_manager import KalshiDBManager
 
 logging.basicConfig(
@@ -30,7 +30,7 @@ class TeamWinnerMarketSync:
     """Sync only team vs team winner markets from Kalshi"""
 
     def __init__(self):
-        self.client = KalshiClient()
+        self.client = KalshiPublicClient()  # No auth needed!
         self.db = KalshiDBManager()
         self.synced_count = 0
         self.skipped_count = 0
@@ -119,17 +119,7 @@ class TeamWinnerMarketSync:
             Dict with sync statistics
         """
         logger.info(f"Starting Kalshi team winner market sync for {sport.upper()}")
-
-        # Login to Kalshi
-        if not self.client.login():
-            logger.error("Failed to login to Kalshi. Check credentials in .env")
-            logger.error("Required: KALSHI_EMAIL and KALSHI_PASSWORD")
-            return {
-                'success': False,
-                'error': 'Authentication failed',
-                'synced': 0,
-                'skipped': 0
-            }
+        logger.info("Using public API - no authentication required")
 
         # Fetch all open markets
         logger.info("Fetching markets from Kalshi API...")
@@ -169,7 +159,7 @@ class TeamWinnerMarketSync:
         # Store in database
         if team_winner_markets:
             logger.info("Storing markets in database...")
-            stored = self.db.store_markets(team_winner_markets)
+            stored = self.db.store_markets(team_winner_markets, market_type=sport)
             logger.info(f"Stored {stored} team winner markets in database")
 
         # Get latest prices for all markets
@@ -212,11 +202,11 @@ class TeamWinnerMarketSync:
                 no_price,
                 volume,
                 close_time,
-                updated_at
+                last_updated
             FROM kalshi_markets
             WHERE market_type IN ('nfl', 'cfb', 'winner')
               AND yes_price IS NOT NULL
-            ORDER BY updated_at DESC
+            ORDER BY last_updated DESC
             LIMIT %s
             """
 
@@ -229,7 +219,7 @@ class TeamWinnerMarketSync:
                 print("=" * 80)
 
                 for market in markets:
-                    ticker, title, market_type, yes_price, no_price, volume, close_time, updated_at = market
+                    ticker, title, market_type, yes_price, no_price, volume, close_time, last_updated = market
 
                     print(f"\n{title}")
                     print(f"  Ticker: {ticker}")
@@ -237,7 +227,7 @@ class TeamWinnerMarketSync:
                     print(f"  Odds: Yes {yes_price:.1%} / No {no_price:.1%}")
                     print(f"  Volume: ${volume:,.0f}")
                     print(f"  Closes: {close_time}")
-                    print(f"  Updated: {updated_at}")
+                    print(f"  Updated: {last_updated}")
 
                 print("\n" + "=" * 80)
             else:

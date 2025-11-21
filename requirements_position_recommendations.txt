@@ -1,0 +1,58 @@
+# AI Position Recommendation System - Additional Requirements
+# Add these to your existing requirements.txt
+
+# ============================================================================
+# Options Analytics
+# ============================================================================
+py_vollib==1.0.1           # Implied volatility calculations
+mibian==0.1.3              # Black-Scholes Greeks (already installed)
+
+# ============================================================================
+# Market Data APIs (Optional but Recommended)
+# ============================================================================
+polygon-api-client==1.12.4      # Real-time options Greeks and market data
+finnhub-python==2.4.18          # News and sentiment analysis
+
+# ============================================================================
+# AI/LLM APIs
+# ============================================================================
+# NOTE: You already have anthropic and openai in your system
+# If not installed:
+# anthropic==0.25.0              # Claude API
+# openai==1.12.0                 # GPT-4 API
+# google-generativeai==0.3.2     # Gemini API
+
+# ============================================================================
+# Async Support
+# ============================================================================
+# aiohttp==3.9.1  # Already installed
+
+# ============================================================================
+# Technical Indicators (Optional)
+# ============================================================================
+# ta-lib==0.4.28                 # Advanced technical indicators
+#                                # Requires TA-Lib C library:
+#                                # Windows: Download from https://github.com/mrjbq7/ta-lib
+#                                # macOS: brew install ta-lib
+#                                # Linux: sudo apt-get install ta-lib
+
+# ============================================================================
+# Data Validation
+# ============================================================================
+# pydantic==2.5.0  # Already installed
+
+# ============================================================================
+# Caching
+# ============================================================================
+# redis==5.0.1  # Already installed
+
+# ============================================================================
+# Database
+# ============================================================================
+# psycopg2-binary==2.9.9  # Already installed
+
+# ============================================================================
+# Testing
+# ============================================================================
+# pytest==7.4.3           # Already installed
+# pytest-asyncio==0.21.1  # Already installed

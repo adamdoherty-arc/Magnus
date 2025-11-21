@@ -1,0 +1,18 @@
+# Multi-Agent QA System - Dependencies
+# Install with: pip install -r requirements_qa_system.txt
+
+# Core dependencies
+psycopg2-binary>=2.9.0
+python-dotenv>=1.0.0
+
+# Vector database and embeddings
+chromadb>=0.4.0
+sentence-transformers>=2.2.0
+
+# Optional: For better performance
+torch>=2.0.0  # PyTorch for embeddings
+numpy>=1.24.0
+
+# Optional: For development
+pytest>=7.4.0  # Testing
+black>=23.0.0  # Code formatting

@@ -32,7 +32,7 @@ from src.game_watchlist_manager import GameWatchlistManager
 from src.kalshi_db_manager import KalshiDBManager
 from src.espn_live_data import get_espn_client
 from src.espn_ncaa_live_data import get_espn_ncaa_client
-from src.espn_kalshi_matcher import enrich_games_with_kalshi_odds
+from src.espn_kalshi_matcher_optimized import enrich_games_with_kalshi_odds_optimized as enrich_games_with_kalshi_odds
 from src.advanced_betting_ai_agent import AdvancedBettingAIAgent
 from src.telegram_notifier import TelegramNotifier
 

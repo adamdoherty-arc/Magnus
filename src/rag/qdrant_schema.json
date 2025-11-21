@@ -1,0 +1,380 @@
+{
+  "collection_name": "options_trades",
+  "description": "Vector embeddings of historical options trades for RAG-based recommendations",
+  "vector_config": {
+    "size": 768,
+    "distance": "Cosine",
+    "on_disk": false
+  },
+  "optimizers_config": {
+    "deleted_threshold": 0.2,
+    "vacuum_min_vector_number": 1000,
+    "default_segment_number": 2,
+    "max_segment_size": 200000,
+    "memmap_threshold": 50000,
+    "indexing_threshold": 10000,
+    "flush_interval_sec": 5,
+    "max_optimization_threads": 2
+  },
+  "hnsw_config": {
+    "m": 16,
+    "ef_construct": 100,
+    "full_scan_threshold": 10000,
+    "max_indexing_threads": 0,
+    "on_disk": false
+  },
+  "payload_schema": {
+    "trade_id": {
+      "type": "integer",
+      "description": "Primary key from xtrades_trades table",
+      "indexed": true
+    },
+    "ticker": {
+      "type": "keyword",
+      "description": "Stock ticker symbol (e.g. AAPL, TSLA)",
+      "indexed": true
+    },
+    "strategy": {
+      "type": "keyword",
+      "description": "Options strategy type (CSP, CC, Put Credit Spread, etc.)",
+      "indexed": true
+    },
+    "action": {
+      "type": "keyword",
+      "description": "Trade action (BTO, STC, BTC, STO)",
+      "indexed": false
+    },
+    "strike_price": {
+      "type": "float",
+      "description": "Strike price of the option",
+      "indexed": false
+    },
+    "expiration_date": {
+      "type": "datetime",
+      "description": "Option expiration date (ISO 8601 format)",
+      "indexed": false
+    },
+    "dte": {
+      "type": "integer",
+      "description": "Days to expiration at entry",
+      "indexed": true,
+      "range_indexed": true
+    },
+    "premium": {
+      "type": "float",
+      "description": "Premium collected or paid",
+      "indexed": false
+    },
+    "entry_price": {
+      "type": "float",
+      "description": "Entry price of the option",
+      "indexed": false
+    },
+    "exit_price": {
+      "type": "float",
+      "description": "Exit price of the option",
+      "indexed": false
+    },
+    "quantity": {
+      "type": "integer",
+      "description": "Number of contracts",
+      "indexed": false
+    },
+    "pnl": {
+      "type": "float",
+      "description": "Profit/Loss in dollars",
+      "indexed": false
+    },
+    "pnl_percent": {
+      "type": "float",
+      "description": "Profit/Loss as percentage",
+      "indexed": false
+    },
+    "status": {
+      "type": "keyword",
+      "description": "Trade status (open, closed, expired)",
+      "indexed": true
+    },
+    "win": {
+      "type": "bool",
+      "description": "Whether trade was profitable",
+      "indexed": true
+    },
+    "entry_date": {
+      "type": "datetime",
+      "description": "Trade entry timestamp (ISO 8601)",
+      "indexed": true
+    },
+    "exit_date": {
+      "type": "datetime",
+      "description": "Trade exit timestamp (ISO 8601)",
+      "indexed": false
+    },
+    "hold_days": {
+      "type": "integer",
+      "description": "Number of days trade was held",
+      "indexed": false
+    },
+    "profile_username": {
+      "type": "keyword",
+      "description": "Xtrades profile username",
+      "indexed": true
+    },
+    "sector": {
+      "type": "keyword",
+      "description": "Stock sector (Technology, Healthcare, etc.)",
+      "indexed": true
+    },
+    "market_cap": {
+      "type": "keyword",
+      "description": "Market cap category (Large, Mid, Small)",
+      "indexed": false
+    },
+    "vix_at_entry": {
+      "type": "float",
+      "description": "VIX level when trade was entered",
+      "indexed": true,
+      "range_indexed": true
+    },
+    "spy_trend": {
+      "type": "keyword",
+      "description": "SPY trend at entry (Bullish, Bearish, Neutral)",
+      "indexed": true
+    },
+    "iv_rank": {
+      "type": "integer",
+      "description": "Implied Volatility Rank (0-100)",
+      "indexed": true,
+      "range_indexed": true
+    },
+    "delta": {
+      "type": "float",
+      "description": "Option delta at entry",
+      "indexed": false
+    },
+    "theta": {
+      "type": "float",
+      "description": "Option theta at entry",
+      "indexed": false
+    },
+    "stock_price_at_entry": {
+      "type": "float",
+      "description": "Stock price when trade was entered",
+      "indexed": false
+    },
+    "stock_price_at_exit": {
+      "type": "float",
+      "description": "Stock price when trade was exited",
+      "indexed": false
+    },
+    "alert_text": {
+      "type": "text",
+      "description": "Original alert text from Xtrades",
+      "indexed": false
+    },
+    "embedded_text": {
+      "type": "text",
+      "description": "Formatted text that was embedded",
+      "indexed": false
+    },
+    "success_weight": {
+      "type": "float",
+      "description": "Learning weight (boosted if used in successful recommendations)",
+      "indexed": false,
+      "default": 1.0
+    },
+    "times_referenced": {
+      "type": "integer",
+      "description": "Number of times this trade was used in recommendations",
+      "indexed": false,
+      "default": 0
+    },
+    "avg_recommendation_accuracy": {
+      "type": "float",
+      "description": "Average accuracy of recommendations that used this trade",
+      "indexed": false,
+      "default": 0.0
+    },
+    "created_at": {
+      "type": "datetime",
+      "description": "When this vector was created",
+      "indexed": false
+    },
+    "updated_at": {
+      "type": "datetime",
+      "description": "Last update timestamp",
+      "indexed": false
+    }
+  },
+  "indexes": [
+    {
+      "field": "ticker",
+      "type": "keyword",
+      "description": "Fast filtering by ticker symbol"
+    },
+    {
+      "field": "strategy",
+      "type": "keyword",
+      "description": "Fast filtering by strategy type"
+    },
+    {
+      "field": "status",
+      "type": "keyword",
+      "description": "Filter open vs closed trades"
+    },
+    {
+      "field": "win",
+      "type": "bool",
+      "description": "Filter by winning trades"
+    },
+    {
+      "field": "dte",
+      "type": "integer",
+      "description": "Range queries on days to expiration"
+    },
+    {
+      "field": "vix_at_entry",
+      "type": "float",
+      "description": "Range queries on VIX level"
+    },
+    {
+      "field": "iv_rank",
+      "type": "integer",
+      "description": "Range queries on IV rank"
+    },
+    {
+      "field": "entry_date",
+      "type": "datetime",
+      "description": "Filter by trade date for recency"
+    },
+    {
+      "field": "profile_username",
+      "type": "keyword",
+      "description": "Filter by specific traders"
+    },
+    {
+      "field": "sector",
+      "type": "keyword",
+      "description": "Filter by market sector"
+    },
+    {
+      "field": "spy_trend",
+      "type": "keyword",
+      "description": "Filter by market trend"
+    }
+  ],
+  "usage_notes": {
+    "embedding_model": "sentence-transformers/all-mpnet-base-v2",
+    "embedding_dimensions": 768,
+    "distance_metric": "Cosine similarity (range: -1 to 1, higher is more similar)",
+    "typical_search_params": {
+      "limit": 10,
+      "score_threshold": 0.7,
+      "with_payload": true,
+      "with_vectors": false
+    },
+    "recommended_filters": [
+      "Always filter by status='closed' for training data",
+      "Use ticker or sector filters to narrow search space",
+      "Use dte and vix_at_entry ranges for similar market conditions",
+      "Consider win=true filter for positive examples only"
+    ],
+    "performance_targets": {
+      "search_latency_p95": "< 200ms",
+      "collection_size": "10,000 - 100,000 vectors",
+      "queries_per_day": "100 - 1,000"
+    }
+  },
+  "example_point": {
+    "id": "trade_12345",
+    "vector": [0.023, -0.145, 0.089, "... 765 more values ..."],
+    "payload": {
+      "trade_id": 12345,
+      "ticker": "AAPL",
+      "strategy": "CSP",
+      "action": "BTO",
+      "strike_price": 170.0,
+      "expiration_date": "2024-12-20T16:00:00Z",
+      "dte": 30,
+      "premium": 2.50,
+      "entry_price": 2.50,
+      "exit_price": 0.60,
+      "quantity": 2,
+      "pnl": 380.0,
+      "pnl_percent": 76.0,
+      "status": "closed",
+      "win": true,
+      "entry_date": "2024-11-01T10:30:00Z",
+      "exit_date": "2024-11-15T16:00:00Z",
+      "hold_days": 14,
+      "profile_username": "behappy",
+      "sector": "Technology",
+      "market_cap": "Large",
+      "vix_at_entry": 15.2,
+      "spy_trend": "Bullish",
+      "iv_rank": 45,
+      "delta": -0.30,
+      "theta": 0.15,
+      "stock_price_at_entry": 178.50,
+      "stock_price_at_exit": 182.30,
+      "alert_text": "BTO 2x $AAPL 12/20 $170 CSP @ $2.50 - High IV rank, bullish on tech",
+      "embedded_text": "Strategy: CSP\nTicker: AAPL (Technology)\nAction: BTO\nStrike: $170.0 (Delta: -0.30)...",
+      "success_weight": 1.0,
+      "times_referenced": 0,
+      "avg_recommendation_accuracy": 0.0,
+      "created_at": "2024-11-15T17:00:00Z",
+      "updated_at": "2024-11-15T17:00:00Z"
+    }
+  },
+  "example_queries": [
+    {
+      "description": "Find similar AAPL CSP trades from last year",
+      "query": {
+        "vector": [0.023, -0.145, "..."],
+        "filter": {
+          "must": [
+            {"key": "ticker", "match": {"value": "AAPL"}},
+            {"key": "strategy", "match": {"value": "CSP"}},
+            {"key": "status", "match": {"value": "closed"}},
+            {"key": "entry_date", "range": {
+              "gte": "2023-11-01T00:00:00Z",
+              "lte": "2024-11-01T00:00:00Z"
+            }}
+          ]
+        },
+        "limit": 5,
+        "score_threshold": 0.7
+      }
+    },
+    {
+      "description": "Find similar trades in same market volatility regime",
+      "query": {
+        "vector": [0.023, -0.145, "..."],
+        "filter": {
+          "must": [
+            {"key": "strategy", "match": {"value": "CSP"}},
+            {"key": "status", "match": {"value": "closed"}},
+            {"key": "vix_at_entry", "range": {"gte": 13.0, "lte": 18.0}},
+            {"key": "dte", "range": {"gte": 25, "lte": 35}}
+          ]
+        },
+        "limit": 10
+      }
+    },
+    {
+      "description": "Find winning trades only for positive examples",
+      "query": {
+        "vector": [0.023, -0.145, "..."],
+        "filter": {
+          "must": [
+            {"key": "ticker", "match": {"value": "AAPL"}},
+            {"key": "win", "match": {"value": true}},
+            {"key": "pnl_percent", "range": {"gte": 50.0}}
+          ]
+        },
+        "limit": 5,
+        "score_threshold": 0.75
+      }
+    }
+  ]
+}

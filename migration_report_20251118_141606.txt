@@ -1,0 +1,21 @@
+================================================================================
+KALSHI TEAM NAMES MIGRATION REPORT
+================================================================================
+Generated: 2025-11-18 14:16:06
+Mode: DRY RUN
+
+DATA QUALITY BEFORE MIGRATION:
+  Total Records: 88
+  Valid Records: 56
+  Corrupted Records: 32
+  Corruption Rate: 36.4%
+  Corrupted Home Teams: 0
+  Corrupted Away Teams: 22
+  Unparseable Tickers: 32
+
+MIGRATION RESULTS:
+  Records Updated: 0
+  Backup File: N/A (dry run)
+
+
+================================================================================

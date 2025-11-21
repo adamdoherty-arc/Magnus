@@ -1,0 +1,257 @@
+# NFL Real-Time Data Pipeline Configuration
+# ================================================
+
+pipeline:
+  # Update frequencies
+  live_games_interval: 5  # seconds - how often to poll live game scores
+  scheduled_games_interval: 3600  # seconds - check for upcoming games hourly
+  injury_update_interval: 300  # seconds - update injury reports every 5 minutes
+  kalshi_price_interval: 5  # seconds - monitor Kalshi prices during live games
+  weather_update_interval: 1800  # seconds - update weather every 30 minutes
+
+  # API configuration
+  data_sources:
+    espn:
+      enabled: true
+      base_url: "https://site.api.espn.com/apis/site/v2/sports/football/nfl"
+      rate_limit: 60  # requests per minute
+      timeout: 10  # seconds
+
+    weather:
+      enabled: true
+      provider: "openweathermap"
+      api_key_env: "OPENWEATHER_API_KEY"
+      timeout: 10
+
+    odds:
+      enabled: false  # Set to true if you have The Odds API key
+      provider: "theoddsapi"
+      api_key_env: "ODDS_API_KEY"
+      timeout: 10
+
+    kalshi:
+      enabled: true
+      auto_login: true
+      refresh_markets_interval: 300  # seconds
+
+  # Performance settings
+  performance:
+    max_concurrent_fetches: 4  # parallel API calls
+    connection_pool_size: 10
+    query_timeout: 30  # seconds
+    enable_caching: true
+    cache_ttl: 60  # seconds
+
+  # Database settings
+  database:
+    batch_insert_size: 100  # plays per batch
+    enable_indexing: true
+    vacuum_schedule: "daily"  # vacuum tables to maintain performance
+
+# Alert Configuration
+# ================================================
+
+alerts:
+  # Global settings
+  enabled: true
+  channels:
+    - telegram
+    # - email  # Add when email service configured
+    # - sms    # Add when SMS service configured
+
+  # Rate limiting
+  global_rate_limit: 100  # max alerts per hour
+  cooldown_between_similar_alerts: 300  # seconds (5 minutes)
+
+  # Alert types and thresholds
+  triggers:
+    # Score changes
+    score_change:
+      enabled: true
+      priority: high
+      notify_on:
+        - touchdown
+        - field_goal
+        - safety
+      teams_filter: null  # null = all teams, or ["Chiefs", "Bills", ...]
+
+    # Kalshi price movements
+    price_movement:
+      enabled: true
+      priority: medium
+      thresholds:
+        min_price_change_pct: 10  # Alert on 10%+ price movement
+        min_volume_spike_pct: 50  # Alert on 50%+ volume spike
+      markets_filter: null  # null = all markets
+
+    # Injuries
+    injury_report:
+      enabled: true
+      priority: high
+      notify_on_status:
+        - Out
+        - Questionable  # Only if key position
+      key_positions:
+        - QB
+        - RB
+        - WR
+        - TE
+
+    # Weather alerts
+    weather_change:
+      enabled: true
+      priority: low
+      thresholds:
+        min_temp_change: 10  # degrees Fahrenheit
+        min_wind_change: 15  # MPH
+        precipitation_threshold: 50  # percent chance
+
+    # Game state changes
+    game_state:
+      enabled: true
+      priority: medium
+      notify_on:
+        - game_start
+        - halftime
+        - end_of_quarter
+        - two_minute_warning
+        - game_final
+
+# Notification Templates
+# ================================================
+
+notification_templates:
+  score_update:
+    format: |
+      🏈 **SCORE UPDATE**
+
+      **{away_team}** {away_score} @ **{home_team}** {home_score}
+
+      🎯 {scoring_team} scores {points} points!
+      ⏱️ Q{quarter} - {time_remaining}
+    include_kalshi_markets: true
+
+  kalshi_price_spike:
+    format: |
+      📈 **KALSHI PRICE MOVEMENT**
+
+      **{market_title}**
+
+      Price: `{old_price}` → `{new_price}` ({change_pct:+.1f}%)
+      Volume: ${volume:,.0f}
+      Ticker: `{ticker}`
+    include_correlation_data: true
+
+  injury_alert:
+    format: |
+      🚑 **INJURY UPDATE**
+
+      **{player_name}** ({position})
+      Team: {team}
+      Status: **{injury_status}**
+      Injury: {injury_type}
+
+      {description}
+    include_game_impact: true
+
+  significant_play:
+    format: |
+      ⚡ **BIG PLAY**
+
+      {game_matchup}
+      Q{quarter} - {time_remaining}
+
+      {play_description}
+
+      {play_impact}
+
+# Data Retention
+# ================================================
+
+retention:
+  # How long to keep historical data
+  game_data:
+    live_plays: 90  # days
+    completed_games: 365  # days (1 season)
+    archived_games: -1  # -1 = keep forever
+
+  price_history:
+    granular_snapshots: 7  # days (5-second snapshots)
+    hourly_aggregates: 90  # days
+    daily_aggregates: 365  # days
+
+  alerts:
+    alert_history: 30  # days
+    sync_logs: 14  # days
+
+  # Automatic cleanup
+  cleanup_schedule: "weekly"  # run cleanup job
+  archive_old_data: true  # move to archive table instead of delete
+
+# Monitoring & Health Checks
+# ================================================
+
+monitoring:
+  # Health checks
+  health_check_interval: 60  # seconds
+  alert_on_failures: true
+
+  # Performance metrics
+  track_metrics:
+    - api_latency
+    - database_query_time
+    - sync_cycle_duration
+    - alert_delivery_success_rate
+    - kalshi_price_fetch_time
+
+  # Error thresholds
+  thresholds:
+    max_sync_failures: 5  # consecutive failures before alert
+    max_api_errors_per_hour: 10
+    max_db_connection_errors: 3
+    max_notification_failures: 5
+
+  # Logging
+  log_level: INFO  # DEBUG, INFO, WARNING, ERROR
+  log_to_file: true
+  log_file_path: "logs/nfl_pipeline.log"
+  log_rotation: daily
+  log_retention_days: 30
+
+# Advanced Features
+# ================================================
+
+advanced:
+  # Social sentiment analysis (requires Twitter API)
+  sentiment_analysis:
+    enabled: false  # Set to true when Twitter API configured
+    update_interval: 300  # seconds
+    track_keywords:
+      - "#NFL"
+      - game-specific hashtags
+    sentiment_window: 3600  # seconds (1 hour window)
+
+  # Machine learning predictions
+  ml_predictions:
+    enabled: false  # Set to true when ML model trained
+    model_path: "models/nfl_win_probability.pkl"
+    update_interval: 60  # seconds
+    features:
+      - score_differential
+      - time_remaining
+      - possession
+      - field_position
+
+  # Advanced Kalshi correlation tracking
+  kalshi_correlation:
+    enabled: true
+    track_volume_spikes: true
+    calculate_correlation_strength: true
+    min_correlation_threshold: 0.5
+
+  # Auto-betting (EXPERIMENTAL - use with caution)
+  auto_betting:
+    enabled: false  # NEVER enable without thorough testing
+    max_bet_size: 0  # dollars
+    confidence_threshold: 0.85
+    max_bets_per_day: 0

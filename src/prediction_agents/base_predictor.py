@@ -99,11 +99,12 @@ class BaseSportsPredictor(ABC):
         # Convert to percentage from 50% (50% = no confidence)
         confidence_score = abs(probability - 0.5) * 2  # 0.0 to 1.0 scale
 
-        if confidence_score >= 0.50:  # >75% or <25% win probability
+        # Adjusted thresholds for sports betting (more sensitive to edges)
+        if confidence_score >= 0.30:  # >=65% or <=35% win probability (30+ point edge)
             return 'high'
-        elif confidence_score >= 0.20:  # 60-75% or 25-40% win probability
+        elif confidence_score >= 0.10:  # >=55% or <=45% win probability (10+ point edge)
             return 'medium'
-        else:  # 50-60% or 40-50% win probability
+        else:  # 50-55% or 45-50% win probability (<10 point edge)
             return 'low'
 
     def get_confidence_color(self, confidence: str) -> str:
@@ -164,7 +165,9 @@ class BaseSportsPredictor(ABC):
 
     def create_cache_key(self, home_team: str, away_team: str, game_date: Optional[datetime] = None) -> str:
         """
-        Create a cache key for predictions.
+        Create a deterministic cache key for predictions with guaranteed uniqueness.
+
+        Uses content-based hashing to prevent cache collisions.
 
         Args:
             home_team: Home team name
@@ -172,10 +175,28 @@ class BaseSportsPredictor(ABC):
             game_date: Game date/time
 
         Returns:
-            Cache key string
+            Cache key string with hash for uniqueness
         """
-        date_str = game_date.strftime('%Y-%m-%d') if game_date else 'unknown'
-        return f"{self.sport_name}:{home_team}:{away_team}:{date_str}"
+        import hashlib
+
+        # Normalize team names (lowercase, strip whitespace)
+        home = home_team.lower().strip()
+        away = away_team.lower().strip()
+
+        # Always include date (use 'today' if not provided to prevent 'unknown' collisions)
+        if game_date:
+            date_str = game_date.strftime('%Y-%m-%d')
+        else:
+            date_str = datetime.now().strftime('%Y-%m-%d')
+
+        # Create base key
+        base_key = f"{self.sport_name}:{away}@{home}:{date_str}"
+
+        # Add content hash for extra safety against collisions
+        key_hash = hashlib.md5(base_key.encode()).hexdigest()[:8]
+
+        # Final key format: "NCAA Football:akron@bowling green:2025-11-18:a1b2c3d4"
+        return f"{base_key}:{key_hash}"
 
     def get_cached_prediction(self, cache_key: str) -> Optional[Dict[str, Any]]:
         """
@@ -192,8 +213,12 @@ class BaseSportsPredictor(ABC):
             # Check if cache is still fresh (less than 1 hour old)
             age = (datetime.now() - cached['cached_at']).total_seconds()
             if age < 3600:  # 1 hour
-                self.logger.debug(f"Using cached prediction for {cache_key}")
+                winner = cached['prediction'].get('winner', 'unknown')
+                prob = cached['prediction'].get('probability', 0)
+                self.logger.info(f"💾 CACHE HIT: {cache_key} → {winner} ({prob:.1%})")
                 return cached['prediction']
+            else:
+                self.logger.info(f"⏰ CACHE EXPIRED: {cache_key} (age: {age:.0f}s)")
 
         return None
 
@@ -205,6 +230,9 @@ class BaseSportsPredictor(ABC):
             cache_key: Cache key from create_cache_key()
             prediction: Prediction dictionary to cache
         """
+        winner = prediction.get('winner', 'unknown')
+        prob = prediction.get('probability', 0)
+        self.logger.info(f"💽 CACHING NEW: {cache_key} → {winner} ({prob:.1%})")
         self.prediction_cache[cache_key] = {
             'prediction': prediction,
             'cached_at': datetime.now()

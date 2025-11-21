@@ -53,8 +53,27 @@ class GameWatchlistManager:
                     home_team TEXT,
                     selected_team TEXT,
                     added_at TIMESTAMP DEFAULT NOW(),
-                    is_active BOOLEAN DEFAULT TRUE
+                    is_active BOOLEAN DEFAULT TRUE,
+                    entry_price NUMERIC,
+                    entry_team TEXT,
+                    position_size NUMERIC DEFAULT 0,
+                    last_pnl_percent NUMERIC
                 )
+            """)
+            
+            # Add last_pnl_percent column if it doesn't exist
+            cur.execute("""
+                DO $$
+                BEGIN
+                    IF NOT EXISTS (
+                        SELECT 1 FROM information_schema.columns
+                        WHERE table_name = 'game_watchlist'
+                        AND column_name = 'last_pnl_percent'
+                    ) THEN
+                        ALTER TABLE game_watchlist
+                        ADD COLUMN last_pnl_percent NUMERIC;
+                    END IF;
+                END $$;
             """)
 
             # Drop old unique constraint if it exists and add new composite one
@@ -228,7 +247,23 @@ class GameWatchlistManager:
 
             watchlist = cur.fetchall()
 
-            return [dict(row) for row in watchlist]
+            # Convert to list of dicts with game_data field for compatibility
+            result = []
+            for row in watchlist:
+                row_dict = dict(row)
+                # Create game_data structure for UI display
+                row_dict['game_data'] = {
+                    'away_team': row_dict.get('away_team', 'Away'),
+                    'home_team': row_dict.get('home_team', 'Home'),
+                    'away_score': 0,  # Will be updated by live data
+                    'home_score': 0,
+                    'status_detail': 'Scheduled',
+                    'is_live': False,
+                    'is_completed': False
+                }
+                result.append(row_dict)
+
+            return result
 
         except Exception as e:
             logger.error(f"Error getting watchlist: {e}")
@@ -261,6 +296,79 @@ class GameWatchlistManager:
 
         except Exception as e:
             logger.error(f"Error checking watchlist: {e}")
+            return False
+        finally:
+            if cur:
+                cur.close()
+            if conn:
+                conn.close()
+
+    def get_watchlist_entry(self, user_id: str, game_id: str) -> Optional[Dict]:
+        """Get a specific watchlist entry with position data"""
+        conn = None
+        cur = None
+        try:
+            if not game_id or str(game_id).strip() == '':
+                return None
+
+            conn = self.db.get_connection()
+            cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+            cur.execute("""
+                SELECT * FROM game_watchlist
+                WHERE user_id = %s AND game_id = %s AND is_active = TRUE
+                LIMIT 1
+            """, (user_id, str(game_id)))
+
+            row = cur.fetchone()
+            return dict(row) if row else None
+
+        except Exception as e:
+            logger.error(f"Error getting watchlist entry: {e}")
+            return None
+        finally:
+            if cur:
+                cur.close()
+            if conn:
+                conn.close()
+
+    def update_position(self, user_id: str, game_id: str, entry_price: float, entry_team: str) -> bool:
+        """Update position tracking data for a watched game"""
+        conn = None
+        cur = None
+        try:
+            if not game_id or str(game_id).strip() == '':
+                return False
+
+            conn = self.db.get_connection()
+            cur = conn.cursor()
+
+            # First ensure the game is in watchlist
+            cur.execute("""
+                SELECT id FROM game_watchlist
+                WHERE user_id = %s AND game_id = %s AND is_active = TRUE
+                LIMIT 1
+            """, (user_id, str(game_id)))
+
+            if not cur.fetchone():
+                logger.warning(f"Game {game_id} not in watchlist, cannot update position")
+                return False
+
+            # Update position data
+            cur.execute("""
+                UPDATE game_watchlist
+                SET entry_price = %s, entry_team = %s
+                WHERE user_id = %s AND game_id = %s AND is_active = TRUE
+            """, (entry_price, entry_team, user_id, str(game_id)))
+
+            conn.commit()
+            logger.info(f"Updated position for game {game_id}: {entry_team} @ {entry_price}¢")
+            return True
+
+        except Exception as e:
+            logger.error(f"Error updating position: {e}")
+            if conn:
+                conn.rollback()
             return False
         finally:
             if cur:
@@ -575,6 +683,109 @@ class GameWatchlistManager:
             logger.error(f"Error cleaning up old games: {e}")
             if conn:
                 conn.rollback()
+        finally:
+            if cur:
+                cur.close()
+            if conn:
+                conn.close()
+
+    def cleanup_finished_games(self, user_id: str, minutes_after_completion: int = 30) -> int:
+        """
+        Auto-cleanup: Remove finished games from user's watchlist after specified time
+
+        Args:
+            user_id: User identifier
+            minutes_after_completion: Minutes to wait after game completion before removing (default: 30)
+
+        Returns:
+            Number of games removed
+        """
+        conn = None
+        cur = None
+        try:
+            conn = self.db.get_connection()
+            cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+            # Get user's active watchlist
+            cur.execute("""
+                SELECT game_id, sport FROM game_watchlist
+                WHERE user_id = %s AND is_active = TRUE
+            """, (user_id,))
+
+            watched_games = cur.fetchall()
+
+            if not watched_games:
+                return 0
+
+            # Check each game's status from ESPN
+            from src.espn_live_data import get_espn_client
+            from src.espn_ncaa_live_data import get_espn_ncaa_client
+
+            removed_count = 0
+
+            for game_row in watched_games:
+                game_id = game_row['game_id']
+                sport = game_row.get('sport', 'NFL')
+
+                try:
+                    # Fetch live game data
+                    if sport == 'CFB':
+                        espn = get_espn_ncaa_client()
+                        games = espn.get_scoreboard(group='80')
+                    else:
+                        espn = get_espn_client()
+                        games = espn.get_scoreboard()
+
+                    # Find the game
+                    game_found = False
+                    game_completed = False
+                    completion_time = None
+
+                    for live_game in games:
+                        if str(live_game.get('game_id', '')) == str(game_id):
+                            game_found = True
+                            # Check if completed
+                            if live_game.get('is_completed', False) or 'STATUS_FINAL' in str(live_game.get('status', '')):
+                                game_completed = True
+                                # Get completion time from game state history
+                                last_state = self.get_last_game_state(game_id)
+                                if last_state:
+                                    completion_time = last_state.get('timestamp')
+                            break
+
+                    # Remove if completed AND past the wait time, or not found (game is old)
+                    should_remove = False
+
+                    if not game_found:
+                        should_remove = True  # Game not found, likely old
+                    elif game_completed and completion_time:
+                        # Check if enough time has passed since completion
+                        from datetime import timedelta
+                        time_since_completion = datetime.now() - completion_time
+                        if time_since_completion > timedelta(minutes=minutes_after_completion):
+                            should_remove = True
+
+                    if should_remove:
+                        cur.execute("""
+                            UPDATE game_watchlist
+                            SET is_active = FALSE
+                            WHERE user_id = %s AND game_id = %s
+                        """, (user_id, game_id))
+                        removed_count += 1
+                        logger.info(f"Auto-removed finished game {game_id} from watchlist ({minutes_after_completion} minutes after completion)")
+
+                except Exception as e:
+                    logger.warning(f"Could not check game status for {game_id}: {e}")
+                    continue
+
+            conn.commit()
+            return removed_count
+
+        except Exception as e:
+            logger.error(f"Error cleaning up finished games: {e}")
+            if conn:
+                conn.rollback()
+            return 0
         finally:
             if cur:
                 cur.close()

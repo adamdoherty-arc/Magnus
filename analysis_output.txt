@@ -1,0 +1,57 @@
+================================================================================
+COMPREHENSIVE ALERT HTML STRUCTURE ANALYSIS
+================================================================================
+
+### 1. CURRENT FAILING SELECTOR ###
+Selector: soup.find_all(name=re.compile(r'app-.*alert.*', re.I))
+Total elements found: 2
+
+Tag breakdown:
+  app-alerts-tab: 1
+  app-alerts-table-header-profile: 1
+
+WHY IT FAILS:
+  - These are CONTAINER elements (app-alerts-tab, app-alerts-table-header-profile)
+  - They don't contain the actual trade data directly
+  - The real alerts are NESTED INSIDE these containers
+
+
+### 2. FINDING REAL ALERT ELEMENTS ###
+Looking for elements with: ticker symbol + dollar sign + reasonable length
+
+Found app-alerts-tab container
+
+  app-post elements inside alerts-tab: 0
+  div.post elements inside alerts-tab: 0
+  div.ng-star-inserted elements: 0
+
+
+### 3. ELEMENTS WITH TRADE DATA ###
+Total elements with ticker + price + reasonable length: 27
+
+Tag distribution:
+  div: 18
+  app-post: 3
+  app-quill-text: 3
+  p: 3
+
+
+### 4. DETAILED ALERT EXAMPLES ###
+
+======================================================================
+ALERT EXAMPLE #1
+======================================================================
+Tag: div
+Classes: ['post', 'post-profile', 'ng-star-inserted']
+ID: None
+
+Text content (176 chars):
+Traceback (most recent call last):
+  File "C:\Code\WheelStrategy\final_alert_analysis.py", line 102, in <module>
+    write(text[:200])
+  File "C:\Code\WheelStrategy\final_alert_analysis.py", line 17, in write
+    print(text)
+  File "C:\Program Files\Python312\Lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode characters in position 24-30: character maps to <undefined>

@@ -1,0 +1,15 @@
+{
+  "project_id": 9,
+  "project_name": "WheelStrategy",
+  "agent_type": "project_legion_agent",
+  "capabilities": [
+    "spec_maintenance",
+    "task_execution",
+    "bug_detection",
+    "test_generation",
+    "research"
+  ],
+  "autonomous_tasks": [],
+  "learning_enabled": true,
+  "created_at": "2025-11-10T22:22:03.065586"
+}

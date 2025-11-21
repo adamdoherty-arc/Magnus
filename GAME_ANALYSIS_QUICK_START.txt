@@ -1,0 +1,239 @@
+===========================================
+GAME-BY-GAME ANALYSIS - QUICK START
+===========================================
+
+WHAT YOU ASKED FOR
+------------------
+✓ Focus on game winners (not player props)
+✓ Sort by game time (soonest first)
+✓ Real-time price action monitoring
+✓ Quick opportunities as games progress
+✓ Daily game reports with export
+✓ Less focus on spreads, more on outcomes
+
+WHAT YOU GOT
+------------
+✓ New dashboard page "🏈 Game-by-Game Analysis"
+✓ Markets sorted by game start time
+✓ Live game detection with auto-refresh
+✓ Real-time price monitoring script
+✓ One-click CSV export for daily reports
+✓ AI predictions integrated
+
+HOW TO ACCESS
+-------------
+Dashboard: http://localhost:8501
+Page: Click "🏈 Game-by-Game Analysis" in sidebar
+
+GAME SCHEDULE
+-------------
+Nov 23, 2025:
+  09:30 AM - 1,335 markets (FIRST GAMES - 13h 45m away)
+  13:00 PM - 1,135 markets
+  16:05 PM - 486 markets
+  16:25 PM - 273 markets
+  20:20 PM - 39 markets
+
+Nov 24, 2025:
+  20:15 PM - 32 markets
+
+Total: 3,300 markets | 252 with AI predictions
+
+FEATURES
+--------
+1. SORTED BY TIME
+   - Soonest games at top
+   - Time until game shown (hours/minutes)
+   - Easy to find next opportunities
+
+2. LIVE GAME INDICATORS
+   ⚡ STARTING SOON - < 3 hours
+   🔴 LIVE - Game in progress (auto-refresh)
+   📅 Upcoming - Future games
+
+3. MARKET DETAILS
+   - Current YES/NO prices
+   - AI confidence score (70-100%)
+   - Edge percentage
+   - Volume ($)
+   - Recommendation (BUY YES/NO/PASS)
+
+4. QUICK FILTERS
+   - Min Confidence: 70% (default)
+   - Min Volume: $50 (default)
+   - Refresh button for live prices
+
+5. ONE-CLICK EXPORT
+   - Daily report to CSV
+   - All markets sorted by time
+   - Ready for Excel/Sheets
+   - Direct Kalshi links
+
+REAL-TIME PRICE MONITORING
+---------------------------
+Update all prices once:
+  python sync_kalshi_prices_realtime.py --once
+
+Monitor continuously (every 30s):
+  python sync_kalshi_prices_realtime.py
+
+Custom interval (60s):
+  python sync_kalshi_prices_realtime.py --interval 60
+
+Alert on 10%+ moves:
+  python sync_kalshi_prices_realtime.py --threshold 0.10
+
+SAMPLE WORKFLOW
+---------------
+MORNING (3 hours before games):
+  1. Open dashboard
+  2. Go to Game-by-Game Analysis
+  3. Review top opportunities
+  4. Export daily report
+  5. Start price monitor
+
+DURING GAMES:
+  1. Dashboard auto-refreshes (🔴 LIVE)
+  2. Watch for price spikes
+  3. Look for quick opportunities
+  4. Monitor alerts from price script
+
+AFTER GAMES:
+  1. Check outcomes
+  2. Track prediction accuracy
+  3. Export final report
+  4. Analyze what worked
+
+CSV EXPORT FORMAT
+-----------------
+Columns:
+  - Game_Time (formatted)
+  - Minutes_Until_Game
+  - Is_Live (True/False)
+  - Teams (extracted)
+  - Ticker
+  - Market_Title (full)
+  - Confidence (%)
+  - Predicted_Outcome (yes/no)
+  - Edge_Percentage
+  - YES_Price
+  - NO_Price
+  - Volume ($)
+  - Kalshi_URL (direct link)
+
+File: kalshi_daily_games_report_[timestamp].csv
+
+TYPICAL MARKETS
+---------------
+Most are PARLAY/COMBINATION bets:
+
+Example 1: "yes Indianapolis wins by over 3.5 points,
+            yes Buffalo wins by over 2.5 points"
+
+Example 2: "yes Jonathan Taylor, yes Bijan Robinson,
+            no Indianapolis wins by over 7.5 points"
+
+Example 3: "yes Drake London, yes Tyler Warren,
+            yes Over 54.5 points scored"
+
+Note: Kalshi focuses on parlays rather than simple
+moneylines. System extracts team names and shows
+which teams are involved in each bet.
+
+TOP OPPORTUNITIES
+-----------------
+Filters applied:
+  ✓ Confidence ≥ 70%
+  ✓ Volume ≥ $50
+  ✓ Days to close ≤ 90
+  ✓ Days to close > 0
+
+Current high-confidence markets:
+  - 240 opportunities ≥ 60% confidence
+  - 52 opportunities ≥ 80% confidence
+  - All closing Nov 23-24
+
+PRICE ALERTS
+------------
+When monitoring, you'll see:
+
+📈 TICKER123: 0.45 → 0.52 (+15.6%)
+   yes Indianapolis wins by over 3.5 points...
+
+📉 TICKER456: 0.70 → 0.63 (-10.0%)
+   yes Buffalo wins by over 9.5 points...
+
+These indicate betting opportunities as odds shift!
+
+QUICK COMMANDS
+--------------
+# View dashboard
+http://localhost:8501 → 🏈 Game-by-Game Analysis
+
+# Update prices once
+python sync_kalshi_prices_realtime.py --once
+
+# Monitor prices
+python sync_kalshi_prices_realtime.py
+
+# Check database
+psql -U postgres -d magnus -c "SELECT COUNT(*) FROM kalshi_markets WHERE status = 'active';"
+
+# View next games
+psql -U postgres -d magnus -c "SELECT TO_CHAR(close_time, 'Mon DD HH24:MI') as time, COUNT(*) FROM kalshi_markets WHERE status = 'active' GROUP BY close_time ORDER BY close_time LIMIT 5;"
+
+TIPS FOR SUCCESS
+----------------
+1. Start monitoring 3 hours before games
+2. Focus on high-confidence (≥80%) opportunities
+3. Check volume - avoid thin markets (<$100)
+4. Export daily report for record-keeping
+5. Watch for price spikes during games
+6. Look for quick "in-game" opportunities
+7. Compare AI prediction vs market price
+8. Track which bets actually win
+
+WHAT'S DIFFERENT
+----------------
+OLD (Prediction Markets page):
+  - Mixed market types
+  - Not sorted by time
+  - Harder to find next games
+  - Generic filters
+
+NEW (Game-by-Game Analysis):
+  - Sorted by game time ✓
+  - Focus on game winners ✓
+  - Live game detection ✓
+  - Time until game shown ✓
+  - One-click export ✓
+  - Quick opportunities ✓
+
+SYSTEM STATUS
+-------------
+✅ Dashboard running: http://localhost:8501
+✅ New page integrated: 🏈 Game-by-Game Analysis
+✅ 3,300 active markets
+✅ 252 AI predictions
+✅ Games: Nov 23-24, 2025
+✅ Real-time price monitor ready
+✅ Export functionality working
+
+NEXT STEPS
+----------
+1. Open dashboard and try the new page
+2. Review opportunities for Nov 23 games
+3. Export daily report
+4. Start price monitor before games
+5. Watch for live opportunities during games
+
+DOCUMENTATION
+-------------
+- GAME_BY_GAME_SYSTEM_COMPLETE.md - Full details
+- KALSHI_DASHBOARD_FIX_COMPLETE.md - Technical fixes
+- KALSHI_MULTI_SECTOR_COMPLETE.md - Multi-sector AI
+- This file - Quick reference
+
+===========================================
+READY TO USE - Nov 23 games start in 13h 45m
+===========================================

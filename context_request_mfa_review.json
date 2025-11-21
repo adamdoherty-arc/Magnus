@@ -1,0 +1,7 @@
+{
+  "requesting_agent": "ai-engineer",
+  "request_type": "get_task_briefing",
+  "payload": {
+    "query": "Initial briefing required for Magnus Financial Assistant (MFA) enhancement. Provide comprehensive overview of: 1) Current MFA architecture and implementation status, 2) All Magnus system features and data sources (12+ features mentioned), 3) Existing AI/ML integrations and RAG systems, 4) Database schemas and data pipelines, 5) Current vector database and embedding implementations, 6) Any knowledge management or learning systems in place. Include all relevant documentation paths and architectural decisions made."
+  }
+}

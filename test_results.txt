@@ -1,0 +1,167 @@
+Traceback (most recent call last):
+  File "C:\Code\WheelStrategy\test_enhanced_indicators.py", line 363, in main
+    results.append(("Momentum Indicators", test_momentum_indicators()))
+                                           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Code\WheelStrategy\test_enhanced_indicators.py", line 188, in test_momentum_indicators
+    print(f"Trend: {macd['trend']}")
+                    ~~~~^^^^^^^^^
+KeyError: 'trend'
+AAPL: Not enough data (65 < 100)
+Traceback (most recent call last):
+  File "C:\Code\WheelStrategy\test_enhanced_indicators.py", line 371, in main
+    results.append(("Enhanced Zone Analyzer", test_enhanced_zone_analyzer()))
+                                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Code\WheelStrategy\test_enhanced_indicators.py", line 315, in test_enhanced_zone_analyzer
+    if analysis['smart_money']['order_blocks']:
+       ~~~~~~~~^^^^^^^^^^^^^^^
+KeyError: 'smart_money'
+
+============================================================
+ENHANCED INDICATORS COMPREHENSIVE TEST
+============================================================
+Date: 2025-11-09 19:16:38
+
+============================================================
+TESTING SMART MONEY INDICATORS
+============================================================
+
+Downloading AAPL data...
+[OK] Downloaded 65 candles
+
+--- Testing Order Blocks ---
+Found 8 order blocks
+
+Example Order Block:
+  Type: BULLISH_OB
+  Price Range: $223.78 - $226.52
+  Strength: 73.0/100
+  Date: 2025-08-21 00:00:00-04:00
+
+--- Testing Fair Value Gaps ---
+Found 17 fair value gaps
+
+Example Fair Value Gap:
+  Type: BULLISH_FVG
+  Gap Range: $229.56 - $230.43
+  Gap Size: $0.87 (0.38%)
+  Status: Filled
+
+--- Testing Market Structure ---
+Current Trend: BULLISH
+Last BOS: 2025-10-31 00:00:00-04:00
+Last CHoCH: None
+
+--- Testing Liquidity Pools ---
+Found 2 liquidity pools
+
+Example Liquidity Pool:
+  Type: SELL_SIDE_LIQUIDITY
+  Price: $223.78
+  Strength: 20.0/100
+  Status: Active
+
+[OK] Smart Money Indicators test PASSED
+
+============================================================
+TESTING VOLUME PROFILE ANALYZER
+============================================================
+
+Downloading TSLA data...
+[OK] Downloaded 23 candles
+
+--- Calculating Volume Profile ---
+
+Volume Profile Results:
+  POC (Point of Control): $434.62
+  POC Volume: 70,414,928
+  Value Area High: $454.66
+  Value Area Low: $425.85
+  Value Area Range: $28.81
+
+--- Identifying Volume Nodes ---
+
+High Volume Nodes (HVN): 0
+
+Low Volume Nodes (LVN): 19
+  Top LVN: $412.08 (4,311,842 volume)
+
+--- Proximity Checks (Current Price: $429.52) ---
+  Near POC: True
+  In Value Area: True
+
+[OK] Volume Profile test PASSED
+
+============================================================
+TESTING MOMENTUM INDICATORS
+============================================================
+
+Downloading NVDA data...
+[OK] Downloaded 65 candles
+
+--- Testing RSI ---
+Current RSI: 54.84
+Signal: NEUTRAL
+Strength: NEUTRAL
+Condition: NEUTRAL
+
+--- Testing MACD ---
+MACD Line: 3.2984
+Signal Line: 4.0177
+Histogram: -0.7193
+
+[FAIL] Momentum Indicators test FAILED: 'trend'
+
+============================================================
+TESTING ENHANCED ZONE ANALYZER
+============================================================
+
+Downloading AAPL data for complete analysis...
+[OK] Downloaded 65 candles
+
+Initializing analyzers...
+
+--- Detecting Supply/Demand Zones ---
+Found 0 zones
+
+No zones detected. Adjusting parameters for testing...
+Created test zone for demonstration
+
+--- Analyzing Zone with All Indicators ---
+Zone Type: DEMAND
+Price Range: $255.05 - $263.10
+Base Strength: 70.0/100
+
+Running complete multi-indicator analysis...
+
+============================================================
+COMPLETE ANALYSIS RESULTS
+============================================================
+
+[CHART] ZONE QUALITY
+   Base Score: 62.0/100
+   Enhanced Score: 100.0/100
+   Setup Quality: EXCELLENT
+   Confirmations: 7/10
+
+[OK] CONFIRMATIONS (7)
+   • ORDER BLOCK
+   • FVG
+   • POC
+   • HVN
+   • EMA
+   • CVD
+   • STRUCTURE
+
+[FAIL] Enhanced Zone Analyzer test FAILED: 'smart_money'
+
+============================================================
+TEST SUMMARY
+============================================================
+Smart Money Indicators: [OK] PASSED
+Volume Profile: [OK] PASSED
+Momentum Indicators: [FAIL] FAILED
+Enhanced Zone Analyzer: [FAIL] FAILED
+
+Total: 2/4 tests passed
+
+[WARNING]  2 test(s) failed. Review errors above.

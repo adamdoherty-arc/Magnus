@@ -1,0 +1,2018 @@
+[
+  {
+    "id": 6340,
+    "ticker": "KXNCAAFGAME-25NOV15BSUSDSU-BSU",
+    "title": "Boise St. at San Diego St. Winner?",
+    "home_team": "San Diego State",
+    "away_team": "Ball State"
+  },
+  {
+    "id": 6339,
+    "ticker": "KXNCAAFGAME-25NOV15BSUSDSU-SDSU",
+    "title": "Boise St. at San Diego St. Winner?",
+    "home_team": "San Diego State",
+    "away_team": "Ball State"
+  },
+  {
+    "id": 6362,
+    "ticker": "KXNCAAFGAME-25NOV15CCARGASO-CCAR",
+    "title": "Coastal Carolina at Georgia Southern Winner?",
+    "home_team": "Georgia Southern",
+    "away_team": "Coastal Carolina"
+  },
+  {
+    "id": 6361,
+    "ticker": "KXNCAAFGAME-25NOV15CCARGASO-GASO",
+    "title": "Coastal Carolina at Georgia Southern Winner?",
+    "home_team": "Georgia Southern",
+    "away_team": "Coastal Carolina"
+  },
+  {
+    "id": 6344,
+    "ticker": "KXNCAAFGAME-25NOV15DELSHSU-DEL",
+    "title": "Delaware at Sam Houston Winner?",
+    "home_team": "Sam Houston State",
+    "away_team": "Delaware"
+  },
+  {
+    "id": 6343,
+    "ticker": "KXNCAAFGAME-25NOV15DELSHSU-SHSU",
+    "title": "Delaware at Sam Houston Winner?",
+    "home_team": "Sam Houston State",
+    "away_team": "Delaware"
+  },
+  {
+    "id": 6354,
+    "ticker": "KXNCAAFGAME-25NOV15FLAMISS-FLA",
+    "title": "Florida at Ole Miss Winner?",
+    "home_team": "Ole Miss",
+    "away_team": "Florida"
+  },
+  {
+    "id": 6353,
+    "ticker": "KXNCAAFGAME-25NOV15FLAMISS-MISS",
+    "title": "Florida at Ole Miss Winner?",
+    "home_team": "Ole Miss",
+    "away_team": "Florida"
+  },
+  {
+    "id": 6336,
+    "ticker": "KXNCAAFGAME-25NOV15KENNJVST-JVST",
+    "title": "Kennesaw St. at Jacksonville St. Winner?",
+    "home_team": "Jacksonville State",
+    "away_team": "Kennesaw State"
+  },
+  {
+    "id": 6335,
+    "ticker": "KXNCAAFGAME-25NOV15KENNJVST-KENN",
+    "title": "Kennesaw St. at Jacksonville St. Winner?",
+    "home_team": "Jacksonville State",
+    "away_team": "Kennesaw State"
+  },
+  {
+    "id": 6338,
+    "ticker": "KXNCAAFGAME-25NOV15LTWSU-LT",
+    "title": "Louisiana Tech at Washington St. Winner?",
+    "home_team": "Washington State",
+    "away_team": "Louisiana Tech"
+  },
+  {
+    "id": 6337,
+    "ticker": "KXNCAAFGAME-25NOV15LTWSU-WSU",
+    "title": "Louisiana Tech at Washington St. Winner?",
+    "home_team": "Washington State",
+    "away_team": "Louisiana Tech"
+  },
+  {
+    "id": 6364,
+    "ticker": "KXNCAAFGAME-25NOV15MSSTMIZZ-MIZZ",
+    "title": "Mississippi St. at Missouri Winner?",
+    "home_team": "Missouri",
+    "away_team": "Mississippi State"
+  },
+  {
+    "id": 6363,
+    "ticker": "KXNCAAFGAME-25NOV15MSSTMIZZ-MSST",
+    "title": "Mississippi St. at Missouri Winner?",
+    "home_team": "Missouri",
+    "away_team": "Mississippi State"
+  },
+  {
+    "id": 6348,
+    "ticker": "KXNCAAFGAME-25NOV15PURWASH-PUR",
+    "title": "Purdue at Washington Winner?",
+    "home_team": "Washington",
+    "away_team": "Purdue"
+  },
+  {
+    "id": 6347,
+    "ticker": "KXNCAAFGAME-25NOV15PURWASH-WASH",
+    "title": "Purdue at Washington Winner?",
+    "home_team": "Washington",
+    "away_team": "Purdue"
+  },
+  {
+    "id": 6352,
+    "ticker": "KXNCAAFGAME-25NOV15TCUBYU-BYU",
+    "title": "TCU at BYU Winner?",
+    "home_team": "BYU",
+    "away_team": "TCU"
+  },
+  {
+    "id": 6351,
+    "ticker": "KXNCAAFGAME-25NOV15TCUBYU-TCU",
+    "title": "TCU at BYU Winner?",
+    "home_team": "BYU",
+    "away_team": "TCU"
+  },
+  {
+    "id": 6350,
+    "ticker": "KXNCAAFGAME-25NOV15TEXUGA-TEX",
+    "title": "Texas at Georgia Winner?",
+    "home_team": "Georgia",
+    "away_team": "Texas"
+  },
+  {
+    "id": 6349,
+    "ticker": "KXNCAAFGAME-25NOV15TEXUGA-UGA",
+    "title": "Texas at Georgia Winner?",
+    "home_team": "Georgia",
+    "away_team": "Texas"
+  },
+  {
+    "id": 6358,
+    "ticker": "KXNCAAFGAME-25NOV15UCLAOSU-OSU",
+    "title": "UCLA at Ohio St. Winner?",
+    "home_team": "Ohio State",
+    "away_team": "UCLA"
+  },
+  {
+    "id": 6357,
+    "ticker": "KXNCAAFGAME-25NOV15UCLAOSU-UCLA",
+    "title": "UCLA at Ohio St. Winner?",
+    "home_team": "Ohio State",
+    "away_team": "UCLA"
+  },
+  {
+    "id": 6342,
+    "ticker": "KXNCAAFGAME-25NOV15USUUNLV-UNLV",
+    "title": "Utah St. at UNLV Winner?",
+    "home_team": "UNLV",
+    "away_team": "Utah State"
+  },
+  {
+    "id": 6341,
+    "ticker": "KXNCAAFGAME-25NOV15USUUNLV-USU",
+    "title": "Utah St. at UNLV Winner?",
+    "home_team": "UNLV",
+    "away_team": "Utah State"
+  },
+  {
+    "id": 6360,
+    "ticker": "KXNCAAFGAME-25NOV15UTAHBAY-BAY",
+    "title": "Utah at Baylor Winner?",
+    "home_team": "Baylor",
+    "away_team": "Utah"
+  },
+  {
+    "id": 6359,
+    "ticker": "KXNCAAFGAME-25NOV15UTAHBAY-UTAH",
+    "title": "Utah at Baylor Winner?",
+    "home_team": "Baylor",
+    "away_team": "Utah"
+  },
+  {
+    "id": 6356,
+    "ticker": "KXNCAAFGAME-25NOV15VTFSU-FSU",
+    "title": "Virginia Tech at Florida St. Winner?",
+    "home_team": "Florida State",
+    "away_team": "Virginia Tech"
+  },
+  {
+    "id": 6355,
+    "ticker": "KXNCAAFGAME-25NOV15VTFSU-VT",
+    "title": "Virginia Tech at Florida St. Winner?",
+    "home_team": "Florida State",
+    "away_team": "Virginia Tech"
+  },
+  {
+    "id": 6346,
+    "ticker": "KXNCAAFGAME-25NOV15WYOFRES-FRES",
+    "title": "Wyoming at Fresno St. Winner?",
+    "home_team": "Fresno State",
+    "away_team": "Wyoming"
+  },
+  {
+    "id": 6345,
+    "ticker": "KXNCAAFGAME-25NOV15WYOFRES-WYO",
+    "title": "Wyoming at Fresno St. Winner?",
+    "home_team": "Fresno State",
+    "away_team": "Wyoming"
+  },
+  {
+    "id": 6265,
+    "ticker": "KXNCAAFGAME-25NOV18AKRBGSU-AKR",
+    "title": "Akron at Bowling Green Winner?",
+    "home_team": "Bowling Green",
+    "away_team": "Akron"
+  },
+  {
+    "id": 6264,
+    "ticker": "KXNCAAFGAME-25NOV18AKRBGSU-BGSU",
+    "title": "Akron at Bowling Green Winner?",
+    "home_team": "Bowling Green",
+    "away_team": "Akron"
+  },
+  {
+    "id": 6263,
+    "ticker": "KXNCAAFGAME-25NOV18MASSOHIO-MASS",
+    "title": "UMass at Ohio Winner?",
+    "home_team": "Ohio",
+    "away_team": "UMass"
+  },
+  {
+    "id": 6262,
+    "ticker": "KXNCAAFGAME-25NOV18MASSOHIO-OHIO",
+    "title": "UMass at Ohio Winner?",
+    "home_team": "Ohio",
+    "away_team": "UMass"
+  },
+  {
+    "id": 6261,
+    "ticker": "KXNCAAFGAME-25NOV18WMUNIU-NIU",
+    "title": "Western Michigan at Northern Illinois Winner?",
+    "home_team": "Northern Illinois",
+    "away_team": "Western Michigan"
+  },
+  {
+    "id": 6260,
+    "ticker": "KXNCAAFGAME-25NOV18WMUNIU-WMU",
+    "title": "Western Michigan at Northern Illinois Winner?",
+    "home_team": "Northern Illinois",
+    "away_team": "Western Michigan"
+  },
+  {
+    "id": 6259,
+    "ticker": "KXNCAAFGAME-25NOV19CMUKENT-CMU",
+    "title": "Central Michigan at Kent St. Winner?",
+    "home_team": "Kent State",
+    "away_team": "Central Michigan"
+  },
+  {
+    "id": 6258,
+    "ticker": "KXNCAAFGAME-25NOV19CMUKENT-KENT",
+    "title": "Central Michigan at Kent St. Winner?",
+    "home_team": "Kent State",
+    "away_team": "Central Michigan"
+  },
+  {
+    "id": 18002,
+    "ticker": "KXNCAAFGAME-25NOV19MOHBUFF-BUFF",
+    "title": "Miami (OH) at Buffalo Winner?",
+    "home_team": "Buffalo",
+    "away_team": "Miami (OH)"
+  },
+  {
+    "id": 18001,
+    "ticker": "KXNCAAFGAME-25NOV19MOHBUFF-MOH",
+    "title": "Miami (OH) at Buffalo Winner?",
+    "home_team": "Buffalo",
+    "away_team": "Miami (OH)"
+  },
+  {
+    "id": 6257,
+    "ticker": "KXNCAAFGAME-25NOV20ULLARST-ARST",
+    "title": "Louisiana at Arkansas St. Winner?",
+    "home_team": "Arkansas State",
+    "away_team": "Louisiana"
+  },
+  {
+    "id": 6256,
+    "ticker": "KXNCAAFGAME-25NOV20ULLARST-ULL",
+    "title": "Louisiana at Arkansas St. Winner?",
+    "home_team": "Arkansas State",
+    "away_team": "Louisiana"
+  },
+  {
+    "id": 6255,
+    "ticker": "KXNCAAFGAME-25NOV21FSUNCST-FSU",
+    "title": "Florida St. at North Carolina St. Winner?",
+    "home_team": "NC State",
+    "away_team": "Florida State"
+  },
+  {
+    "id": 6254,
+    "ticker": "KXNCAAFGAME-25NOV21FSUNCST-NCST",
+    "title": "Florida St. at North Carolina St. Winner?",
+    "home_team": "NC State",
+    "away_team": "Florida State"
+  },
+  {
+    "id": 6253,
+    "ticker": "KXNCAAFGAME-25NOV21HAWUNLV-HAW",
+    "title": "Hawai'i at UNLV Winner?",
+    "home_team": "UNLV",
+    "away_team": "Hawai'i"
+  },
+  {
+    "id": 6252,
+    "ticker": "KXNCAAFGAME-25NOV21HAWUNLV-UNLV",
+    "title": "Hawai'i at UNLV Winner?",
+    "home_team": "UNLV",
+    "away_team": "Hawai'i"
+  },
+  {
+    "id": 6221,
+    "ticker": "KXNCAAFGAME-25NOV22ARKTEX-ARK",
+    "title": "Arkansas at Texas Winner?",
+    "home_team": "Texas",
+    "away_team": "Arkansas"
+  },
+  {
+    "id": 6220,
+    "ticker": "KXNCAAFGAME-25NOV22ARKTEX-TEX",
+    "title": "Arkansas at Texas Winner?",
+    "home_team": "Texas",
+    "away_team": "Arkansas"
+  },
+  {
+    "id": 6167,
+    "ticker": "KXNCAAFGAME-25NOV22ASUCOLO-ASU",
+    "title": "Arizona St. at Colorado Winner?",
+    "home_team": "Colorado",
+    "away_team": "Arizona State"
+  },
+  {
+    "id": 6166,
+    "ticker": "KXNCAAFGAME-25NOV22ASUCOLO-COLO",
+    "title": "Arizona St. at Colorado Winner?",
+    "home_team": "Colorado",
+    "away_team": "Arizona State"
+  },
+  {
+    "id": 6209,
+    "ticker": "KXNCAAFGAME-25NOV22BALLTOL-BALL",
+    "title": "Ball St. at Toledo Winner?",
+    "home_team": "Toledo",
+    "away_team": "Ball State"
+  },
+  {
+    "id": 6208,
+    "ticker": "KXNCAAFGAME-25NOV22BALLTOL-TOL",
+    "title": "Ball St. at Toledo Winner?",
+    "home_team": "Toledo",
+    "away_team": "Ball State"
+  },
+  {
+    "id": 6175,
+    "ticker": "KXNCAAFGAME-25NOV22BAYARIZ-ARIZ",
+    "title": "Baylor at Arizona Winner?",
+    "home_team": "Arizona",
+    "away_team": "Baylor"
+  },
+  {
+    "id": 6174,
+    "ticker": "KXNCAAFGAME-25NOV22BAYARIZ-BAY",
+    "title": "Baylor at Arizona Winner?",
+    "home_team": "Arizona",
+    "away_team": "Baylor"
+  },
+  {
+    "id": 6203,
+    "ticker": "KXNCAAFGAME-25NOV22BYUCIN-BYU",
+    "title": "BYU at Cincinnati Winner?",
+    "home_team": "Cincinnati",
+    "away_team": "BYU"
+  },
+  {
+    "id": 6202,
+    "ticker": "KXNCAAFGAME-25NOV22BYUCIN-CIN",
+    "title": "BYU at Cincinnati Winner?",
+    "home_team": "Cincinnati",
+    "away_team": "BYU"
+  },
+  {
+    "id": 6219,
+    "ticker": "KXNCAAFGAME-25NOV22CALSTAN-CAL",
+    "title": "California at Stanford Winner?",
+    "home_team": "Stanford",
+    "away_team": "California"
+  },
+  {
+    "id": 6218,
+    "ticker": "KXNCAAFGAME-25NOV22CALSTAN-STAN",
+    "title": "California at Stanford Winner?",
+    "home_team": "Stanford",
+    "away_team": "California"
+  },
+  {
+    "id": 6199,
+    "ticker": "KXNCAAFGAME-25NOV22CCARSCAR-CCAR",
+    "title": "Coastal Carolina at South Carolina Winner?",
+    "home_team": "South Carolina",
+    "away_team": "Coastal Carolina"
+  },
+  {
+    "id": 6198,
+    "ticker": "KXNCAAFGAME-25NOV22CCARSCAR-SCAR",
+    "title": "Coastal Carolina at South Carolina Winner?",
+    "home_team": "South Carolina",
+    "away_team": "Coastal Carolina"
+  },
+  {
+    "id": 6245,
+    "ticker": "KXNCAAFGAME-25NOV22CHARUGA-CHAR",
+    "title": "Charlotte at Georgia Winner?",
+    "home_team": "Georgia",
+    "away_team": "Charlotte"
+  },
+  {
+    "id": 6244,
+    "ticker": "KXNCAAFGAME-25NOV22CHARUGA-UGA",
+    "title": "Charlotte at Georgia Winner?",
+    "home_team": "Georgia",
+    "away_team": "Charlotte"
+  },
+  {
+    "id": 6191,
+    "ticker": "KXNCAAFGAME-25NOV22CONNFAU-CONN",
+    "title": "UConn at Florida Atlantic Winner?",
+    "home_team": "Florida",
+    "away_team": "UConn"
+  },
+  {
+    "id": 6190,
+    "ticker": "KXNCAAFGAME-25NOV22CONNFAU-FAU",
+    "title": "UConn at Florida Atlantic Winner?",
+    "home_team": "Florida",
+    "away_team": "UConn"
+  },
+  {
+    "id": 6165,
+    "ticker": "KXNCAAFGAME-25NOV22CSUBSU-BSU",
+    "title": "Colorado St. at Boise St. Winner?",
+    "home_team": "Ball State",
+    "away_team": "Colorado State"
+  },
+  {
+    "id": 6164,
+    "ticker": "KXNCAAFGAME-25NOV22CSUBSU-CSU",
+    "title": "Colorado St. at Boise St. Winner?",
+    "home_team": "Ball State",
+    "away_team": "Colorado State"
+  },
+  {
+    "id": 6177,
+    "ticker": "KXNCAAFGAME-25NOV22DELWAKE-DEL",
+    "title": "Delaware at Wake Forest Winner?",
+    "home_team": "Wake Forest",
+    "away_team": "Delaware"
+  },
+  {
+    "id": 6176,
+    "ticker": "KXNCAAFGAME-25NOV22DELWAKE-WAKE",
+    "title": "Delaware at Wake Forest Winner?",
+    "home_team": "Wake Forest",
+    "away_team": "Delaware"
+  },
+  {
+    "id": 6207,
+    "ticker": "KXNCAAFGAME-25NOV22DUKEUNC-DUKE",
+    "title": "Duke at North Carolina Winner?",
+    "home_team": "North Carolina",
+    "away_team": "Duke"
+  },
+  {
+    "id": 6206,
+    "ticker": "KXNCAAFGAME-25NOV22DUKEUNC-UNC",
+    "title": "Duke at North Carolina Winner?",
+    "home_team": "North Carolina",
+    "away_team": "Duke"
+  },
+  {
+    "id": 6181,
+    "ticker": "KXNCAAFGAME-25NOV22ECUUTSA-ECU",
+    "title": "East Carolina at UTSA Winner?",
+    "home_team": "UTSA",
+    "away_team": "East Carolina"
+  },
+  {
+    "id": 6180,
+    "ticker": "KXNCAAFGAME-25NOV22ECUUTSA-UTSA",
+    "title": "East Carolina at UTSA Winner?",
+    "home_team": "UTSA",
+    "away_team": "East Carolina"
+  },
+  {
+    "id": 6241,
+    "ticker": "KXNCAAFGAME-25NOV22EIUALA-ALA",
+    "title": "Eastern Illinois at Alabama Winner?",
+    "home_team": "Alabama",
+    "away_team": "Illinois"
+  },
+  {
+    "id": 6240,
+    "ticker": "KXNCAAFGAME-25NOV22EIUALA-EIU",
+    "title": "Eastern Illinois at Alabama Winner?",
+    "home_team": "Alabama",
+    "away_team": "Illinois"
+  },
+  {
+    "id": 6151,
+    "ticker": "KXNCAAFGAME-25NOV22FURCLEM-CLEM",
+    "title": "Furman at Clemson Winner?",
+    "home_team": "Clemson",
+    "away_team": "Furman"
+  },
+  {
+    "id": 6150,
+    "ticker": "KXNCAAFGAME-25NOV22FURCLEM-FUR",
+    "title": "Furman at Clemson Winner?",
+    "home_team": "Clemson",
+    "away_team": "Furman"
+  },
+  {
+    "id": 6227,
+    "ticker": "KXNCAAFGAME-25NOV22GASTTROY-GAST",
+    "title": "Georgia St. at Troy Winner?",
+    "home_team": "Troy",
+    "away_team": "Georgia State"
+  },
+  {
+    "id": 6226,
+    "ticker": "KXNCAAFGAME-25NOV22GASTTROY-TROY",
+    "title": "Georgia St. at Troy Winner?",
+    "home_team": "Troy",
+    "away_team": "Georgia State"
+  },
+  {
+    "id": 6197,
+    "ticker": "KXNCAAFGAME-25NOV22ILLWIS-ILL",
+    "title": "Illinois at Wisconsin Winner?",
+    "home_team": "Wisconsin",
+    "away_team": "Illinois"
+  },
+  {
+    "id": 6196,
+    "ticker": "KXNCAAFGAME-25NOV22ILLWIS-WIS",
+    "title": "Illinois at Wisconsin Winner?",
+    "home_team": "Wisconsin",
+    "away_team": "Illinois"
+  },
+  {
+    "id": 6229,
+    "ticker": "KXNCAAFGAME-25NOV22JVSTFIU-FIU",
+    "title": "Jacksonville St. at Florida International Winner?",
+    "home_team": "FIU",
+    "away_team": "Jacksonville State"
+  },
+  {
+    "id": 6228,
+    "ticker": "KXNCAAFGAME-25NOV22JVSTFIU-JVST",
+    "title": "Jacksonville St. at Florida International Winner?",
+    "home_team": "FIU",
+    "away_team": "Jacksonville State"
+  },
+  {
+    "id": 6169,
+    "ticker": "KXNCAAFGAME-25NOV22KSUUTAH-KSU",
+    "title": "Kansas St. at Utah Winner?",
+    "home_team": "Utah",
+    "away_team": "Kansas State"
+  },
+  {
+    "id": 6168,
+    "ticker": "KXNCAAFGAME-25NOV22KSUUTAH-UTAH",
+    "title": "Kansas St. at Utah Winner?",
+    "home_team": "Utah",
+    "away_team": "Kansas State"
+  },
+  {
+    "id": 6157,
+    "ticker": "KXNCAAFGAME-25NOV22KUISU-ISU",
+    "title": "Kansas at Iowa St. Winner?",
+    "home_team": "Iowa State",
+    "away_team": "Kansas"
+  },
+  {
+    "id": 6156,
+    "ticker": "KXNCAAFGAME-25NOV22KUISU-KU",
+    "title": "Kansas at Iowa St. Winner?",
+    "home_team": "Iowa State",
+    "away_team": "Kansas"
+  },
+  {
+    "id": 6235,
+    "ticker": "KXNCAAFGAME-25NOV22LIBLT-LIB",
+    "title": "Liberty at Louisiana Tech Winner?",
+    "home_team": "Louisiana Tech",
+    "away_team": "Liberty"
+  },
+  {
+    "id": 6234,
+    "ticker": "KXNCAAFGAME-25NOV22LIBLT-LT",
+    "title": "Liberty at Louisiana Tech Winner?",
+    "home_team": "Louisiana Tech",
+    "away_team": "Liberty"
+  },
+  {
+    "id": 6193,
+    "ticker": "KXNCAAFGAME-25NOV22LOUSMU-LOU",
+    "title": "Louisville at SMU Winner?",
+    "home_team": "SMU",
+    "away_team": "Louisville"
+  },
+  {
+    "id": 6192,
+    "ticker": "KXNCAAFGAME-25NOV22LOUSMU-SMU",
+    "title": "Louisville at SMU Winner?",
+    "home_team": "SMU",
+    "away_team": "Louisville"
+  },
+  {
+    "id": 6143,
+    "ticker": "KXNCAAFGAME-25NOV22MERAUB-AUB",
+    "title": "Mercer at Auburn Winner?",
+    "home_team": "Auburn",
+    "away_team": "Mercer"
+  },
+  {
+    "id": 6142,
+    "ticker": "KXNCAAFGAME-25NOV22MERAUB-MER",
+    "title": "Mercer at Auburn Winner?",
+    "home_team": "Auburn",
+    "away_team": "Mercer"
+  },
+  {
+    "id": 6211,
+    "ticker": "KXNCAAFGAME-25NOV22MIAVT-MIA",
+    "title": "Miami (FL) at Virginia Tech Winner?",
+    "home_team": "Virginia Tech",
+    "away_team": "Miami"
+  },
+  {
+    "id": 6210,
+    "ticker": "KXNCAAFGAME-25NOV22MIAVT-VT",
+    "title": "Miami (FL) at Virginia Tech Winner?",
+    "home_team": "Virginia Tech",
+    "away_team": "Miami"
+  },
+  {
+    "id": 6185,
+    "ticker": "KXNCAAFGAME-25NOV22MICHMD-MD",
+    "title": "Michigan at Maryland Winner?",
+    "home_team": "Maryland",
+    "away_team": "Michigan"
+  },
+  {
+    "id": 6184,
+    "ticker": "KXNCAAFGAME-25NOV22MICHMD-MICH",
+    "title": "Michigan at Maryland Winner?",
+    "home_team": "Maryland",
+    "away_team": "Michigan"
+  },
+  {
+    "id": 6155,
+    "ticker": "KXNCAAFGAME-25NOV22MINNNW-MINN",
+    "title": "Minnesota at Northwestern Winner?",
+    "home_team": "Northwestern",
+    "away_team": "Minnesota"
+  },
+  {
+    "id": 6154,
+    "ticker": "KXNCAAFGAME-25NOV22MINNNW-NW",
+    "title": "Minnesota at Northwestern Winner?",
+    "home_team": "Northwestern",
+    "away_team": "Minnesota"
+  },
+  {
+    "id": 6249,
+    "ticker": "KXNCAAFGAME-25NOV22MIZZOKLA-MIZZ",
+    "title": "Missouri at Oklahoma Winner?",
+    "home_team": "Oklahoma",
+    "away_team": "Missouri"
+  },
+  {
+    "id": 6248,
+    "ticker": "KXNCAAFGAME-25NOV22MIZZOKLA-OKLA",
+    "title": "Missouri at Oklahoma Winner?",
+    "home_team": "Oklahoma",
+    "away_team": "Missouri"
+  },
+  {
+    "id": 6243,
+    "ticker": "KXNCAAFGAME-25NOV22MOSUKENN-KENN",
+    "title": "Missouri St. at Kennesaw St. Winner?",
+    "home_team": "Kennesaw State",
+    "away_team": "Missouri State"
+  },
+  {
+    "id": 6242,
+    "ticker": "KXNCAAFGAME-25NOV22MOSUKENN-MOSU",
+    "title": "Missouri St. at Kennesaw St. Winner?",
+    "home_team": "Kennesaw State",
+    "away_team": "Missouri State"
+  },
+  {
+    "id": 6179,
+    "ticker": "KXNCAAFGAME-25NOV22MRSHAPP-APP",
+    "title": "Marshall at Appalachian St. Winner?",
+    "home_team": "Appalachian",
+    "away_team": "Marshall"
+  },
+  {
+    "id": 6178,
+    "ticker": "KXNCAAFGAME-25NOV22MRSHAPP-MRSH",
+    "title": "Marshall at Appalachian St. Winner?",
+    "home_team": "Appalachian",
+    "away_team": "Marshall"
+  },
+  {
+    "id": 6187,
+    "ticker": "KXNCAAFGAME-25NOV22MSUIOWA-IOWA",
+    "title": "Michigan St. at Iowa Winner?",
+    "home_team": "Iowa",
+    "away_team": "Michigan State"
+  },
+  {
+    "id": 6186,
+    "ticker": "KXNCAAFGAME-25NOV22MSUIOWA-MSU",
+    "title": "Michigan St. at Iowa Winner?",
+    "home_team": "Iowa",
+    "away_team": "Michigan State"
+  },
+  {
+    "id": 6201,
+    "ticker": "KXNCAAFGAME-25NOV22NEBPSU-NEB",
+    "title": "Nebraska at Penn St. Winner?",
+    "home_team": "Penn State",
+    "away_team": "Nebraska"
+  },
+  {
+    "id": 6200,
+    "ticker": "KXNCAAFGAME-25NOV22NEBPSU-PSU",
+    "title": "Nebraska at Penn St. Winner?",
+    "home_team": "Penn State",
+    "away_team": "Nebraska"
+  },
+  {
+    "id": 6239,
+    "ticker": "KXNCAAFGAME-25NOV22NEVWYO-NEV",
+    "title": "Nevada at Wyoming Winner?",
+    "home_team": "Wyoming",
+    "away_team": "Nevada"
+  },
+  {
+    "id": 6238,
+    "ticker": "KXNCAAFGAME-25NOV22NEVWYO-WYO",
+    "title": "Nevada at Wyoming Winner?",
+    "home_team": "Wyoming",
+    "away_team": "Nevada"
+  },
+  {
+    "id": 6233,
+    "ticker": "KXNCAAFGAME-25NOV22NMSUUTEP-NMSU",
+    "title": "New Mexico St. at UTEP Winner?",
+    "home_team": "UTEP",
+    "away_team": "New Mexico State"
+  },
+  {
+    "id": 6232,
+    "ticker": "KXNCAAFGAME-25NOV22NMSUUTEP-UTEP",
+    "title": "New Mexico St. at UTEP Winner?",
+    "home_team": "UTEP",
+    "away_team": "New Mexico State"
+  },
+  {
+    "id": 6217,
+    "ticker": "KXNCAAFGAME-25NOV22ODUGASO-GASO",
+    "title": "Old Dominion at Georgia Southern Winner?",
+    "home_team": "Georgia Southern",
+    "away_team": "Old Dominion"
+  },
+  {
+    "id": 6216,
+    "ticker": "KXNCAAFGAME-25NOV22ODUGASO-ODU",
+    "title": "Old Dominion at Georgia Southern Winner?",
+    "home_team": "Georgia Southern",
+    "away_team": "Old Dominion"
+  },
+  {
+    "id": 6173,
+    "ticker": "KXNCAAFGAME-25NOV22OKSTUCF-OKST",
+    "title": "Oklahoma St. at UCF Winner?",
+    "home_team": "UCF",
+    "away_team": "Oklahoma State"
+  },
+  {
+    "id": 6172,
+    "ticker": "KXNCAAFGAME-25NOV22OKSTUCF-UCF",
+    "title": "Oklahoma St. at UCF Winner?",
+    "home_team": "UCF",
+    "away_team": "Oklahoma State"
+  },
+  {
+    "id": 6171,
+    "ticker": "KXNCAAFGAME-25NOV22PITTGT-GT",
+    "title": "Pittsburgh at Georgia Tech Winner?",
+    "home_team": "Georgia Tech",
+    "away_team": "Pittsburgh"
+  },
+  {
+    "id": 6170,
+    "ticker": "KXNCAAFGAME-25NOV22PITTGT-PITT",
+    "title": "Pittsburgh at Georgia Tech Winner?",
+    "home_team": "Georgia Tech",
+    "away_team": "Pittsburgh"
+  },
+  {
+    "id": 6189,
+    "ticker": "KXNCAAFGAME-25NOV22RUTGOSU-OSU",
+    "title": "Rutgers at Ohio St. Winner?",
+    "home_team": "Ohio",
+    "away_team": "Rutgers"
+  },
+  {
+    "id": 6188,
+    "ticker": "KXNCAAFGAME-25NOV22RUTGOSU-RUTG",
+    "title": "Rutgers at Ohio St. Winner?",
+    "home_team": "Ohio",
+    "away_team": "Rutgers"
+  },
+  {
+    "id": 6251,
+    "ticker": "KXNCAAFGAME-25NOV22SAMTXAM-SAM",
+    "title": "Samford at Texas A&M Winner?",
+    "home_team": "Texas",
+    "away_team": "Samford"
+  },
+  {
+    "id": 6250,
+    "ticker": "KXNCAAFGAME-25NOV22SAMTXAM-TXAM",
+    "title": "Samford at Texas A&M Winner?",
+    "home_team": "Texas",
+    "away_team": "Samford"
+  },
+  {
+    "id": 6237,
+    "ticker": "KXNCAAFGAME-25NOV22SHSUMTU-MTU",
+    "title": "Sam Houston at Middle Tennessee Winner?",
+    "home_team": "Middle",
+    "away_team": "Houston"
+  },
+  {
+    "id": 6236,
+    "ticker": "KXNCAAFGAME-25NOV22SHSUMTU-SHSU",
+    "title": "Sam Houston at Middle Tennessee Winner?",
+    "home_team": "Middle",
+    "away_team": "Houston"
+  },
+  {
+    "id": 6161,
+    "ticker": "KXNCAAFGAME-25NOV22SJSUSDSU-SDSU",
+    "title": "San Jose St. at San Diego St. Winner?",
+    "home_team": "San Diego State",
+    "away_team": "San Jose State"
+  },
+  {
+    "id": 6160,
+    "ticker": "KXNCAAFGAME-25NOV22SJSUSDSU-SJSU",
+    "title": "San Jose St. at San Diego St. Winner?",
+    "home_team": "San Diego State",
+    "away_team": "San Jose State"
+  },
+  {
+    "id": 6231,
+    "ticker": "KXNCAAFGAME-25NOV22SYRND-ND",
+    "title": "Syracuse at Notre Dame Winner?",
+    "home_team": "Notre Dame",
+    "away_team": "Syracuse"
+  },
+  {
+    "id": 6230,
+    "ticker": "KXNCAAFGAME-25NOV22SYRND-SYR",
+    "title": "Syracuse at Notre Dame Winner?",
+    "home_team": "Notre Dame",
+    "away_team": "Syracuse"
+  },
+  {
+    "id": 6183,
+    "ticker": "KXNCAAFGAME-25NOV22TCUHOU-HOU",
+    "title": "TCU at Houston Winner?",
+    "home_team": "Houston",
+    "away_team": "TCU"
+  },
+  {
+    "id": 6182,
+    "ticker": "KXNCAAFGAME-25NOV22TCUHOU-TCU",
+    "title": "TCU at Houston Winner?",
+    "home_team": "Houston",
+    "away_team": "TCU"
+  },
+  {
+    "id": 6195,
+    "ticker": "KXNCAAFGAME-25NOV22TENNFLA-FLA",
+    "title": "Tennessee at Florida Winner?",
+    "home_team": "Florida",
+    "away_team": "Tennessee"
+  },
+  {
+    "id": 6194,
+    "ticker": "KXNCAAFGAME-25NOV22TENNFLA-TENN",
+    "title": "Tennessee at Florida Winner?",
+    "home_team": "Florida",
+    "away_team": "Tennessee"
+  },
+  {
+    "id": 6247,
+    "ticker": "KXNCAAFGAME-25NOV22TLSAARMY-ARMY",
+    "title": "Tulsa at Army Winner?",
+    "home_team": "Army",
+    "away_team": "Tulsa"
+  },
+  {
+    "id": 6246,
+    "ticker": "KXNCAAFGAME-25NOV22TLSAARMY-TLSA",
+    "title": "Tulsa at Army Winner?",
+    "home_team": "Army",
+    "away_team": "Tulsa"
+  },
+  {
+    "id": 6149,
+    "ticker": "KXNCAAFGAME-25NOV22TULNTEM-TEM",
+    "title": "Tulane at Temple Winner?",
+    "home_team": "Temple",
+    "away_team": "Tulane"
+  },
+  {
+    "id": 6148,
+    "ticker": "KXNCAAFGAME-25NOV22TULNTEM-TULN",
+    "title": "Tulane at Temple Winner?",
+    "home_team": "Temple",
+    "away_team": "Tulane"
+  },
+  {
+    "id": 6153,
+    "ticker": "KXNCAAFGAME-25NOV22UKVAN-UK",
+    "title": "Kentucky at Vanderbilt Winner?",
+    "home_team": "Vanderbilt",
+    "away_team": "Kentucky"
+  },
+  {
+    "id": 6152,
+    "ticker": "KXNCAAFGAME-25NOV22UKVAN-VAN",
+    "title": "Kentucky at Vanderbilt Winner?",
+    "home_team": "Vanderbilt",
+    "away_team": "Kentucky"
+  },
+  {
+    "id": 6225,
+    "ticker": "KXNCAAFGAME-25NOV22UNMAFA-AFA",
+    "title": "New Mexico at Air Force Winner?",
+    "home_team": "Air",
+    "away_team": "Mexico"
+  },
+  {
+    "id": 6224,
+    "ticker": "KXNCAAFGAME-25NOV22UNMAFA-UNM",
+    "title": "New Mexico at Air Force Winner?",
+    "home_team": "Air",
+    "away_team": "Mexico"
+  },
+  {
+    "id": 6213,
+    "ticker": "KXNCAAFGAME-25NOV22UNTRICE-RICE",
+    "title": "North Texas at Rice Winner?",
+    "home_team": "Rice",
+    "away_team": "Texas"
+  },
+  {
+    "id": 6212,
+    "ticker": "KXNCAAFGAME-25NOV22UNTRICE-UNT",
+    "title": "North Texas at Rice Winner?",
+    "home_team": "Rice",
+    "away_team": "Texas"
+  },
+  {
+    "id": 6205,
+    "ticker": "KXNCAAFGAME-25NOV22USCORE-ORE",
+    "title": "USC at Oregon Winner?",
+    "home_team": "Oregon",
+    "away_team": "USC"
+  },
+  {
+    "id": 6204,
+    "ticker": "KXNCAAFGAME-25NOV22USCORE-USC",
+    "title": "USC at Oregon Winner?",
+    "home_team": "Oregon",
+    "away_team": "USC"
+  },
+  {
+    "id": 6215,
+    "ticker": "KXNCAAFGAME-25NOV22USFUAB-UAB",
+    "title": "South Florida at UAB Winner?",
+    "home_team": "UAB",
+    "away_team": "South Florida"
+  },
+  {
+    "id": 6214,
+    "ticker": "KXNCAAFGAME-25NOV22USFUAB-USF",
+    "title": "South Florida at UAB Winner?",
+    "home_team": "UAB",
+    "away_team": "South Florida"
+  },
+  {
+    "id": 6145,
+    "ticker": "KXNCAAFGAME-25NOV22USMUSA-USA",
+    "title": "Southern Miss at South Alabama Winner?",
+    "home_team": "South Alabama",
+    "away_team": "Southern Miss"
+  },
+  {
+    "id": 6144,
+    "ticker": "KXNCAAFGAME-25NOV22USMUSA-USM",
+    "title": "Southern Miss at South Alabama Winner?",
+    "home_team": "South Alabama",
+    "away_team": "Southern Miss"
+  },
+  {
+    "id": 6223,
+    "ticker": "KXNCAAFGAME-25NOV22USUFRES-FRES",
+    "title": "Utah St. at Fresno St. Winner?",
+    "home_team": "Fresno State",
+    "away_team": "Utah State"
+  },
+  {
+    "id": 6222,
+    "ticker": "KXNCAAFGAME-25NOV22USUFRES-USU",
+    "title": "Utah St. at Fresno St. Winner?",
+    "home_team": "Fresno State",
+    "away_team": "Utah State"
+  },
+  {
+    "id": 6147,
+    "ticker": "KXNCAAFGAME-25NOV22WASHUCLA-UCLA",
+    "title": "Washington at UCLA Winner?",
+    "home_team": "UCLA",
+    "away_team": "Washington"
+  },
+  {
+    "id": 6146,
+    "ticker": "KXNCAAFGAME-25NOV22WASHUCLA-WASH",
+    "title": "Washington at UCLA Winner?",
+    "home_team": "UCLA",
+    "away_team": "Washington"
+  },
+  {
+    "id": 6159,
+    "ticker": "KXNCAAFGAME-25NOV22WKULSU-LSU",
+    "title": "Western Kentucky at LSU Winner?",
+    "home_team": "LSU",
+    "away_team": "Western Kentucky"
+  },
+  {
+    "id": 6158,
+    "ticker": "KXNCAAFGAME-25NOV22WKULSU-WKU",
+    "title": "Western Kentucky at LSU Winner?",
+    "home_team": "LSU",
+    "away_team": "Western Kentucky"
+  },
+  {
+    "id": 6163,
+    "ticker": "KXNCAAFGAME-25NOV22WSUJMU-JMU",
+    "title": "Washington St. at James Madison Winner?",
+    "home_team": "James Madison",
+    "away_team": "Washington State"
+  },
+  {
+    "id": 6162,
+    "ticker": "KXNCAAFGAME-25NOV22WSUJMU-WSU",
+    "title": "Washington St. at James Madison Winner?",
+    "home_team": "James Madison",
+    "away_team": "Washington State"
+  },
+  {
+    "id": 11406,
+    "ticker": "KXNCAAFGAME-25NOV25BGSUMASS-BGSU",
+    "title": "Bowling Green at UMass Winner?",
+    "home_team": "UMass",
+    "away_team": "Green"
+  },
+  {
+    "id": 11405,
+    "ticker": "KXNCAAFGAME-25NOV25BGSUMASS-MASS",
+    "title": "Bowling Green at UMass Winner?",
+    "home_team": "UMass",
+    "away_team": "Green"
+  },
+  {
+    "id": 11404,
+    "ticker": "KXNCAAFGAME-25NOV25WMUEMU-EMU",
+    "title": "Western Michigan at Eastern Michigan Winner?",
+    "home_team": "Eastern Michigan",
+    "away_team": "Western Michigan"
+  },
+  {
+    "id": 11403,
+    "ticker": "KXNCAAFGAME-25NOV25WMUEMU-WMU",
+    "title": "Western Michigan at Eastern Michigan Winner?",
+    "home_team": "Eastern Michigan",
+    "away_team": "Western Michigan"
+  },
+  {
+    "id": 11402,
+    "ticker": "KXNCAAFGAME-25NOV27NAVYMEM-MEM",
+    "title": "Navy at Memphis Winner?",
+    "home_team": "Memphis",
+    "away_team": "Navy"
+  },
+  {
+    "id": 11401,
+    "ticker": "KXNCAAFGAME-25NOV27NAVYMEM-NAVY",
+    "title": "Navy at Memphis Winner?",
+    "home_team": "Memphis",
+    "away_team": "Navy"
+  },
+  {
+    "id": 11390,
+    "ticker": "KXNCAAFGAME-25NOV28AFACSU-AFA",
+    "title": "Air Force at Colorado St. Winner?",
+    "home_team": "Colorado",
+    "away_team": "Force"
+  },
+  {
+    "id": 11389,
+    "ticker": "KXNCAAFGAME-25NOV28AFACSU-CSU",
+    "title": "Air Force at Colorado St. Winner?",
+    "home_team": "Colorado",
+    "away_team": "Force"
+  },
+  {
+    "id": 11378,
+    "ticker": "KXNCAAFGAME-25NOV28ARIZASU-ARIZ",
+    "title": "Arizona at Arizona St. Winner?",
+    "home_team": "Arizona State",
+    "away_team": "Arizona"
+  },
+  {
+    "id": 11377,
+    "ticker": "KXNCAAFGAME-25NOV28ARIZASU-ASU",
+    "title": "Arizona at Arizona St. Winner?",
+    "home_team": "Arizona State",
+    "away_team": "Arizona"
+  },
+  {
+    "id": 11384,
+    "ticker": "KXNCAAFGAME-25NOV28BSUUSU-BSU",
+    "title": "Boise St. at Utah St. Winner?",
+    "home_team": "Utah State",
+    "away_team": "Ball State"
+  },
+  {
+    "id": 11383,
+    "ticker": "KXNCAAFGAME-25NOV28BSUUSU-USU",
+    "title": "Boise St. at Utah St. Winner?",
+    "home_team": "Utah State",
+    "away_team": "Ball State"
+  },
+  {
+    "id": 11380,
+    "ticker": "KXNCAAFGAME-25NOV28INDPUR-IND",
+    "title": "Indiana at Purdue Winner?",
+    "home_team": "Purdue",
+    "away_team": "Indiana"
+  },
+  {
+    "id": 11379,
+    "ticker": "KXNCAAFGAME-25NOV28INDPUR-PUR",
+    "title": "Indiana at Purdue Winner?",
+    "home_team": "Purdue",
+    "away_team": "Indiana"
+  },
+  {
+    "id": 11398,
+    "ticker": "KXNCAAFGAME-25NOV28IOWANEB-IOWA",
+    "title": "Iowa at Nebraska Winner?",
+    "home_team": "Nebraska",
+    "away_team": "Iowa"
+  },
+  {
+    "id": 11397,
+    "ticker": "KXNCAAFGAME-25NOV28IOWANEB-NEB",
+    "title": "Iowa at Nebraska Winner?",
+    "home_team": "Nebraska",
+    "away_team": "Iowa"
+  },
+  {
+    "id": 11400,
+    "ticker": "KXNCAAFGAME-25NOV28KENTNIU-KENT",
+    "title": "Kent St. at Northern Illinois Winner?",
+    "home_team": "Northern Illinois",
+    "away_team": "Kent State"
+  },
+  {
+    "id": 11399,
+    "ticker": "KXNCAAFGAME-25NOV28KENTNIU-NIU",
+    "title": "Kent St. at Northern Illinois Winner?",
+    "home_team": "Northern Illinois",
+    "away_team": "Kent State"
+  },
+  {
+    "id": 11396,
+    "ticker": "KXNCAAFGAME-25NOV28MISSMSST-MISS",
+    "title": "Ole Miss at Mississippi St. Winner?",
+    "home_team": "Mississippi State",
+    "away_team": "Ole Miss"
+  },
+  {
+    "id": 11395,
+    "ticker": "KXNCAAFGAME-25NOV28MISSMSST-MSST",
+    "title": "Ole Miss at Mississippi St. Winner?",
+    "home_team": "Mississippi State",
+    "away_team": "Ole Miss"
+  },
+  {
+    "id": 11392,
+    "ticker": "KXNCAAFGAME-25NOV28OHIOBUFF-BUFF",
+    "title": "Ohio at Buffalo Winner?",
+    "home_team": "Buffalo",
+    "away_team": "Ohio"
+  },
+  {
+    "id": 11391,
+    "ticker": "KXNCAAFGAME-25NOV28OHIOBUFF-OHIO",
+    "title": "Ohio at Buffalo Winner?",
+    "home_team": "Buffalo",
+    "away_team": "Ohio"
+  },
+  {
+    "id": 11386,
+    "ticker": "KXNCAAFGAME-25NOV28SDSUUNM-SDSU",
+    "title": "San Diego St. at New Mexico Winner?",
+    "home_team": "New",
+    "away_team": "St."
+  },
+  {
+    "id": 11385,
+    "ticker": "KXNCAAFGAME-25NOV28SDSUUNM-UNM",
+    "title": "San Diego St. at New Mexico Winner?",
+    "home_team": "New",
+    "away_team": "St."
+  },
+  {
+    "id": 18000,
+    "ticker": "KXNCAAFGAME-25NOV28TEMUNT-TEM",
+    "title": "Temple at North Texas Winner?",
+    "home_team": "North Texas",
+    "away_team": "Temple"
+  },
+  {
+    "id": 17999,
+    "ticker": "KXNCAAFGAME-25NOV28TEMUNT-UNT",
+    "title": "Temple at North Texas Winner?",
+    "home_team": "North Texas",
+    "away_team": "Temple"
+  },
+  {
+    "id": 11382,
+    "ticker": "KXNCAAFGAME-25NOV28TXAMTEX-TEX",
+    "title": "Texas A&M at Texas Winner?",
+    "home_team": "Texas",
+    "away_team": "A&M"
+  },
+  {
+    "id": 11381,
+    "ticker": "KXNCAAFGAME-25NOV28TXAMTEX-TXAM",
+    "title": "Texas A&M at Texas Winner?",
+    "home_team": "Texas",
+    "away_team": "A&M"
+  },
+  {
+    "id": 11388,
+    "ticker": "KXNCAAFGAME-25NOV28UGAGT-GT",
+    "title": "Georgia at Georgia Tech Winner?",
+    "home_team": "Georgia Tech",
+    "away_team": "Georgia"
+  },
+  {
+    "id": 11387,
+    "ticker": "KXNCAAFGAME-25NOV28UGAGT-UGA",
+    "title": "Georgia at Georgia Tech Winner?",
+    "home_team": "Georgia Tech",
+    "away_team": "Georgia"
+  },
+  {
+    "id": 11394,
+    "ticker": "KXNCAAFGAME-25NOV28UTAHKU-KU",
+    "title": "Utah at Kansas Winner?",
+    "home_team": "Kansas",
+    "away_team": "Utah"
+  },
+  {
+    "id": 11393,
+    "ticker": "KXNCAAFGAME-25NOV28UTAHKU-UTAH",
+    "title": "Utah at Kansas Winner?",
+    "home_team": "Kansas",
+    "away_team": "Utah"
+  },
+  {
+    "id": 11346,
+    "ticker": "KXNCAAFGAME-25NOV29ALAAUB-ALA",
+    "title": "Alabama at Auburn Winner?",
+    "home_team": "Auburn",
+    "away_team": "Alabama"
+  },
+  {
+    "id": 11345,
+    "ticker": "KXNCAAFGAME-25NOV29ALAAUB-AUB",
+    "title": "Alabama at Auburn Winner?",
+    "home_team": "Auburn",
+    "away_team": "Alabama"
+  },
+  {
+    "id": 17996,
+    "ticker": "KXNCAAFGAME-25NOV29ARMYUTSA-ARMY",
+    "title": "Army at UTSA Winner?",
+    "home_team": "UTSA",
+    "away_team": "Army"
+  },
+  {
+    "id": 17995,
+    "ticker": "KXNCAAFGAME-25NOV29ARMYUTSA-UTSA",
+    "title": "Army at UTSA Winner?",
+    "home_team": "UTSA",
+    "away_team": "Army"
+  },
+  {
+    "id": 11308,
+    "ticker": "KXNCAAFGAME-25NOV29ARSTAPP-APP",
+    "title": "Arkansas St. at Appalachian St. Winner?",
+    "home_team": "Appalachian State",
+    "away_team": "Arkansas State"
+  },
+  {
+    "id": 11307,
+    "ticker": "KXNCAAFGAME-25NOV29ARSTAPP-ARST",
+    "title": "Arkansas St. at Appalachian St. Winner?",
+    "home_team": "Appalachian State",
+    "away_team": "Arkansas State"
+  },
+  {
+    "id": 17998,
+    "ticker": "KXNCAAFGAME-25NOV29BALLMOH-BALL",
+    "title": "Ball St. at Miami (OH) Winner?",
+    "home_team": "Miami (OH)",
+    "away_team": "Ball State"
+  },
+  {
+    "id": 17997,
+    "ticker": "KXNCAAFGAME-25NOV29BALLMOH-MOH",
+    "title": "Ball St. at Miami (OH) Winner?",
+    "home_team": "Miami (OH)",
+    "away_team": "Ball State"
+  },
+  {
+    "id": 11354,
+    "ticker": "KXNCAAFGAME-25NOV29BCSYR-BC",
+    "title": "Boston College at Syracuse Winner?",
+    "home_team": "Syracuse",
+    "away_team": "Boston College"
+  },
+  {
+    "id": 11353,
+    "ticker": "KXNCAAFGAME-25NOV29BCSYR-SYR",
+    "title": "Boston College at Syracuse Winner?",
+    "home_team": "Syracuse",
+    "away_team": "Boston College"
+  },
+  {
+    "id": 11328,
+    "ticker": "KXNCAAFGAME-25NOV29CHARTULN-CHAR",
+    "title": "Charlotte at Tulane Winner?",
+    "home_team": "Tulane",
+    "away_team": "Charlotte"
+  },
+  {
+    "id": 11327,
+    "ticker": "KXNCAAFGAME-25NOV29CHARTULN-TULN",
+    "title": "Charlotte at Tulane Winner?",
+    "home_team": "Tulane",
+    "away_team": "Charlotte"
+  },
+  {
+    "id": 11364,
+    "ticker": "KXNCAAFGAME-25NOV29CINTCU-CIN",
+    "title": "Cincinnati at TCU Winner?",
+    "home_team": "TCU",
+    "away_team": "Cincinnati"
+  },
+  {
+    "id": 11363,
+    "ticker": "KXNCAAFGAME-25NOV29CINTCU-TCU",
+    "title": "Cincinnati at TCU Winner?",
+    "home_team": "TCU",
+    "away_team": "Cincinnati"
+  },
+  {
+    "id": 11376,
+    "ticker": "KXNCAAFGAME-25NOV29CLEMSCAR-CLEM",
+    "title": "Clemson at South Carolina Winner?",
+    "home_team": "South Carolina",
+    "away_team": "Clemson"
+  },
+  {
+    "id": 11375,
+    "ticker": "KXNCAAFGAME-25NOV29CLEMSCAR-SCAR",
+    "title": "Clemson at South Carolina Winner?",
+    "home_team": "South Carolina",
+    "away_team": "Clemson"
+  },
+  {
+    "id": 11344,
+    "ticker": "KXNCAAFGAME-25NOV29COLOKSU-COLO",
+    "title": "Colorado at Kansas St. Winner?",
+    "home_team": "Kansas State",
+    "away_team": "Colorado"
+  },
+  {
+    "id": 11343,
+    "ticker": "KXNCAAFGAME-25NOV29COLOKSU-KSU",
+    "title": "Colorado at Kansas St. Winner?",
+    "home_team": "Kansas State",
+    "away_team": "Colorado"
+  },
+  {
+    "id": 11300,
+    "ticker": "KXNCAAFGAME-25NOV29ECUFAU-ECU",
+    "title": "East Carolina at Florida Atlantic Winner?",
+    "home_team": "Florida Atlantic",
+    "away_team": "East Carolina"
+  },
+  {
+    "id": 11299,
+    "ticker": "KXNCAAFGAME-25NOV29ECUFAU-FAU",
+    "title": "East Carolina at Florida Atlantic Winner?",
+    "home_team": "Florida Atlantic",
+    "away_team": "East Carolina"
+  },
+  {
+    "id": 11350,
+    "ticker": "KXNCAAFGAME-25NOV29FIUSHSU-FIU",
+    "title": "Florida International at Sam Houston Winner?",
+    "home_team": "Sam Houston State",
+    "away_team": "FIU"
+  },
+  {
+    "id": 11349,
+    "ticker": "KXNCAAFGAME-25NOV29FIUSHSU-SHSU",
+    "title": "Florida International at Sam Houston Winner?",
+    "home_team": "Sam Houston State",
+    "away_team": "FIU"
+  },
+  {
+    "id": 11338,
+    "ticker": "KXNCAAFGAME-25NOV29FRESSJSU-FRES",
+    "title": "Fresno St. at San Jose St. Winner?",
+    "home_team": "San Jose State",
+    "away_team": "Fresno State"
+  },
+  {
+    "id": 11337,
+    "ticker": "KXNCAAFGAME-25NOV29FRESSJSU-SJSU",
+    "title": "Fresno St. at San Jose St. Winner?",
+    "home_team": "San Jose State",
+    "away_team": "Fresno State"
+  },
+  {
+    "id": 11302,
+    "ticker": "KXNCAAFGAME-25NOV29FSUFLA-FLA",
+    "title": "Florida St. at Florida Winner?",
+    "home_team": "Florida",
+    "away_team": "Florida State"
+  },
+  {
+    "id": 11301,
+    "ticker": "KXNCAAFGAME-25NOV29FSUFLA-FSU",
+    "title": "Florida St. at Florida Winner?",
+    "home_team": "Florida",
+    "away_team": "Florida State"
+  },
+  {
+    "id": 11318,
+    "ticker": "KXNCAAFGAME-25NOV29GASOMRSH-GASO",
+    "title": "Georgia Southern at Marshall Winner?",
+    "home_team": "Marshall",
+    "away_team": "Southern"
+  },
+  {
+    "id": 11317,
+    "ticker": "KXNCAAFGAME-25NOV29GASOMRSH-MRSH",
+    "title": "Georgia Southern at Marshall Winner?",
+    "home_team": "Marshall",
+    "away_team": "Southern"
+  },
+  {
+    "id": 11332,
+    "ticker": "KXNCAAFGAME-25NOV29GASTODU-GAST",
+    "title": "Georgia St. at Old Dominion Winner?",
+    "home_team": "Old Dominion",
+    "away_team": "Georgia State"
+  },
+  {
+    "id": 11331,
+    "ticker": "KXNCAAFGAME-25NOV29GASTODU-ODU",
+    "title": "Georgia St. at Old Dominion Winner?",
+    "home_team": "Old Dominion",
+    "away_team": "Georgia State"
+  },
+  {
+    "id": 11370,
+    "ticker": "KXNCAAFGAME-25NOV29HOUBAY-BAY",
+    "title": "Houston at Baylor Winner?",
+    "home_team": "Baylor",
+    "away_team": "Houston"
+  },
+  {
+    "id": 11369,
+    "ticker": "KXNCAAFGAME-25NOV29HOUBAY-HOU",
+    "title": "Houston at Baylor Winner?",
+    "home_team": "Baylor",
+    "away_team": "Houston"
+  },
+  {
+    "id": 11352,
+    "ticker": "KXNCAAFGAME-25NOV29ISUOKST-ISU",
+    "title": "Iowa St. at Oklahoma St. Winner?",
+    "home_team": "Oklahoma State",
+    "away_team": "Iowa State"
+  },
+  {
+    "id": 11351,
+    "ticker": "KXNCAAFGAME-25NOV29ISUOKST-OKST",
+    "title": "Iowa St. at Oklahoma St. Winner?",
+    "home_team": "Oklahoma State",
+    "away_team": "Iowa State"
+  },
+  {
+    "id": 11336,
+    "ticker": "KXNCAAFGAME-25NOV29JMUCCAR-CCAR",
+    "title": "James Madison at Coastal Carolina Winner?",
+    "home_team": "Coastal Carolina",
+    "away_team": "James Madison"
+  },
+  {
+    "id": 11335,
+    "ticker": "KXNCAAFGAME-25NOV29JMUCCAR-JMU",
+    "title": "James Madison at Coastal Carolina Winner?",
+    "home_team": "Coastal Carolina",
+    "away_team": "James Madison"
+  },
+  {
+    "id": 11288,
+    "ticker": "KXNCAAFGAME-25NOV29KENNLIB-KENN",
+    "title": "Kennesaw St. at Liberty Winner?",
+    "home_team": "Liberty",
+    "away_team": "Kennesaw State"
+  },
+  {
+    "id": 11287,
+    "ticker": "KXNCAAFGAME-25NOV29KENNLIB-LIB",
+    "title": "Kennesaw St. at Liberty Winner?",
+    "home_team": "Liberty",
+    "away_team": "Kennesaw State"
+  },
+  {
+    "id": 11306,
+    "ticker": "KXNCAAFGAME-25NOV29LSUOKLA-LSU",
+    "title": "LSU at Oklahoma Winner?",
+    "home_team": "Oklahoma",
+    "away_team": "LSU"
+  },
+  {
+    "id": 11305,
+    "ticker": "KXNCAAFGAME-25NOV29LSUOKLA-OKLA",
+    "title": "LSU at Oklahoma Winner?",
+    "home_team": "Oklahoma",
+    "away_team": "LSU"
+  },
+  {
+    "id": 11292,
+    "ticker": "KXNCAAFGAME-25NOV29LTMOSU-LT",
+    "title": "Louisiana Tech at Missouri St. Winner?",
+    "home_team": "Missouri State",
+    "away_team": "Louisiana Tech"
+  },
+  {
+    "id": 11291,
+    "ticker": "KXNCAAFGAME-25NOV29LTMOSU-MOSU",
+    "title": "Louisiana Tech at Missouri St. Winner?",
+    "home_team": "Missouri State",
+    "away_team": "Louisiana Tech"
+  },
+  {
+    "id": 11342,
+    "ticker": "KXNCAAFGAME-25NOV29MDMSU-MD",
+    "title": "Maryland at Michigan St. Winner?",
+    "home_team": "Michigan State",
+    "away_team": "Maryland"
+  },
+  {
+    "id": 11341,
+    "ticker": "KXNCAAFGAME-25NOV29MDMSU-MSU",
+    "title": "Maryland at Michigan St. Winner?",
+    "home_team": "Michigan State",
+    "away_team": "Maryland"
+  },
+  {
+    "id": 11312,
+    "ticker": "KXNCAAFGAME-25NOV29MIAPITT-MIA",
+    "title": "Miami (FL) at Pittsburgh Winner?",
+    "home_team": "Pittsburgh",
+    "away_team": "Miami"
+  },
+  {
+    "id": 11311,
+    "ticker": "KXNCAAFGAME-25NOV29MIAPITT-PITT",
+    "title": "Miami (FL) at Pittsburgh Winner?",
+    "home_team": "Pittsburgh",
+    "away_team": "Miami"
+  },
+  {
+    "id": 11322,
+    "ticker": "KXNCAAFGAME-25NOV29MIZZARK-ARK",
+    "title": "Missouri at Arkansas Winner?",
+    "home_team": "Arkansas",
+    "away_team": "Missouri"
+  },
+  {
+    "id": 11321,
+    "ticker": "KXNCAAFGAME-25NOV29MIZZARK-MIZZ",
+    "title": "Missouri at Arkansas Winner?",
+    "home_team": "Arkansas",
+    "away_team": "Missouri"
+  },
+  {
+    "id": 11290,
+    "ticker": "KXNCAAFGAME-25NOV29MTUNMSU-MTU",
+    "title": "Middle Tennessee at New Mexico St. Winner?",
+    "home_team": "New",
+    "away_team": "Tennessee"
+  },
+  {
+    "id": 11289,
+    "ticker": "KXNCAAFGAME-25NOV29MTUNMSU-NMSU",
+    "title": "Middle Tennessee at New Mexico St. Winner?",
+    "home_team": "New",
+    "away_team": "Tennessee"
+  },
+  {
+    "id": 11368,
+    "ticker": "KXNCAAFGAME-25NOV29NDSTAN-ND",
+    "title": "Notre Dame at Stanford Winner?",
+    "home_team": "Stanford",
+    "away_team": "Notre Dame"
+  },
+  {
+    "id": 11367,
+    "ticker": "KXNCAAFGAME-25NOV29NDSTAN-STAN",
+    "title": "Notre Dame at Stanford Winner?",
+    "home_team": "Stanford",
+    "away_team": "Notre Dame"
+  },
+  {
+    "id": 11358,
+    "ticker": "KXNCAAFGAME-25NOV29NWILL-ILL",
+    "title": "Northwestern at Illinois Winner?",
+    "home_team": "Illinois",
+    "away_team": "Northwestern"
+  },
+  {
+    "id": 11357,
+    "ticker": "KXNCAAFGAME-25NOV29NWILL-NW",
+    "title": "Northwestern at Illinois Winner?",
+    "home_team": "Illinois",
+    "away_team": "Northwestern"
+  },
+  {
+    "id": 11372,
+    "ticker": "KXNCAAFGAME-25NOV29OREWASH-ORE",
+    "title": "Oregon at Washington Winner?",
+    "home_team": "Washington",
+    "away_team": "Oregon"
+  },
+  {
+    "id": 11371,
+    "ticker": "KXNCAAFGAME-25NOV29OREWASH-WASH",
+    "title": "Oregon at Washington Winner?",
+    "home_team": "Washington",
+    "away_team": "Oregon"
+  },
+  {
+    "id": 11286,
+    "ticker": "KXNCAAFGAME-25NOV29ORSTWSU-ORST",
+    "title": "Oregon St. at Washington St. Winner?",
+    "home_team": "Washington State",
+    "away_team": "Oregon State"
+  },
+  {
+    "id": 11285,
+    "ticker": "KXNCAAFGAME-25NOV29ORSTWSU-WSU",
+    "title": "Oregon St. at Washington St. Winner?",
+    "home_team": "Washington State",
+    "away_team": "Oregon State"
+  },
+  {
+    "id": 11374,
+    "ticker": "KXNCAAFGAME-25NOV29OSUMICH-MICH",
+    "title": "Ohio St. at Michigan Winner?",
+    "home_team": "Michigan",
+    "away_team": "Ohio State"
+  },
+  {
+    "id": 11373,
+    "ticker": "KXNCAAFGAME-25NOV29OSUMICH-OSU",
+    "title": "Ohio St. at Michigan Winner?",
+    "home_team": "Michigan",
+    "away_team": "Ohio State"
+  },
+  {
+    "id": 11320,
+    "ticker": "KXNCAAFGAME-25NOV29PSURUTG-PSU",
+    "title": "Penn St. at Rutgers Winner?",
+    "home_team": "Rutgers",
+    "away_team": "St."
+  },
+  {
+    "id": 11319,
+    "ticker": "KXNCAAFGAME-25NOV29PSURUTG-RUTG",
+    "title": "Penn St. at Rutgers Winner?",
+    "home_team": "Rutgers",
+    "away_team": "St."
+  },
+  {
+    "id": 11334,
+    "ticker": "KXNCAAFGAME-25NOV29RICEUSF-RICE",
+    "title": "Rice at South Florida Winner?",
+    "home_team": "South Florida",
+    "away_team": "Rice"
+  },
+  {
+    "id": 11333,
+    "ticker": "KXNCAAFGAME-25NOV29RICEUSF-USF",
+    "title": "Rice at South Florida Winner?",
+    "home_team": "South Florida",
+    "away_team": "Rice"
+  },
+  {
+    "id": 11314,
+    "ticker": "KXNCAAFGAME-25NOV29SMUCAL-CAL",
+    "title": "SMU at California Winner?",
+    "home_team": "California",
+    "away_team": "SMU"
+  },
+  {
+    "id": 11313,
+    "ticker": "KXNCAAFGAME-25NOV29SMUCAL-SMU",
+    "title": "SMU at California Winner?",
+    "home_team": "California",
+    "away_team": "SMU"
+  },
+  {
+    "id": 11298,
+    "ticker": "KXNCAAFGAME-25NOV29TOLCMU-CMU",
+    "title": "Toledo at Central Michigan Winner?",
+    "home_team": "Central Michigan",
+    "away_team": "Toledo"
+  },
+  {
+    "id": 11297,
+    "ticker": "KXNCAAFGAME-25NOV29TOLCMU-TOL",
+    "title": "Toledo at Central Michigan Winner?",
+    "home_team": "Central Michigan",
+    "away_team": "Toledo"
+  },
+  {
+    "id": 11362,
+    "ticker": "KXNCAAFGAME-25NOV29TROYUSM-TROY",
+    "title": "Troy at Southern Miss Winner?",
+    "home_team": "Southern Miss",
+    "away_team": "Troy"
+  },
+  {
+    "id": 11361,
+    "ticker": "KXNCAAFGAME-25NOV29TROYUSM-USM",
+    "title": "Troy at Southern Miss Winner?",
+    "home_team": "Southern Miss",
+    "away_team": "Troy"
+  },
+  {
+    "id": 11316,
+    "ticker": "KXNCAAFGAME-25NOV29TTUWVU-TTU",
+    "title": "Texas Tech at West Virginia Winner?",
+    "home_team": "West Virginia",
+    "away_team": "Texas Tech"
+  },
+  {
+    "id": 11315,
+    "ticker": "KXNCAAFGAME-25NOV29TTUWVU-WVU",
+    "title": "Texas Tech at West Virginia Winner?",
+    "home_team": "West Virginia",
+    "away_team": "Texas Tech"
+  },
+  {
+    "id": 11324,
+    "ticker": "KXNCAAFGAME-25NOV29UABTLSA-TLSA",
+    "title": "UAB at Tulsa Winner?",
+    "home_team": "Tulsa",
+    "away_team": "UAB"
+  },
+  {
+    "id": 11323,
+    "ticker": "KXNCAAFGAME-25NOV29UABTLSA-UAB",
+    "title": "UAB at Tulsa Winner?",
+    "home_team": "Tulsa",
+    "away_team": "UAB"
+  },
+  {
+    "id": 11340,
+    "ticker": "KXNCAAFGAME-25NOV29UCFBYU-BYU",
+    "title": "UCF at BYU Winner?",
+    "home_team": "BYU",
+    "away_team": "UCF"
+  },
+  {
+    "id": 11339,
+    "ticker": "KXNCAAFGAME-25NOV29UCFBYU-UCF",
+    "title": "UCF at BYU Winner?",
+    "home_team": "BYU",
+    "away_team": "UCF"
+  },
+  {
+    "id": 11310,
+    "ticker": "KXNCAAFGAME-25NOV29UCLAUSC-UCLA",
+    "title": "UCLA at USC Winner?",
+    "home_team": "USC",
+    "away_team": "UCLA"
+  },
+  {
+    "id": 11309,
+    "ticker": "KXNCAAFGAME-25NOV29UCLAUSC-USC",
+    "title": "UCLA at USC Winner?",
+    "home_team": "USC",
+    "away_team": "UCLA"
+  },
+  {
+    "id": 11356,
+    "ticker": "KXNCAAFGAME-25NOV29UKLOU-LOU",
+    "title": "Kentucky at Louisville Winner?",
+    "home_team": "Louisville",
+    "away_team": "Kentucky"
+  },
+  {
+    "id": 11355,
+    "ticker": "KXNCAAFGAME-25NOV29UKLOU-UK",
+    "title": "Kentucky at Louisville Winner?",
+    "home_team": "Louisville",
+    "away_team": "Kentucky"
+  },
+  {
+    "id": 11360,
+    "ticker": "KXNCAAFGAME-25NOV29UNCNCST-NCST",
+    "title": "North Carolina at North Carolina St. Winner?",
+    "home_team": "NC State",
+    "away_team": "North Carolina"
+  },
+  {
+    "id": 11359,
+    "ticker": "KXNCAAFGAME-25NOV29UNCNCST-UNC",
+    "title": "North Carolina at North Carolina St. Winner?",
+    "home_team": "NC State",
+    "away_team": "North Carolina"
+  },
+  {
+    "id": 11282,
+    "ticker": "KXNCAAFGAME-25NOV29UNLVNEV-NEV",
+    "title": "UNLV at Nevada Winner?",
+    "home_team": "Nevada",
+    "away_team": "UNLV"
+  },
+  {
+    "id": 11281,
+    "ticker": "KXNCAAFGAME-25NOV29UNLVNEV-UNLV",
+    "title": "UNLV at Nevada Winner?",
+    "home_team": "Nevada",
+    "away_team": "UNLV"
+  },
+  {
+    "id": 11326,
+    "ticker": "KXNCAAFGAME-25NOV29USATXST-TXST",
+    "title": "South Alabama at Texas St. Winner?",
+    "home_team": "Texas State",
+    "away_team": "South Alabama"
+  },
+  {
+    "id": 11325,
+    "ticker": "KXNCAAFGAME-25NOV29USATXST-USA",
+    "title": "South Alabama at Texas St. Winner?",
+    "home_team": "Texas State",
+    "away_team": "South Alabama"
+  },
+  {
+    "id": 11304,
+    "ticker": "KXNCAAFGAME-25NOV29UTEPDEL-DEL",
+    "title": "UTEP at Delaware Winner?",
+    "home_team": "Delaware",
+    "away_team": "UTEP"
+  },
+  {
+    "id": 11303,
+    "ticker": "KXNCAAFGAME-25NOV29UTEPDEL-UTEP",
+    "title": "UTEP at Delaware Winner?",
+    "home_team": "Delaware",
+    "away_team": "UTEP"
+  },
+  {
+    "id": 11296,
+    "ticker": "KXNCAAFGAME-25NOV29VANTENN-TENN",
+    "title": "Vanderbilt at Tennessee Winner?",
+    "home_team": "Tennessee",
+    "away_team": "Vanderbilt"
+  },
+  {
+    "id": 11295,
+    "ticker": "KXNCAAFGAME-25NOV29VANTENN-VAN",
+    "title": "Vanderbilt at Tennessee Winner?",
+    "home_team": "Tennessee",
+    "away_team": "Vanderbilt"
+  },
+  {
+    "id": 11366,
+    "ticker": "KXNCAAFGAME-25NOV29VTUVA-UVA",
+    "title": "Virginia Tech at Virginia Winner?",
+    "home_team": "Virginia",
+    "away_team": "Virginia Tech"
+  },
+  {
+    "id": 11365,
+    "ticker": "KXNCAAFGAME-25NOV29VTUVA-VT",
+    "title": "Virginia Tech at Virginia Winner?",
+    "home_team": "Virginia",
+    "away_team": "Virginia Tech"
+  },
+  {
+    "id": 11330,
+    "ticker": "KXNCAAFGAME-25NOV29WAKEDUKE-DUKE",
+    "title": "Wake Forest at Duke Winner?",
+    "home_team": "Duke",
+    "away_team": "Wake Forest"
+  },
+  {
+    "id": 11329,
+    "ticker": "KXNCAAFGAME-25NOV29WAKEDUKE-WAKE",
+    "title": "Wake Forest at Duke Winner?",
+    "home_team": "Duke",
+    "away_team": "Wake Forest"
+  },
+  {
+    "id": 11348,
+    "ticker": "KXNCAAFGAME-25NOV29WISMINN-MINN",
+    "title": "Wisconsin at Minnesota Winner?",
+    "home_team": "Minnesota",
+    "away_team": "Wisconsin"
+  },
+  {
+    "id": 11347,
+    "ticker": "KXNCAAFGAME-25NOV29WISMINN-WIS",
+    "title": "Wisconsin at Minnesota Winner?",
+    "home_team": "Minnesota",
+    "away_team": "Wisconsin"
+  },
+  {
+    "id": 11294,
+    "ticker": "KXNCAAFGAME-25NOV29WKUJVST-JVST",
+    "title": "Western Kentucky at Jacksonville St. Winner?",
+    "home_team": "Jacksonville State",
+    "away_team": "Western Kentucky"
+  },
+  {
+    "id": 11293,
+    "ticker": "KXNCAAFGAME-25NOV29WKUJVST-WKU",
+    "title": "Western Kentucky at Jacksonville St. Winner?",
+    "home_team": "Jacksonville State",
+    "away_team": "Western Kentucky"
+  },
+  {
+    "id": 11284,
+    "ticker": "KXNCAAFGAME-25NOV29WYOHAW-HAW",
+    "title": "Wyoming at Hawai'i Winner?",
+    "home_team": "Hawai'i",
+    "away_team": "Wyoming"
+  },
+  {
+    "id": 11283,
+    "ticker": "KXNCAAFGAME-25NOV29WYOHAW-WYO",
+    "title": "Wyoming at Hawai'i Winner?",
+    "home_team": "Hawai'i",
+    "away_team": "Wyoming"
+  }
+]

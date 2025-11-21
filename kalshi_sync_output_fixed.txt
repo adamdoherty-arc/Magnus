@@ -1,0 +1,50 @@
+INFO:__main__:======================================================================
+INFO:__main__:KALSHI FOOTBALL MARKETS SYNC
+INFO:__main__:======================================================================
+INFO:__main__:
+[1] Initializing Kalshi API client...
+INFO:src.kalshi_client_v2:RSA private key loaded successfully
+INFO:__main__:    \u2705 Kalshi client initialized with API keys
+INFO:__main__:
+[2] Initializing database...
+INFO:src.kalshi_db_manager:Database connection pool initialized (2-50 connections)
+INFO:src.kalshi_db_manager:Kalshi database tables already initialized
+INFO:__main__:    \u2705 Database initialized
+INFO:__main__:
+[3] Fetching football markets from Kalshi...
+INFO:src.kalshi_client_v2:Fetching NFL game markets...
+ERROR:src.kalshi_client_v2:Error fetching markets for series KXNFLGAME: 400 Client Error: Bad Request for url: https://api.elections.kalshi.com/trade-api/v2/markets?series_ticker=KXNFLGAME&limit=1000&status=active
+INFO:src.kalshi_client_v2:Fetching college football game markets...
+ERROR:src.kalshi_client_v2:Error fetching markets for series KXNCAAFGAME: 400 Client Error: Bad Request for url: https://api.elections.kalshi.com/trade-api/v2/markets?series_ticker=KXNCAAFGAME&limit=1000&status=active
+INFO:src.kalshi_client_v2:Found 0 NFL markets and 0 college football markets
+INFO:__main__:    Found 0 NFL markets
+INFO:__main__:    Found 0 College Football markets
+INFO:__main__:
+[4] Storing NFL markets in database...
+INFO:__main__:    \u2705 Stored 0 NFL markets
+INFO:__main__:
+[5] Storing College Football markets in database...
+INFO:__main__:    \u2705 Stored 0 College Football markets
+INFO:__main__:
+======================================================================
+INFO:__main__:SYNC COMPLETE!
+INFO:__main__:======================================================================
+INFO:__main__:NFL Markets:
+INFO:__main__:  Total: 0
+INFO:__main__:  Stored: 0
+INFO:__main__:  Failed: 0
+INFO:__main__:
+College Football Markets:
+INFO:__main__:  Total: 0
+INFO:__main__:  Stored: 0
+INFO:__main__:  Failed: 0
+INFO:__main__:
+Duration: 1 seconds
+INFO:__main__:======================================================================
+INFO:__main__:
+[6] Database Statistics:
+INFO:__main__:    Total Markets in DB: 6221
+INFO:__main__:    Active Markets: 6221
+INFO:__main__:    Markets by Type: {'nfl': 2361, 'college': 449, 'all': 3363, 'cfb': 48}
+INFO:__main__:
+\u2705 Kalshi markets sync completed successfully!

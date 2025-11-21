@@ -1,0 +1,110 @@
+# Page-specific configuration settings
+# Each page can have its own defaults and constraints
+
+pages:
+  ai_options_agent:
+    # Default filters
+    default_dte_range: [20, 45]
+    default_delta_range: [-0.35, -0.25]
+    default_min_premium: 100.0
+    max_results: 200
+
+    # Limits
+    max_dte: 90
+    min_dte: 1
+    max_delta: -0.01
+    min_delta: -0.50
+
+    # Display settings
+    default_min_score: 50
+    results_per_page: 50
+
+  comprehensive_strategy:
+    strategies_to_analyze: 10
+    default_models: ["claude", "deepseek", "gemini"]
+    max_models: 5
+    timeout_per_strategy: 120  # seconds
+
+  positions_page:
+    # Refresh settings
+    refresh_interval: 300  # 5 minutes
+    auto_refresh_default: false
+    refresh_frequency_options: ["30s", "1m", "2m", "5m", "10m"]
+
+    # Display settings
+    show_closed_positions: true
+    max_trade_history: 365  # days
+    performance_periods: ["Last 7 Days", "Last 30 Days", "Last 3 Months", "Last 6 Months", "Last 1 Year", "All Time"]
+
+    # CSP Opportunities
+    csp_opportunities_dte: 30
+    csp_opportunities_delta_range: [0.25, 0.40]
+
+  tradingview_watchlists:
+    # Auto-sync settings
+    auto_sync_before_market: true
+    auto_sync_interval: 300  # 5 minutes during market hours
+    market_open_hour: 9
+    market_open_minute: 30
+    market_timezone: "America/New_York"
+
+    # Display settings
+    default_filters:
+      min_stock_price: 0.0
+      max_stock_price: 10000.0
+      min_premium: 0.0
+
+    # Options scanning
+    default_dte: 30
+    dte_tolerance: 2  # +/- days
+    default_delta_range: [0.25, 0.40]
+
+  database_scan:
+    # Daily sync settings
+    daily_sync_hour: 10  # 10 AM ET
+    daily_sync_minute: 0
+
+    # Display settings
+    max_stocks_display: 1000
+    default_filters:
+      min_stock_price: 0.0
+      max_stock_price: 10000.0
+      min_premium: 0.0
+
+    # Calendar spreads
+    calendar_spread_defaults:
+      max_symbols: 20
+      min_score: 60
+      spread_types: ["Both", "Call Calendars Only", "Put Calendars Only"]
+
+  premium_options_flow:
+    # Flow detection thresholds
+    min_premium_threshold: 10000  # $10k
+    min_volume_threshold: 100
+    update_interval: 60  # seconds
+
+  earnings_calendar:
+    # Display settings
+    days_ahead: 30
+    show_past_earnings: false
+    min_market_cap: 1000000000  # $1B
+
+  prediction_markets:
+    # Kalshi integration
+    default_filters:
+      min_volume: 1000
+      max_spread: 0.05
+
+  sector_analysis:
+    # Sector limits
+    max_sector_exposure: 30  # percent
+    min_diversification_sectors: 3
+
+  settings:
+    # Strategy parameters
+    default_min_dte: 21
+    default_max_dte: 45
+    default_target_delta: 0.3
+    default_max_position_size: 5.0  # percent
+    default_max_sector_exposure: 30.0  # percent
+    default_min_options_volume: 100

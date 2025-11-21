@@ -1,0 +1,234 @@
+================================================================================
+COMPLETE ALERT HTML EXAMPLES
+================================================================================
+
+Total app-post elements found: 3
+
+
+################################################################################
+ALERT EXAMPLE #1
+################################################################################
+
+Text Content (176 characters):
+--------------------------------------------------------------------------------
+84Ken@chelseablue| via #🤑｜𝗚𝗔𝗜𝗡𝗦50m agoSPX﻿@obijuan1656﻿you will hate me for this….. but busy at work so I can’t alert and watch it at the same time.Thanks﻿$SPX﻿and﻿@_ken_spx﻿00
+--------------------------------------------------------------------------------
+
+Full HTML Structure:
+--------------------------------------------------------------------------------
+<app-post _ngcontent-ng-c3750626829="" _nghost-ng-c2111033885="">
+ <div _ngcontent-ng-c2111033885="" class="post ng-star-inserted">
+  <div _ngcontent-ng-c2111033885="" class="post__header ng-star-inserted">
+   <div _ngcontent-ng-c2111033885="" class="post__header__avatar">
+    <app-avatar _ngcontent-ng-c2111033885="" _nghost-ng-c303891878="" class="clickable">
+     <div _ngcontent-ng-c303891878="" class="avatar avatar--medium ng-star-inserted">
+      <img _ngcontent-ng-c303891878="" class="ng-star-inserted" draggable="false" lazy="" src="https://storage.xtrades.net/avatars/6dcef182-8b20-4f3a-a2ff-bb61299b81f7.png"/>
+      <!-- -->
+      <div _ngcontent-ng-c303891878="" class="avatar__xscore ng-star-inserted">
+       84
+      </div>
+      <!-- -->
+      <!-- -->
+      <!-- -->
+      <!-- -->
+     </div>
+     <!-- -->
+     <!-- -->
+     <!-- -->
+    </app-avatar>
+   </div>
+   <div _ngcontent-ng-c2111033885="" class="post__header__details">
+    <div _ngcontent-ng-c2111033885="" class="post__header__details__author">
+     <div _ngcontent-ng-c2111033885="" class="post__header__details__author__displayname clickable ng-star-inserted">
+      Ken
+     </div>
+     <!-- -->
+     <div _ngcontent-ng-c2111033885="" class="post__header__details__author__username clickable">
+      <span _ngcontent-ng-c2111033885="">
+       @chelseablue
+      </span>
+     </div>
+     <div _ngcontent-ng-c2111033885="" class="discord-channel-name clickable ng-star-inserted">
+      <div _ngcontent-ng-c211103388
+...
+--------------------------------------------------------------------------------
+
+Key Fields:
+--------------------------------------------------------------------------------
+  Tickers: SPX
+  Username: @chelseablue
+  Display Name: Ken
+  X-Score: 84
+  Posted: 50m ago
+--------------------------------------------------------------------------------
+
+################################################################################
+ALERT EXAMPLE #2
+################################################################################
+
+Text Content (257 characters):
+--------------------------------------------------------------------------------
+0naeeem@naeeem| via #🤑｜𝗚𝗔𝗜𝗡𝗦2h agoQQQ**Amazing  call on﻿$QQQ﻿by﻿@averageupnotdown_16144﻿**  ❤️ inside of the⁠: ⁠⁠⁠⁠⁠⁠⁠⁠⁠⁠⁠⁠⁠⁠⁠⁠⁠⁠⁠ ⁠⁠⁠⁠⁠⁠⁠﻿📲｜ᴛɪᴇʀ-3﻿**Entry: **0.12Exit:0.37Profit:+208% 🔥🧠 Get access to these signals by signing up @http://xtrades.net/plans00
+--------------------------------------------------------------------------------
+
+Full HTML Structure:
+--------------------------------------------------------------------------------
+<app-post _ngcontent-ng-c3750626829="" _nghost-ng-c2111033885="">
+ <div _ngcontent-ng-c2111033885="" class="post ng-star-inserted">
+  <div _ngcontent-ng-c2111033885="" class="post__header ng-star-inserted">
+   <div _ngcontent-ng-c2111033885="" class="post__header__avatar">
+    <app-avatar _ngcontent-ng-c2111033885="" _nghost-ng-c303891878="" class="clickable">
+     <div _ngcontent-ng-c303891878="" class="avatar avatar--medium ng-star-inserted">
+      <img _ngcontent-ng-c303891878="" class="ng-star-inserted" draggable="false" lazy="" src="https://storage.xtrades.net/avatars/0fc629d2-fa41-44b1-8bbd-3e1828389c79.png"/>
+      <!-- -->
+      <div _ngcontent-ng-c303891878="" class="avatar__xscore ng-star-inserted">
+       0
+      </div>
+      <!-- -->
+      <!-- -->
+      <!-- -->
+      <!-- -->
+     </div>
+     <!-- -->
+     <!-- -->
+     <!-- -->
+    </app-avatar>
+   </div>
+   <div _ngcontent-ng-c2111033885="" class="post__header__details">
+    <div _ngcontent-ng-c2111033885="" class="post__header__details__author">
+     <div _ngcontent-ng-c2111033885="" class="post__header__details__author__displayname clickable ng-star-inserted">
+      naeeem
+     </div>
+     <!-- -->
+     <div _ngcontent-ng-c2111033885="" class="post__header__details__author__username clickable">
+      <span _ngcontent-ng-c2111033885="">
+       @naeeem
+      </span>
+     </div>
+     <div _ngcontent-ng-c2111033885="" class="discord-channel-name clickable ng-star-inserted">
+      <div _ngcontent-ng-c2111033885="
+...
+--------------------------------------------------------------------------------
+
+Key Fields:
+--------------------------------------------------------------------------------
+  Tickers: QQQ
+  Username: @naeeem
+  Display Name: naeeem
+  X-Score: 0
+  Posted: 2h ago
+--------------------------------------------------------------------------------
+
+################################################################################
+ALERT EXAMPLE #3
+################################################################################
+
+Text Content (89 characters):
+--------------------------------------------------------------------------------
+84Ken@chelseablue| via #🤑｜𝗚𝗔𝗜𝗡𝗦1d agoSPXDone for the day.... thanks﻿$SPX﻿and﻿@_ken_spx﻿70
+--------------------------------------------------------------------------------
+
+Full HTML Structure:
+--------------------------------------------------------------------------------
+<app-post _ngcontent-ng-c3750626829="" _nghost-ng-c2111033885="">
+ <div _ngcontent-ng-c2111033885="" class="post ng-star-inserted">
+  <div _ngcontent-ng-c2111033885="" class="post__header ng-star-inserted">
+   <div _ngcontent-ng-c2111033885="" class="post__header__avatar">
+    <app-avatar _ngcontent-ng-c2111033885="" _nghost-ng-c303891878="" class="clickable">
+     <div _ngcontent-ng-c303891878="" class="avatar avatar--medium ng-star-inserted">
+      <img _ngcontent-ng-c303891878="" class="ng-star-inserted" draggable="false" lazy="" src="https://storage.xtrades.net/avatars/6dcef182-8b20-4f3a-a2ff-bb61299b81f7.png"/>
+      <!-- -->
+      <div _ngcontent-ng-c303891878="" class="avatar__xscore ng-star-inserted">
+       84
+      </div>
+      <!-- -->
+      <!-- -->
+      <!-- -->
+      <!-- -->
+     </div>
+     <!-- -->
+     <!-- -->
+     <!-- -->
+    </app-avatar>
+   </div>
+   <div _ngcontent-ng-c2111033885="" class="post__header__details">
+    <div _ngcontent-ng-c2111033885="" class="post__header__details__author">
+     <div _ngcontent-ng-c2111033885="" class="post__header__details__author__displayname clickable ng-star-inserted">
+      Ken
+     </div>
+     <!-- -->
+     <div _ngcontent-ng-c2111033885="" class="post__header__details__author__username clickable">
+      <span _ngcontent-ng-c2111033885="">
+       @chelseablue
+      </span>
+     </div>
+     <div _ngcontent-ng-c2111033885="" class="discord-channel-name clickable ng-star-inserted">
+      <div _ngcontent-ng-c211103388
+...
+--------------------------------------------------------------------------------
+
+Key Fields:
+--------------------------------------------------------------------------------
+  Tickers: SPX
+  Username: @chelseablue
+  Display Name: Ken
+  X-Score: 84
+  Posted: 1d ago
+--------------------------------------------------------------------------------
+
+
+================================================================================
+CORRECT SELECTOR
+================================================================================
+
+Python Code:
+--------------------------------------------------------------------------------
+alerts = soup.find_all('app-post')
+--------------------------------------------------------------------------------
+
+This will find: 3 alert elements
+
+Compare to current selector:
+  soup.find_all(name=re.compile(r'app-.*alert.*', re.I))
+  Finds: 2 elements (containers only)
+
+
+================================================================================
+FIELD EXTRACTION GUIDE
+================================================================================
+
+For each <app-post> element:
+
+1. TICKER:
+   - Find: $TICKER pattern in text
+   - Code: re.findall(r'\$([A-Z]{1,5})\b', text)
+
+2. USERNAME:
+   - Find: <span> with @ character
+   - Code: post.find('span', class_=None, string=re.compile(r'@\w+'))
+
+3. DISPLAY NAME:
+   - Find: div.post__header__details__author__displayname
+   - Code: post.find('div', class_='post__header__details__author__displayname')
+
+4. X-SCORE:
+   - Find: div.avatar__xscore
+   - Code: post.find('div', class_='avatar__xscore')
+
+5. TIMESTAMP:
+   - Find: "Xm ago", "Xh ago", "Xd ago" pattern
+   - Code: re.search(r'(\d+[mhd])\s+ago', text)
+
+6. TRADE TEXT:
+   - Find: app-quill-text element
+   - Code: post.find('app-quill-text')
+
+7. ACTIONS:
+   - Find: BTO, STC, BTC, STO in text
+   - Code: re.findall(r'\b(BTO|STC|BTC|STO)\b', text, re.I)
+
+8. STRATEGY:
+   - Find: CSP, CC, Put, Call, etc.
+   - Code: re.search(r'\b(CSP|CC|Put|Call|Spread)\b', text, re.I)
+
+================================================================================
