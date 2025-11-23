@@ -18,7 +18,8 @@ from src.stock_data_sync import StockDataSync
 
 logger = logging.getLogger(__name__)
 
-st.set_page_config(page_title="Premium Scanner", page_icon="💎", layout="wide")
+# Note: st.set_page_config is called in dashboard.py, not here
+# This page is loaded as a module by dashboard.py
 
 
 # ============================================================================
@@ -944,5 +945,5 @@ def main():
     st.caption("💎 Premium Scanner • Connection pooling enabled • Advanced analytics")
 
 
-if __name__ == "__main__":
-    main()
+# Execute main function when module is loaded
+main()
