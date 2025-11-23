@@ -756,7 +756,7 @@ def main():
     with st.sidebar:
         st.header("🎯 Filters")
 
-        with st.form("scanner_filters"):
+        with st.form("filter_form"):
             st.subheader("Basic Filters")
 
             max_stock_price = st.number_input(

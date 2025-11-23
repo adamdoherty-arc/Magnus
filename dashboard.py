@@ -233,6 +233,12 @@ st.markdown("""
         margin: 0rem !important;
         padding: 0rem !important;
     }
+
+    /* Limit watchlist dropdown height for better UX */
+    .stSelectbox [data-baseweb="select"] > div {
+        max-height: 400px !important;
+        overflow-y: auto !important;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -319,64 +325,42 @@ if st.sidebar.button("🏟️ Sports Game Hub", width='stretch'):
 if st.sidebar.button("🎲 Kalshi Markets", width='stretch'):
     st.session_state.page = "Prediction Markets"
 
-# ==================== MY SUBSCRIPTIONS WIDGET ====================
+# ==================== SMART SUBSCRIPTIONS WIDGET ====================
 try:
     from src.game_watchlist_manager import GameWatchlistManager
     from src.kalshi_db_manager import KalshiDBManager
 
-    # Initialize session state for user_id if not exists
+    # Initialize user_id
     if 'user_id' not in st.session_state:
         st.session_state.user_id = os.getenv('TELEGRAM_USER_ID', 'default_user')
 
-    # Get watchlist manager
+    # Get subscription stats
     db = KalshiDBManager()
     watchlist_mgr = GameWatchlistManager(db)
-    watchlist = watchlist_mgr.get_user_watchlist(st.session_state.user_id)
+    stats = watchlist_mgr.get_watchlist_stats(st.session_state.user_id)
 
-    if watchlist and len(watchlist) > 0:
+    # Only show widget if user has subscriptions
+    if stats.get('total', 0) > 0:
         st.sidebar.markdown("---")
         st.sidebar.markdown("### 📋 My Subscriptions")
 
-        # Show count
-        total_count = len(watchlist)
-        st.sidebar.caption(f"**{total_count} games subscribed**")
+        # Show quick stats
+        st.sidebar.metric("Total Games", stats.get('total', 0))
 
-        # Show quick summary by sport
-        nfl_count = len([w for w in watchlist if w.get('sport') == 'NFL'])
-        ncaa_count = len([w for w in watchlist if w.get('sport') == 'CFB'])
-        nba_count = len([w for w in watchlist if w.get('sport') == 'NBA'])
+        # Sport breakdown
+        sport_parts = []
+        if stats.get('nfl', 0) > 0:
+            sport_parts.append(f"🏈 {stats['nfl']}")
+        if stats.get('ncaa', 0) > 0:
+            sport_parts.append(f"🎓 {stats['ncaa']}")
+        if stats.get('nba', 0) > 0:
+            sport_parts.append(f"🏀 {stats['nba']}")
 
-        summary_parts = []
-        if nfl_count > 0:
-            summary_parts.append(f"🏈 {nfl_count}")
-        if ncaa_count > 0:
-            summary_parts.append(f"🎓 {ncaa_count}")
-        if nba_count > 0:
-            summary_parts.append(f"🏀 {nba_count}")
+        if sport_parts:
+            st.sidebar.caption(" | ".join(sport_parts))
 
-        if summary_parts:
-            st.sidebar.caption(" | ".join(summary_parts))
-
-        # Show up to 3 most recent subscriptions
-        recent_games = watchlist[:3]
-        for watch_game in recent_games:
-            game_data = watch_game.get('game_data', {})
-            away = game_data.get('away_team', watch_game.get('away_team', 'Away'))
-            home = game_data.get('home_team', watch_game.get('home_team', 'Home'))
-
-            # Truncate long team names
-            if len(away) > 12:
-                away = away[:10] + "..."
-            if len(home) > 12:
-                home = home[:10] + "..."
-
-            st.sidebar.caption(f"• {away} @ {home}")
-
-        if len(watchlist) > 3:
-            st.sidebar.caption(f"_...and {len(watchlist) - 3} more_")
-
-        # Link to full management
-        if st.sidebar.button("📊 Manage All Subscriptions", key="manage_subs_sidebar"):
+        # Manage button
+        if st.sidebar.button("⚙️ Manage Subscriptions", key="manage_subs_sidebar", use_container_width=True):
             st.session_state.page = "Sports Game Hub"
             st.rerun()
 
@@ -754,20 +738,18 @@ elif page == "TradingView Watchlists":
                 if not stock_symbols:
                     st.warning(f"No stock symbols found in {selected_watchlist}. This watchlist contains only crypto/non-stock symbols.")
                 else:
-                    # Sync section - compact side-by-side layout
-                    col_sync1, col_sync2, col_sync3 = st.columns([1, 2, 1])
-                    with col_sync1:
+                    # Sync section - compact 2-column layout
+                    col_main, col_sync = st.columns([3, 1])
+                    with col_main:
                         st.metric("Stocks", len(stock_symbols))
-                    with col_sync2:
-                        if st.button("🔄 Sync Prices & Premiums", type="primary", use_container_width=True):
+                    with col_sync:
+                        if st.button("🔄 Sync", type="primary", use_container_width=True):
                             st.success("⚡ Syncing in background...")
                             # Start background sync (truly non-blocking)
                             import subprocess
                             subprocess.Popen([
                                 "python", "src/watchlist_sync_service.py", selected_watchlist
                             ], creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
-                    with col_sync3:
-                        st.caption("")  # Empty for spacing
 
                     # SIMPLE IMPLEMENTATION - Just show 30-day options with 0.25-0.40 delta
                     st.markdown("💵 **Cash-Secured Put Options** • 30 DTE • Δ 0.25-0.40")
