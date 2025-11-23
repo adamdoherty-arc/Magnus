@@ -16,10 +16,6 @@ def display_theta_forecasts(positions: list):
     if not positions:
         return
 
-    st.markdown("---")
-    st.markdown("### 📉 Theta Decay Forecasts")
-    st.caption("Day-by-day profit projections until expiration")
-
     # Position selector
     position_labels = [f"{p['Symbol']} ${p['Strike']:.2f} exp {p['Expiration']}"
                       for p in positions]
@@ -29,6 +25,9 @@ def display_theta_forecasts(positions: list):
         format_func=lambda i: position_labels[i],
         key="theta_forecast_selector"
     )
+
+    # Add spacing after dropdown to prevent overlap with metrics
+    st.write("")
 
     position = positions[selected_idx]
 
