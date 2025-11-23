@@ -18,11 +18,11 @@ query = """
         sp.ask,
         sp.volume,
         sp.open_interest as oi,
-        s.name,
+        s.company_name,
         s.sector
     FROM stock_premiums sp
     LEFT JOIN stock_data sd ON sp.symbol = sd.symbol
-    LEFT JOIN stocks s ON sp.symbol = s.ticker
+    LEFT JOIN stocks s ON sp.symbol = s.symbol
     WHERE sp.dte BETWEEN 29 AND 33
         AND ABS(sp.delta) BETWEEN 0.25 AND 0.40
         AND sp.premium >= 0

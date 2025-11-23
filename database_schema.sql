@@ -243,20 +243,41 @@ CREATE TABLE system_config (
 );
 
 -- Indexes for performance optimization
-CREATE INDEX idx_stock_prices_time ON stock_prices (time DESC);
-CREATE INDEX idx_stock_prices_stock_id ON stock_prices (stock_id);
-CREATE INDEX idx_stocks_symbol ON stocks (symbol);
-CREATE INDEX idx_stocks_active ON stocks (is_active) WHERE is_active = true;
-CREATE INDEX idx_options_chains_stock_expiry ON options_chains (stock_id, expiration_date);
-CREATE INDEX idx_options_chains_strike ON options_chains (strike_price);
-CREATE INDEX idx_positions_user_status ON positions (user_id, status);
-CREATE INDEX idx_positions_stock_id ON positions (stock_id);
-CREATE INDEX idx_trades_position_id ON trades (position_id);
-CREATE INDEX idx_trades_execution_time ON trades (execution_time DESC);
-CREATE INDEX idx_strategy_signals_active ON strategy_signals (is_active, created_at DESC) WHERE is_active = true;
-CREATE INDEX idx_price_alerts_active ON price_alerts (is_active, stock_id) WHERE is_active = true;
-CREATE INDEX idx_alert_events_triggered_at ON alert_events (triggered_at DESC);
-CREATE INDEX idx_risk_metrics_user_date ON risk_metrics (user_id, metric_date DESC);
+
+-- Stock price data indexes
+CREATE INDEX IF NOT EXISTS idx_stock_prices_time ON stock_prices (time DESC);
+CREATE INDEX IF NOT EXISTS idx_stock_prices_stock_id ON stock_prices (stock_id);
+
+-- Stock metadata indexes - critical for filtering operations
+CREATE INDEX IF NOT EXISTS idx_stocks_symbol ON stocks (symbol);
+CREATE INDEX IF NOT EXISTS idx_stocks_active ON stocks (is_active) WHERE is_active = true;
+CREATE INDEX IF NOT EXISTS idx_stocks_sector ON stocks (sector) WHERE sector IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_stocks_industry ON stocks (industry) WHERE industry IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_stocks_optionable ON stocks (is_optionable) WHERE is_optionable = true;
+
+-- Options chains indexes - optimized for common query patterns
+CREATE INDEX IF NOT EXISTS idx_options_chains_stock_expiry ON options_chains (stock_id, expiration_date);
+CREATE INDEX IF NOT EXISTS idx_options_chains_strike ON options_chains (strike_price);
+CREATE INDEX IF NOT EXISTS idx_options_symbol_expiry ON options_chains (stock_id, expiration_date, option_type);
+CREATE INDEX IF NOT EXISTS idx_options_strike_type ON options_chains (strike_price, option_type);
+
+-- Positions indexes - optimized for user queries and status filtering
+CREATE INDEX IF NOT EXISTS idx_positions_user_status ON positions (user_id, status);
+CREATE INDEX IF NOT EXISTS idx_positions_stock_id ON positions (stock_id);
+CREATE INDEX IF NOT EXISTS idx_positions_user_symbol ON positions (user_id, stock_id);
+CREATE INDEX IF NOT EXISTS idx_positions_status ON positions (status) WHERE status IN ('open', 'assigned', 'expired');
+
+-- Trade execution indexes
+CREATE INDEX IF NOT EXISTS idx_trades_position_id ON trades (position_id);
+CREATE INDEX IF NOT EXISTS idx_trades_execution_time ON trades (execution_time DESC);
+
+-- Strategy and alerts indexes
+CREATE INDEX IF NOT EXISTS idx_strategy_signals_active ON strategy_signals (is_active, created_at DESC) WHERE is_active = true;
+CREATE INDEX IF NOT EXISTS idx_price_alerts_active ON price_alerts (is_active, stock_id) WHERE is_active = true;
+CREATE INDEX IF NOT EXISTS idx_alert_events_triggered_at ON alert_events (triggered_at DESC);
+
+-- Risk metrics indexes
+CREATE INDEX IF NOT EXISTS idx_risk_metrics_user_date ON risk_metrics (user_id, metric_date DESC);
 
 -- Insert default system configuration
 INSERT INTO system_config (config_key, config_value, description) VALUES

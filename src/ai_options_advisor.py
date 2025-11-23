@@ -19,14 +19,29 @@ from dataclasses import dataclass
 import json
 import asyncio
 
-# Technical indicators
-import talib
+# Technical indicators (optional)
+try:
+    import talib
+    TALIB_AVAILABLE = True
+except ImportError:
+    TALIB_AVAILABLE = False
+    talib = None
 
-# For AI integration
-from langchain_community.chat_models import ChatOpenAI
-from langchain_core.prompts import ChatPromptTemplate, SystemMessagePromptTemplate, HumanMessagePromptTemplate
-from langchain_core.messages import BaseMessage
-from langchain_core.callbacks import StreamingStdOutCallbackHandler
+# For AI integration (optional)
+try:
+    from langchain_openai import ChatOpenAI
+    from langchain_core.prompts import ChatPromptTemplate, SystemMessagePromptTemplate, HumanMessagePromptTemplate
+    from langchain_core.messages import BaseMessage
+    from langchain_core.callbacks import StreamingStdOutCallbackHandler
+    LANGCHAIN_AVAILABLE = True
+except ImportError:
+    LANGCHAIN_AVAILABLE = False
+    ChatOpenAI = None
+    ChatPromptTemplate = None
+    SystemMessagePromptTemplate = None
+    HumanMessagePromptTemplate = None
+    BaseMessage = None
+    StreamingStdOutCallbackHandler = None
 
 logger = logging.getLogger(__name__)
 
@@ -61,7 +76,7 @@ class AIOptionsAdvisor:
             openai_api_key: OpenAI API key for GPT-4 integration
         """
         self.api_key = openai_api_key
-        if self.api_key:
+        if self.api_key and LANGCHAIN_AVAILABLE:
             self.llm = ChatOpenAI(
                 api_key=self.api_key,
                 model="gpt-4-turbo-preview",
@@ -70,7 +85,10 @@ class AIOptionsAdvisor:
             )
         else:
             self.llm = None
-            logger.warning("No OpenAI API key provided. AI recommendations will be limited.")
+            if not LANGCHAIN_AVAILABLE:
+                logger.warning("LangChain not available. AI recommendations disabled. Install: pip install langchain langchain-community langchain-core")
+            elif not self.api_key:
+                logger.warning("No OpenAI API key provided. AI recommendations will be limited.")
 
         # Initialize analysis components
         self.fundamental_analyzer = FundamentalAnalyzer()
@@ -251,6 +269,12 @@ class AIOptionsAdvisor:
         """
 
         try:
+            if not LANGCHAIN_AVAILABLE:
+                logger.warning("LangChain not available, using rule-based recommendation")
+                return self._generate_rule_based_recommendation(
+                    position, opportunities, fundamentals, technicals, market_conditions
+                )
+
             messages = [
                 SystemMessagePromptTemplate.from_template(system_prompt).format(),
                 HumanMessagePromptTemplate.from_template(human_prompt).format()
@@ -615,16 +639,26 @@ class TechnicalAnalyzer:
             volume = hist['Volume'].values
 
             # Calculate indicators
+            if TALIB_AVAILABLE:
+                rsi_val = float(talib.RSI(close_prices, timeperiod=14)[-1])
+                ma_50 = float(talib.SMA(close_prices, timeperiod=50)[-1])
+                ma_200 = float(talib.SMA(close_prices, timeperiod=200)[-1]) if len(close_prices) >= 200 else None
+            else:
+                # Simple fallback calculations
+                rsi_val = 50.0  # Neutral RSI
+                ma_50 = float(np.mean(close_prices[-50:])) if len(close_prices) >= 50 else float(close_prices[-1])
+                ma_200 = float(np.mean(close_prices[-200:])) if len(close_prices) >= 200 else None
+
             analysis = {
                 'current_price': float(close_prices[-1]),
                 'trend': self._determine_trend(close_prices),
-                'rsi': float(talib.RSI(close_prices, timeperiod=14)[-1]),
-                'rsi_signal': self._interpret_rsi(talib.RSI(close_prices, timeperiod=14)[-1]),
+                'rsi': rsi_val,
+                'rsi_signal': self._interpret_rsi(rsi_val),
                 'macd_signal': self._get_macd_signal(close_prices),
                 'support': self._find_support(low_prices[-50:]),
                 'resistance': self._find_resistance(high_prices[-50:]),
-                'ma_50': float(talib.SMA(close_prices, timeperiod=50)[-1]),
-                'ma_200': float(talib.SMA(close_prices, timeperiod=200)[-1]) if len(close_prices) >= 200 else None,
+                'ma_50': ma_50,
+                'ma_200': ma_200,
                 'volume_trend': self._analyze_volume(volume)
             }
 
@@ -643,8 +677,13 @@ class TechnicalAnalyzer:
         if len(prices) < 20:
             return "Unknown"
 
-        sma_20 = talib.SMA(prices, timeperiod=20)[-1]
-        sma_50 = talib.SMA(prices, timeperiod=50)[-1] if len(prices) >= 50 else sma_20
+        if TALIB_AVAILABLE:
+            sma_20 = talib.SMA(prices, timeperiod=20)[-1]
+            sma_50 = talib.SMA(prices, timeperiod=50)[-1] if len(prices) >= 50 else sma_20
+        else:
+            # Simple moving average fallback
+            sma_20 = float(np.mean(prices[-20:]))
+            sma_50 = float(np.mean(prices[-50:])) if len(prices) >= 50 else sma_20
 
         current = prices[-1]
 
@@ -671,15 +710,19 @@ class TechnicalAnalyzer:
     def _get_macd_signal(self, prices: np.ndarray) -> str:
         """Get MACD signal"""
         try:
-            macd, signal, hist = talib.MACD(prices)
-            if hist[-1] > 0 and hist[-2] <= 0:
-                return "Bullish Crossover"
-            elif hist[-1] < 0 and hist[-2] >= 0:
-                return "Bearish Crossover"
-            elif hist[-1] > 0:
-                return "Bullish"
+            if TALIB_AVAILABLE:
+                macd, signal, hist = talib.MACD(prices)
+                if hist[-1] > 0 and hist[-2] <= 0:
+                    return "Bullish Crossover"
+                elif hist[-1] < 0 and hist[-2] >= 0:
+                    return "Bearish Crossover"
+                elif hist[-1] > 0:
+                    return "Bullish"
+                else:
+                    return "Bearish"
             else:
-                return "Bearish"
+                # Simple trend-based fallback
+                return "Neutral"
         except:
             return "N/A"
 

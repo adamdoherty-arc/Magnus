@@ -1,0 +1,59 @@
+#!/usr/bin/env python3
+"""
+Pre-commit Git Hook - Runs orchestrator validation before commits
+Install: Copy to .git/hooks/pre-commit and make executable
+"""
+import sys
+import os
+from pathlib import Path
+
+# Add orchestrator directory to path
+orchestrator_dir = Path(__file__).parent.parent
+sys.path.insert(0, str(orchestrator_dir))
+
+try:
+    from main_orchestrator import get_orchestrator
+except ImportError as e:
+    # Fallback if imports fail
+    print(f"Warning: Could not import orchestrator: {e}")
+    sys.exit(0)
+
+def main():
+    """Run pre-commit validation"""
+    orchestrator = get_orchestrator()
+
+    # Get staged files
+    import subprocess
+    result = subprocess.run(
+        ["git", "diff", "--cached", "--name-only"],
+        capture_output=True,
+        text=True
+    )
+
+    if result.returncode != 0:
+        print("Error getting staged files")
+        sys.exit(1)
+
+    staged_files = [f for f in result.stdout.split('\n') if f.strip()]
+
+    if not staged_files:
+        # No files staged, nothing to check
+        sys.exit(0)
+
+    print(f"Orchestrator: Checking {len(staged_files)} files...")
+
+    # Run QA on staged files
+    qa_results = orchestrator.post_execution_qa(staged_files)
+
+    if not qa_results.get("passed", False):
+        print("\n❌ Pre-commit validation FAILED")
+        print(orchestrator.qa_agent.get_qa_summary(qa_results))
+        print("\nFix the violations above before committing.")
+        print("Or use --no-verify to bypass (not recommended)")
+        sys.exit(1)
+
+    print("✅ Pre-commit validation PASSED")
+    sys.exit(0)
+
+if __name__ == "__main__":
+    main()

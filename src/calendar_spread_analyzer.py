@@ -14,7 +14,42 @@ from typing import List, Dict, Optional, Tuple
 import math
 import logging
 
+from src.services.rate_limiter import rate_limit
+
 logger = logging.getLogger(__name__)
+
+
+# PERFORMANCE FIX: Rate-limited Robinhood API wrappers to prevent account bans
+# Robinhood allows ~60 calls/minute. Without rate limiting, nested loops can hit 200+ calls/minute.
+
+@rate_limit("robinhood", tokens=1, timeout=30)
+def get_chains_rate_limited(symbol: str):
+    """Rate-limited wrapper for rh.get_chains()"""
+    return rh.get_chains(symbol)
+
+
+@rate_limit("robinhood", tokens=1, timeout=30)
+def get_chain_expirations_rate_limited(chain_id: str):
+    """Rate-limited wrapper for rh.get_chain_expirations()"""
+    return rh.get_chain_expirations(chain_id)
+
+
+@rate_limit("robinhood", tokens=1, timeout=30)
+def get_chain_strikes_rate_limited(chain_id: str):
+    """Rate-limited wrapper for rh.get_chain_strikes()"""
+    return rh.get_chain_strikes(chain_id)
+
+
+@rate_limit("robinhood", tokens=1, timeout=30)
+def find_options_rate_limited(symbol: str, expiration: str, strike: str, option_type: str):
+    """Rate-limited wrapper for rh.find_options_by_expiration_and_strike()"""
+    return rh.find_options_by_expiration_and_strike(symbol, expiration, strike, option_type)
+
+
+@rate_limit("robinhood", tokens=1, timeout=30)
+def get_option_market_data_rate_limited(option_id: str):
+    """Rate-limited wrapper for rh.get_option_market_data_by_id()"""
+    return rh.get_option_market_data_by_id(option_id)
 
 
 class CalendarSpreadAnalyzer:
@@ -42,15 +77,15 @@ class CalendarSpreadAnalyzer:
         try:
             opportunities = []
 
-            # Get option chains
-            chains = rh.get_chains(symbol)
+            # Get option chains (rate-limited)
+            chains = get_chains_rate_limited(symbol)
             if not chains:
                 return []
 
             chain_id = chains[0]['id']
 
-            # Get expiration dates
-            expirations = rh.get_chain_expirations(chain_id)
+            # Get expiration dates (rate-limited)
+            expirations = get_chain_expirations_rate_limited(chain_id)
             if len(expirations) < 2:
                 return []  # Need at least 2 expirations
 
@@ -98,8 +133,8 @@ class CalendarSpreadAnalyzer:
     def _get_strikes_near_price(self, symbol: str, stock_price: float, chain_id: str) -> List[float]:
         """Get strikes within 10% of stock price"""
         try:
-            # Get option strikes
-            strikes_data = rh.get_chain_strikes(chain_id)
+            # Get option strikes (rate-limited)
+            strikes_data = get_chain_strikes_rate_limited(chain_id)
             all_strikes = [float(s) for s in strikes_data]
 
             # Filter to strikes within 10% of stock price
@@ -217,7 +252,8 @@ class CalendarSpreadAnalyzer:
     def _get_option_data(self, symbol: str, expiration: str, strike: float, option_type: str) -> Optional[Dict]:
         """Get option data from Robinhood"""
         try:
-            options = rh.find_options_by_expiration_and_strike(
+            # Find options (rate-limited)
+            options = find_options_rate_limited(
                 symbol,
                 expiration,
                 str(strike),
@@ -229,8 +265,8 @@ class CalendarSpreadAnalyzer:
 
             option_data = options[0]
 
-            # Get market data
-            market_data = rh.get_option_market_data_by_id(option_data['id'])
+            # Get market data (rate-limited)
+            market_data = get_option_market_data_rate_limited(option_data['id'])
             if not market_data or len(market_data) == 0:
                 return None
 

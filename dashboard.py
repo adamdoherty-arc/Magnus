@@ -12,6 +12,9 @@ from dotenv import load_dotenv
 # Load environment variables at the very start
 load_dotenv()
 
+# PERFORMANCE FIX: Set global timeout for all external API calls (prevents page hangs)
+import src.api_timeout_config  # Auto-configures 10-second timeout on import
+
 # Optional date parser
 try:
     from dateutil import parser
@@ -21,6 +24,14 @@ except ImportError:
 # Import Omnipresent AVA (used in main flow)
 from src.ava.omnipresent_ava_enhanced import show_enhanced_ava as show_omnipresent_ava
 
+# Import Top Betting Picks Widget
+try:
+    from src.components.top_betting_picks_widget import display_top_picks_compact
+    BETTING_WIDGET_AVAILABLE = True
+except ImportError:
+    BETTING_WIDGET_AVAILABLE = False
+    display_top_picks_compact = None
+
 # Lazy import helpers (loaded on-demand for better performance)
 _plotly_go = None
 _plotly_px = None
@@ -28,12 +39,8 @@ _yfinance = None
 _redis_client = None
 _agents_initialized = False
 
-# Check agent management page availability
-try:
-    import agent_management_page
-    AGENT_MANAGEMENT_AVAILABLE = True
-except ImportError:
-    AGENT_MANAGEMENT_AVAILABLE = False
+# Check if agent management page is available
+AGENT_MANAGEMENT_AVAILABLE = os.path.exists('agent_management_page.py')
 
 def get_plotly_go():
     """Lazy load plotly graph_objects"""
@@ -71,55 +78,71 @@ st.set_page_config(
 # PERFORMANCE: Cache Warming System
 # ============================================================================
 
+# PERFORMANCE FIX: Create executor at module level to prevent memory leaks
+# Previously: executor was created inside @st.cache_resource, causing leak
+# Now: Single executor shared across all cache warming operations
+import atexit
+from concurrent.futures import ThreadPoolExecutor
+import logging
+
+logger_warming = logging.getLogger(__name__)
+
+# Global executor for background tasks (created once, reused forever)
+_background_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="cache_warmer")
+
+# Register cleanup function to shut down executor on exit
+def _cleanup_executor():
+    """Shutdown executor gracefully on application exit"""
+    logger_warming.info("Shutting down background executor...")
+    _background_executor.shutdown(wait=True)
+    logger_warming.info("Background executor shutdown complete")
+
+atexit.register(_cleanup_executor)
+
+
+def background_warm():
+    """Warm caches in background"""
+    try:
+        logger_warming.info("🔥 Starting cache warming...")
+
+        # PERFORMANCE FIX: Corrected import paths for cache warming
+        # Warm xtrades cache (most frequently accessed)
+        try:
+            from xtrades_watchlists_page import (
+                get_closed_trades_cached,
+                get_active_trades_cached,
+                get_active_profiles_cached
+            )
+            get_closed_trades_cached(limit=100)
+            get_active_trades_cached(limit=100)
+            get_active_profiles_cached()
+            logger_warming.info("✅ XTrades cache warmed")
+        except Exception as e:
+            logger_warming.warning(f"XTrades cache warming failed: {e}")
+
+        # Warm Kalshi cache
+        try:
+            from kalshi_nfl_markets_page import KalshiMarketsApp
+            app = KalshiMarketsApp()
+            app.get_all_markets()  # Method call, not function
+            logger_warming.info("✅ Kalshi cache warmed")
+        except Exception as e:
+            logger_warming.warning(f"Kalshi cache warming failed: {e}")
+
+        logger_warming.info("🎉 Cache warming complete!")
+
+    except Exception as e:
+        logger_warming.error(f"Cache warming error: {e}")
+
+
 @st.cache_resource
 def warm_critical_caches():
     """
     Pre-populate critical caches on dashboard startup for instant page loads.
-    Runs in background thread to avoid blocking UI.
+    Submits background task to global executor (no executor creation = no leak).
     """
-    import threading
-    import logging
-
-    logger = logging.getLogger(__name__)
-
-    def background_warm():
-        """Warm caches in background"""
-        try:
-            logger.info("🔥 Starting cache warming...")
-
-            # Warm positions cache (most frequently accessed)
-            try:
-                from positions_page_improved import get_closed_trades_cached
-                get_closed_trades_cached()  # Uses default: 365 days
-                logger.info("✅ Positions cache warmed")
-            except Exception as e:
-                logger.warning(f"Positions cache warming failed: {e}")
-
-            # Warm xtrades cache
-            try:
-                from xtrades_watchlists_page import get_active_trades_cached, get_active_profiles_cached
-                get_active_trades_cached(limit=100)
-                get_active_profiles_cached()
-                logger.info("✅ XTrades cache warmed")
-            except Exception as e:
-                logger.warning(f"XTrades cache warming failed: {e}")
-
-            # Warm Kalshi cache
-            try:
-                from kalshi_nfl_markets_page import get_all_markets
-                get_all_markets()
-                logger.info("✅ Kalshi cache warmed")
-            except Exception as e:
-                logger.warning(f"Kalshi cache warming failed: {e}")
-
-            logger.info("🎉 Cache warming complete!")
-
-        except Exception as e:
-            logger.error(f"Cache warming error: {e}")
-
-    # Start warming in background (non-blocking)
-    thread = threading.Thread(target=background_warm, daemon=True)
-    thread.start()
+    # Submit to global executor (no new executor created)
+    _background_executor.submit(background_warm)
     return True
 
 # Warm caches on startup (called once)
@@ -174,8 +197,8 @@ st.markdown("""
         background-color: rgba(151, 166, 195, 0.45) !important;
         border-left: 8px solid #667eea !important;
         border-right: 3px solid #667eea !important;
-        padding: 0.25rem 0.5rem !important;
-        padding-left: 0.7rem !important;
+        padding: 0.6rem 0.9rem !important;
+        padding-left: 1.2rem !important;
         margin-left: -3px !important;
         transform: translateX(3px) scale(1.02);
         box-shadow: 0 4px 8px rgba(102, 126, 234, 0.3) !important;
@@ -269,42 +292,97 @@ if st.sidebar.button("📈 Dashboard", width='stretch'):
     st.session_state.page = "Dashboard"
 if st.sidebar.button("💼 Positions", width='stretch'):
     st.session_state.page = "Positions"
-if st.sidebar.button("💸 Premium Options Flow", width='stretch'):
-    st.session_state.page = "Premium Options Flow"
 if st.sidebar.button("🏭 Sector Analysis", width='stretch'):
     st.session_state.page = "Sector Analysis"
-if st.sidebar.button("📊 TradingView Watchlists", width='stretch'):
+if st.sidebar.button("📊 Watchlists", use_container_width=True):
     st.session_state.page = "TradingView Watchlists"
-if st.sidebar.button("🗄️ Database Scan", width='stretch'):
-    st.session_state.page = "Database Scan"
+if st.sidebar.button("💎 Premium Scanner", width='stretch'):
+    st.session_state.page = "Premium Scanner"
 if st.sidebar.button("📅 Earnings Calendar", width='stretch'):
     st.session_state.page = "Earnings Calendar"
 if st.sidebar.button("📱 XTrade Messages", width='stretch'):
     st.session_state.page = "XTrade Messages"
-if st.sidebar.button("📊 Supply/Demand Zones", width='stretch'):
-    st.session_state.page = "Supply/Demand Zones"
+if st.sidebar.button("📊 Technical Indicators", width='stretch'):
+    st.session_state.page = "Technical Indicators"
 if st.sidebar.button("🎯 Options Analysis", width='stretch'):
     st.session_state.page = "Options Analysis"
-# Legacy pages - kept for analysis (will be removed after review)
-if st.sidebar.button("🤖 AI Options Agent", width='stretch'):
-    st.session_state.page = "AI Options Agent"
-if st.sidebar.button("🎯 Comprehensive Strategy Analysis", width='stretch'):
-    st.session_state.page = "Comprehensive Strategy Analysis"
 
 st.sidebar.markdown("---")
 
 # ==================== PREDICTION MARKETS ====================
 st.sidebar.markdown("### 🎲 Prediction Markets")
-if st.sidebar.button("🎯 AVA Betting Picks", width='stretch'):
-    st.session_state.page = "AVA Betting Picks"
-if st.sidebar.button("🏟️ Sports Game Cards", width='stretch'):
-    st.session_state.page = "Sports Game Cards"
-if st.sidebar.button("🏈 Game-by-Game Analysis", width='stretch'):
-    st.session_state.page = "Game-by-Game Analysis"
-if st.sidebar.button("🎯 AI Sports Predictions", width='stretch'):
-    st.session_state.page = "AI Sports Predictions"
+if st.sidebar.button("🏟️ Sports Game Hub", width='stretch'):
+    st.session_state.page = "Sports Game Hub"
+# if st.sidebar.button("🎯 AI Sports Predictions", width='stretch'):
+#     st.session_state.page = "AI Sports Predictions"
+# NOTE: Page disabled - requires prediction_markets_enhanced.py
 if st.sidebar.button("🎲 Kalshi Markets", width='stretch'):
     st.session_state.page = "Prediction Markets"
+
+# ==================== MY SUBSCRIPTIONS WIDGET ====================
+try:
+    from src.game_watchlist_manager import GameWatchlistManager
+    from src.kalshi_db_manager import KalshiDBManager
+
+    # Initialize session state for user_id if not exists
+    if 'user_id' not in st.session_state:
+        st.session_state.user_id = os.getenv('TELEGRAM_USER_ID', 'default_user')
+
+    # Get watchlist manager
+    db = KalshiDBManager()
+    watchlist_mgr = GameWatchlistManager(db)
+    watchlist = watchlist_mgr.get_user_watchlist(st.session_state.user_id)
+
+    if watchlist and len(watchlist) > 0:
+        st.sidebar.markdown("---")
+        st.sidebar.markdown("### 📋 My Subscriptions")
+
+        # Show count
+        total_count = len(watchlist)
+        st.sidebar.caption(f"**{total_count} games subscribed**")
+
+        # Show quick summary by sport
+        nfl_count = len([w for w in watchlist if w.get('sport') == 'NFL'])
+        ncaa_count = len([w for w in watchlist if w.get('sport') == 'CFB'])
+        nba_count = len([w for w in watchlist if w.get('sport') == 'NBA'])
+
+        summary_parts = []
+        if nfl_count > 0:
+            summary_parts.append(f"🏈 {nfl_count}")
+        if ncaa_count > 0:
+            summary_parts.append(f"🎓 {ncaa_count}")
+        if nba_count > 0:
+            summary_parts.append(f"🏀 {nba_count}")
+
+        if summary_parts:
+            st.sidebar.caption(" | ".join(summary_parts))
+
+        # Show up to 3 most recent subscriptions
+        recent_games = watchlist[:3]
+        for watch_game in recent_games:
+            game_data = watch_game.get('game_data', {})
+            away = game_data.get('away_team', watch_game.get('away_team', 'Away'))
+            home = game_data.get('home_team', watch_game.get('home_team', 'Home'))
+
+            # Truncate long team names
+            if len(away) > 12:
+                away = away[:10] + "..."
+            if len(home) > 12:
+                home = home[:10] + "..."
+
+            st.sidebar.caption(f"• {away} @ {home}")
+
+        if len(watchlist) > 3:
+            st.sidebar.caption(f"_...and {len(watchlist) - 3} more_")
+
+        # Link to full management
+        if st.sidebar.button("📊 Manage All Subscriptions", key="manage_subs_sidebar"):
+            st.session_state.page = "Sports Game Hub"
+            st.rerun()
+
+except Exception as e:
+    # Gracefully handle if watchlist not available
+    pass
 
 st.sidebar.markdown("---")
 
@@ -395,8 +473,12 @@ if page == "Dashboard":
     else:
         st.info("💡 Connect to Robinhood in the Settings tab to see your real portfolio data")
 
+    # === TOP BETTING PICKS WIDGET ===
+    # Show top betting opportunities in compact format
+    if BETTING_WIDGET_AVAILABLE:
+        display_top_picks_compact(max_picks=10)
+
     # Balance Forecast Timeline
-    st.markdown("---")
     st.markdown("### 📅 Balance Forecast Timeline")
 
     if positions:
@@ -491,7 +573,6 @@ if page == "Dashboard":
                 st.metric("Avg Monthly Return", f"{monthly_return:.2f}%")
 
     # Detailed Position Forecast
-    st.markdown("---")
     st.markdown("### 🎯 Individual Position Forecasts")
 
     if positions:
@@ -551,7 +632,6 @@ if page == "Dashboard":
         st.info("No active positions. Connect to Robinhood or open some positions to see forecasts.")
 
     # Historical Performance (if data available)
-    st.markdown("---")
     st.markdown("### 📊 Historical Performance")
 
     # This would show actual historical data if available
@@ -560,17 +640,17 @@ if page == "Dashboard":
     else:
         st.info("Connect to Robinhood to track historical performance")
 
-# Opportunities feature removed - premium analysis integrated into TradingView Watchlists and Database Scan
+# Opportunities feature removed - premium analysis integrated into TradingView Watchlists and Premium Scanner
 
 elif page == "Positions":
     # Use improved Positions page with all enhancements
     from positions_page_improved import show_positions_page
     show_positions_page()
 
-# Premium Scanner page removed - functionality integrated into TradingView Watchlists and Database Scan
+# Premium Scanner page removed - functionality integrated into TradingView Watchlists and new unified Premium Scanner
 
 elif page == "TradingView Watchlists":
-    st.title("📊 My Watchlists - Premium Analysis")
+    st.title("📊 Watchlists")
     
     # Sync status widget
     from src.components.sync_status_widget import SyncStatusWidget
@@ -582,7 +662,7 @@ elif page == "TradingView Watchlists":
     )
 
     # Import modules
-    # TradingView Database Manager is already imported at the top
+    from src.tradingview_db_manager import TradingViewDBManager
     import yfinance as yf
     import pandas as pd
     from datetime import datetime, timedelta
@@ -629,12 +709,10 @@ elif page == "TradingView Watchlists":
     tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["🔄 Auto-Sync", "📥 Import Watchlist", "📊 My Watchlist Analysis", "📈 Saved Watchlists", "🎯 Quick Scan", "📆 Calendar Spreads"])
 
     with tab1:
-        st.subheader("📊 Your Watchlists")
-
-        # Refresh button
-        col1, col2, col3 = st.columns([2, 2, 2])
+        # Refresh button (compact)
+        col1, col2 = st.columns([4, 1])
         with col1:
-            if st.button("🔄 Refresh Watchlists", width='stretch'):
+            if st.button("🔄 Refresh Watchlists", use_container_width=True):
                 with st.spinner("Loading watchlists from database..."):
                     # Load all watchlists from database
                     watchlists = tv_manager.get_all_symbols_dict()
@@ -647,14 +725,10 @@ elif page == "TradingView Watchlists":
                     else:
                         st.info("No watchlists found. Import symbols below to create watchlists.")
                     st.rerun()
-
         with col2:
-            pass  # Manual Import button removed - use Import Watchlist tab instead
-
-        with col3:
             if 'last_sync' in st.session_state:
                 time_since = (datetime.now() - st.session_state['last_sync']).seconds // 60
-                st.info(f"Last sync: {time_since} min ago")
+                st.caption(f"⏱️ {time_since}m")
 
         # Load watchlists on first run
         if 'watchlists_db' not in st.session_state:
@@ -663,13 +737,12 @@ elif page == "TradingView Watchlists":
         watchlists_db = st.session_state.get('watchlists_db', {})
 
         if watchlists_db:
-            st.subheader("📋 Your Watchlists - Live Market Data")
-
-            # Watchlist selector
+            # Watchlist selector (no redundant subheader)
             selected_watchlist = st.selectbox(
                 "Select Watchlist",
                 list(watchlists_db.keys()),
-                format_func=lambda x: f"{x} ({len(watchlists_db[x])} stocks)"
+                format_func=lambda x: f"{x} ({len(watchlists_db[x])} stocks)",
+                help="Choose a watchlist to view premium opportunities"
             )
 
             if selected_watchlist:
@@ -681,36 +754,32 @@ elif page == "TradingView Watchlists":
                 if not stock_symbols:
                     st.warning(f"No stock symbols found in {selected_watchlist}. This watchlist contains only crypto/non-stock symbols.")
                 else:
-                    # Show sync button
-                    col_sync1, col_sync2, col_sync3 = st.columns([2, 2, 2])
+                    # Sync section - compact side-by-side layout
+                    col_sync1, col_sync2, col_sync3 = st.columns([1, 2, 1])
                     with col_sync1:
-                        st.metric("Stocks in Watchlist", len(stock_symbols))
+                        st.metric("Stocks", len(stock_symbols))
                     with col_sync2:
-                        if st.button("🔄 Sync Prices & Premiums", type="primary", width='stretch'):
-                            st.info("⚡ Background sync started! Data will update automatically...")
-                            # Start background sync (non-blocking)
+                        if st.button("🔄 Sync Prices & Premiums", type="primary", use_container_width=True):
+                            st.success("⚡ Syncing in background...")
+                            # Start background sync (truly non-blocking)
                             import subprocess
                             subprocess.Popen([
                                 "python", "src/watchlist_sync_service.py", selected_watchlist
                             ], creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
-                            time.sleep(2)
-                            st.rerun()
-
                     with col_sync3:
-                        st.caption("Data syncs in background")
+                        st.caption("")  # Empty for spacing
 
                     # SIMPLE IMPLEMENTATION - Just show 30-day options with 0.25-0.40 delta
-                    st.markdown("### 💵 Cash-Secured Put Options (30 Days, Delta 0.25-0.40)")
-                    st.caption("Real data from database. Sort by clicking column headers. Filter by stock price and premium.")
+                    st.markdown("💵 **Cash-Secured Put Options** • 30 DTE • Δ 0.25-0.40")
 
-                    # Simple filters
+                    # Compact filters
                     col_f1, col_f2, col_f3 = st.columns(3)
                     with col_f1:
-                        min_stock_price = st.number_input("Min Stock Price ($)", value=0.0, min_value=0.0, step=10.0, key="filter_min_stock")
+                        min_stock_price = st.number_input("Min Stock $", value=0.0, min_value=0.0, step=10.0, key="filter_min_stock")
                     with col_f2:
-                        max_stock_price = st.number_input("Max Stock Price ($)", value=10000.0, min_value=10.0, step=50.0, key="filter_max_stock")
+                        max_stock_price = st.number_input("Max Stock $", value=10000.0, min_value=10.0, step=50.0, key="filter_max_stock")
                     with col_f3:
-                        min_premium = st.number_input("Min Premium ($)", value=0.0, min_value=0.0, step=1.0, key="filter_min_prem")
+                        min_premium = st.number_input("Min Premium $", value=0.0, min_value=0.0, step=1.0, key="filter_min_prem")
 
                     # Get 30-day options with ~0.3 delta
                     conn = tv_manager.get_connection()
@@ -762,21 +831,18 @@ elif page == "TradingView Watchlists":
                         for col in numeric_cols:
                             df[col] = pd.to_numeric(df[col], errors='coerce')
 
-                        # Summary
-                        col1, col2, col3 = st.columns(3)
-                        with col1:
-                            st.metric("Options Found", len(df))
-                        with col2:
-                            st.metric("Avg Premium", f"${df['Premium'].mean():.2f}")
-                        with col3:
-                            st.metric("Avg Monthly Return", f"{df['Monthly %'].mean():.2f}%")
+                        # Summary metrics
+                        col1, col2, col3, col4 = st.columns(4)
+                        col1.metric("Options", len(df))
+                        col2.metric("Avg Premium", f"${df['Premium'].mean():.2f}")
+                        col3.metric("Monthly %", f"{df['Monthly %'].mean():.1f}%")
+                        col4.metric("Avg IV", f"{df['IV'].mean():.0f}%")
 
-                        # Display simple sortable table (NO row selection to avoid black screen)
-                        st.markdown("#### 📊 30-Day Cash-Secured Puts (Click headers to sort)")
+                        # Results table
                         st.dataframe(
                             df,
                             hide_index=True,
-                            width='stretch',
+                            use_container_width=True,
                             column_config={
                                 "Symbol": st.column_config.TextColumn("Symbol", width="small"),
                                 "Stock Price": st.column_config.NumberColumn("Stock $", format="$%.2f"),
@@ -797,28 +863,30 @@ elif page == "TradingView Watchlists":
             st.warning("No watchlists found. Click 'Refresh Watchlists' to fetch from TradingView.")
 
     with tab2:
-        st.subheader("📥 Import Your Watchlist")
-
-        st.info("👆 Paste your watchlist symbols below (from TradingView, Robinhood, or any source)")
-
+        st.subheader("📥 Import Watchlist")
 
         # Text area for importing symbols
         watchlist_text = st.text_area(
             "Enter symbols (comma or line separated):",
-            placeholder="NVDA, AMD, AAPL, MSFT\nTSLA, META, GOOGL\nOr paste directly from TradingView",
-            height=200
+            placeholder="NVDA, AMD, AAPL, MSFT, TSLA, META, GOOGL",
+            height=150,
+            help="Paste from TradingView, Robinhood, or any source"
         )
 
-        watchlist_name = st.text_input("Watchlist Name:", value="My Watchlist")
+        watchlist_name = st.text_input("Watchlist Name:", value="My Watchlist", max_chars=50)
 
         col1, col2 = st.columns(2)
         with col1:
-            import_button = st.button("💾 Save & Analyze Watchlist", type="primary", width='stretch')
+            import_button = st.button("💾 Save & Analyze Watchlist", type="primary", use_container_width=True)
         with col2:
             # Load existing watchlist
             tv_integration = TradingViewDBManager()
             saved_lists = tv_integration.load_saved_watchlists()
-            selected_list = st.selectbox("Or load saved:", list(saved_lists.keys()))
+            selected_list = st.selectbox(
+                "Or load saved:",
+                list(saved_lists.keys()),
+                help="Load a previously saved watchlist"
+            )
 
         if import_button and watchlist_text:
             # Import the symbols
@@ -844,19 +912,18 @@ elif page == "TradingView Watchlists":
                 st.success(f"Loaded {len(saved_lists[selected_list])} symbols from '{selected_list}'")
 
     with tab3:
-        st.subheader("📊 Watchlist Analysis with Premiums")
+        st.subheader("📊 Watchlist Analysis")
 
         if not st.session_state.get('current_watchlist'):
-            st.warning("👆 Please import or load a watchlist in the first tab")
+            st.warning("👆 Import a watchlist first")
         else:
             symbols = st.session_state['current_watchlist']
             watchlist_name = st.session_state.get('current_watchlist_name', 'My Watchlist')
 
-            st.info(f"Analyzing '{watchlist_name}' with {len(symbols)} stocks")
-            st.caption(f"Symbols: {', '.join(symbols[:20])}{'...' if len(symbols) > 20 else ''}")
+            st.caption(f"**{watchlist_name}** ({len(symbols)} stocks) • {', '.join(symbols[:15])}{'...' if len(symbols) > 15 else ''}")
 
             # Analyze button
-            if st.button("📊 Analyze All Stocks & Premiums", type="primary", width='stretch'):
+            if st.button("📊 Analyze All Stocks & Premiums", type="primary", use_container_width=True):
                 with st.spinner(f"Getting real-time data for {len(symbols)} stocks..."):
 
                     # Get comprehensive data with options
@@ -879,10 +946,8 @@ elif page == "TradingView Watchlists":
             if st.session_state.get('watchlist_analysis'):
                 results = st.session_state['watchlist_analysis']
 
-                st.success(f"✅ Analysis complete for {len(results)} stocks")
-
                 if 'analysis_time' in st.session_state:
-                    st.caption(f"Last analyzed: {st.session_state['analysis_time'].strftime('%I:%M %p')}")
+                    st.caption(f"✅ {len(results)} stocks analyzed at {st.session_state['analysis_time'].strftime('%I:%M %p')}")
 
                 # Create DataFrame
                 df = pd.DataFrame(results)
@@ -909,15 +974,14 @@ elif page == "TradingView Watchlists":
                     return ''
 
                 # Display table with color coding
-                st.markdown("### 📈 Complete Analysis Table")
-                st.caption("🟢 Green = Up today | 🔴 Red = Down today | Premiums shown for ~5% OTM puts")
+                st.markdown("### 📈 Analysis Results")
 
                 # Apply styling and display
                 styled_df = df.style.map(highlight_changes, subset=[col for col in df.columns if '% Change' in col])
 
                 st.dataframe(
                     styled_df,
-                    width='stretch',
+                    use_container_width=True,
                     hide_index=True,
                     height=600
                 )
@@ -1006,9 +1070,9 @@ elif page == "TradingView Watchlists":
 
     with tab5:
         st.subheader("🎯 Quick Scan")
-        st.info("📊 **Watchlist Premium Scanner** - Scans only symbols in selected watchlist (vs Database Scanner which scans all 1,205 stocks)")
+        st.info("📊 **Watchlist Premium Scanner** - Scans only symbols in selected watchlist (vs Premium Scanner which can scan all stocks)")
 
-        st.info("No predefined lists available. Please use 'Import Watchlist' or 'Database Scan' to load stocks.")
+        st.info("No predefined lists available. Please use 'Import Watchlist' or 'Premium Scanner' to load stocks.")
 
     with tab6:
         st.subheader("📆 Calendar Spread Opportunities")
@@ -1045,7 +1109,13 @@ elif page == "TradingView Watchlists":
             with st.spinner("Connecting to Robinhood..."):
                 try:
                     import robin_stocks.robinhood as rh
-                    rh.login('brulecapital@gmail.com', 'FortKnox')
+                    # SECURITY FIX: Use environment variables instead of hardcoded credentials
+                    import os
+                    rh_username = os.getenv('ROBINHOOD_USERNAME')
+                    rh_password = os.getenv('ROBINHOOD_PASSWORD')
+                    if not rh_username or not rh_password:
+                        raise ValueError("ROBINHOOD_USERNAME or ROBINHOOD_PASSWORD not found in environment")
+                    rh.login(rh_username, rh_password)
                     st.session_state['rh_calendar_logged_in'] = True
                 except Exception as e:
                     st.error(f"Failed to connect to Robinhood: {e}")
@@ -1063,7 +1133,8 @@ elif page == "TradingView Watchlists":
                     "Select Watchlist",
                     list(watchlists_db.keys()),
                     format_func=lambda x: f"{x} ({len(watchlists_db[x])} stocks)",
-                    key="calendar_spread_watchlist"
+                    key="calendar_spread_watchlist",
+                    help="Choose a watchlist to find calendar spread opportunities"
                 )
 
                 if selected_watchlist:
@@ -1075,10 +1146,7 @@ elif page == "TradingView Watchlists":
                     if not stock_symbols:
                         st.warning(f"No stock symbols found in {selected_watchlist}")
                     else:
-                        st.info(f"Analyzing {len(stock_symbols)} symbols from '{selected_watchlist}'")
-
                         # Strategy parameters
-                        st.markdown("### 🎯 Analysis Filters")
                         col1, col2, col3 = st.columns(3)
 
                         with col1:
@@ -1105,12 +1173,12 @@ elif page == "TradingView Watchlists":
                             spread_type = st.selectbox(
                                 "Spread Type",
                                 ["Both", "Call Calendars Only", "Put Calendars Only"],
-                                key="calendar_spread_type"
+                                key="calendar_spread_type",
+                                help="Filter by calendar spread type"
                             )
 
                         # Analyze button
                         if st.button("🔍 Find Calendar Spreads", type="primary", key="find_calendar_spreads_btn"):
-                            st.markdown("---")
                             st.markdown("### 🎯 Analysis Results")
 
                             # Progress tracking
@@ -1120,39 +1188,61 @@ elif page == "TradingView Watchlists":
                             all_opportunities = []
                             symbols_to_analyze = stock_symbols[:max_symbols]
 
-                            # Import analyzer
+                            # PERFORMANCE: Parallel analysis with ThreadPoolExecutor (5-10x faster!)
                             from src.calendar_spread_analyzer import CalendarSpreadAnalyzer
+                            from concurrent.futures import ThreadPoolExecutor, as_completed
+                            import robin_stocks.robinhood as rh
+
                             analyzer = CalendarSpreadAnalyzer()
 
-                            for idx, symbol in enumerate(symbols_to_analyze):
-                                status_text.text(f"Analyzing {symbol}... ({idx + 1}/{len(symbols_to_analyze)})")
-                                progress_bar.progress((idx + 1) / len(symbols_to_analyze))
-
+                            def analyze_single_symbol(symbol):
+                                """Analyze a single symbol (thread-safe)"""
                                 try:
-                                    # Get stock price
-                                    import robin_stocks.robinhood as rh
                                     quote = rh.get_latest_price(symbol)
                                     if not quote or not quote[0]:
-                                        continue
+                                        return []
 
                                     stock_price = float(quote[0])
-
-                                    # Analyze for calendar spreads
                                     opportunities = analyzer.analyze_symbol(symbol, stock_price)
 
                                     # Filter by score and type
+                                    filtered = []
                                     for opp in opportunities:
                                         if opp['score'] >= min_score:
                                             if spread_type == "Both":
-                                                all_opportunities.append(opp)
+                                                filtered.append(opp)
                                             elif spread_type == "Call Calendars Only" and "Call" in opp['type']:
-                                                all_opportunities.append(opp)
+                                                filtered.append(opp)
                                             elif spread_type == "Put Calendars Only" and "Put" in opp['type']:
-                                                all_opportunities.append(opp)
+                                                filtered.append(opp)
+
+                                    return filtered
 
                                 except Exception as e:
                                     st.warning(f"Error analyzing {symbol}: {e}")
-                                    continue
+                                    return []
+
+                            # Parallel execution (5 workers for optimal throughput)
+                            with ThreadPoolExecutor(max_workers=5) as executor:
+                                # Submit all tasks
+                                future_to_symbol = {
+                                    executor.submit(analyze_single_symbol, symbol): symbol
+                                    for symbol in symbols_to_analyze
+                                }
+
+                                # Process results as they complete
+                                completed = 0
+                                for future in as_completed(future_to_symbol):
+                                    symbol = future_to_symbol[future]
+                                    completed += 1
+                                    status_text.text(f"Analyzed {symbol}... ({completed}/{len(symbols_to_analyze)})")
+                                    progress_bar.progress(completed / len(symbols_to_analyze))
+
+                                    try:
+                                        opportunities = future.result()
+                                        all_opportunities.extend(opportunities)
+                                    except Exception as e:
+                                        st.warning(f"Error processing {symbol}: {e}")
 
                             progress_bar.empty()
                             status_text.empty()
@@ -1230,7 +1320,6 @@ elif page == "TradingView Watchlists":
                                 )
 
                                 # Detailed view for top opportunities
-                                st.markdown("---")
                                 st.markdown("### 🔍 Detailed Analysis - Top 5 Opportunities")
 
                                 top_5 = opportunities[:5]
@@ -1294,7 +1383,6 @@ Net Debit: ${opp['net_debit']:.2f}
                                         """, language="text")
 
                                 # Download CSV
-                                st.markdown("---")
                                 csv = display_df.to_csv(index=False)
                                 st.download_button(
                                     label="📥 Download Results as CSV",
@@ -1329,7 +1417,6 @@ elif page == "Risk Analysis":
     with col4:
         st.metric("VaR (95%)", "$2,450", "▼10%")
     
-    st.markdown("---")
     
     # Sector allocation
     col1, col2 = st.columns(2)
@@ -1372,7 +1459,6 @@ elif page == "Risk Analysis":
                 st.success(alert['Message'])
     
     # Recommendations
-    st.markdown("---")
     st.subheader("💡 Risk Management Recommendations")
     
     recommendations = [
@@ -1385,9 +1471,20 @@ elif page == "Risk Analysis":
     for rec in recommendations:
         st.write(f"• {rec}")
 
-elif page == "Database Scan":
-    st.title("🗄️ Database Stock Scanner")
+elif page == "Premium Scanner":
+    # Import and run the new Premium Scanner page
+    import importlib.util
+    import sys
+
+    spec = importlib.util.spec_from_file_location("premium_scanner_page", "premium_scanner_page.py")
+    premium_scanner_module = importlib.util.module_from_spec(spec)
+    sys.modules["premium_scanner_page"] = premium_scanner_module
+    spec.loader.exec_module(premium_scanner_module)
+
+elif page == "Database Scan (Legacy)":
+    st.title("🗄️ Database Stock Scanner (Legacy)")
     st.markdown("Scan PostgreSQL database for stocks and analyze option premiums")
+    st.warning("⚠️ This page is deprecated. Please use 'Premium Scanner' instead.")
 
     from src.database_scanner import DatabaseScanner
     import pytz
@@ -1483,7 +1580,6 @@ elif page == "Database Scan":
                         if last_sync:
                             st.caption(f"Last sync: {last_sync.strftime('%Y-%m-%d %H:%M:%S')}")
                     
-                    st.markdown("---")
                 else:
                     st.warning("⚠️ No sync data found. Run sync to populate stock data.")
             except Exception as e:
@@ -1536,7 +1632,6 @@ elif page == "Database Scan":
                         else:
                             st.metric("Avg Price", "N/A")
 
-                    st.markdown("---")
 
                     # Display stocks table
                     df = pd.DataFrame(stocks)
@@ -1627,7 +1722,6 @@ elif page == "Database Scan":
                             st.json(stocks[0] if stocks else {})
 
                     # Refresh view button
-                    st.markdown("---")
                     st.info("💡 Stock prices update automatically during daily premium sync at 10 AM ET. Manual sync available in Premium Scanner tab.")
                     if st.button("🔄 Refresh View", type="primary"):
                         st.rerun()
@@ -1815,7 +1909,6 @@ elif page == "Database Scan":
                 if st.button("🔄 Refresh Progress", key="refresh_progress_waiting"):
                     st.rerun()
 
-        st.markdown("---")
 
         # Filters (30-day options only)
         col_f1, col_f2, col_f3 = st.columns(3)
@@ -1850,11 +1943,11 @@ elif page == "Database Scan":
                 sp.ask,
                 sp.volume,
                 sp.open_interest as oi,
-                s.name,
+                s.company_name,
                 s.sector
             FROM stock_premiums sp
             LEFT JOIN stock_data sd ON sp.symbol = sd.symbol
-            LEFT JOIN stocks s ON sp.symbol = s.ticker
+            LEFT JOIN stocks s ON sp.symbol = s.symbol
             WHERE sp.dte BETWEEN %s AND %s
                 AND ABS(sp.delta) BETWEEN 0.25 AND 0.40
                 AND sp.premium >= %s
@@ -1922,7 +2015,6 @@ elif page == "Database Scan":
 
         # AI Research Integration for Premium Scanner results
         if rows:
-            st.markdown("---")
             from src.components.ai_research_widget import display_consolidated_ai_research_section
             symbols = df['Symbol'].unique().tolist()[:20]  # Limit to top 20 for performance
             display_consolidated_ai_research_section(symbols, key_prefix="db_premium")
@@ -1962,7 +2054,13 @@ elif page == "Database Scan":
             with st.spinner("Connecting to Robinhood..."):
                 try:
                     import robin_stocks.robinhood as rh
-                    rh.login('brulecapital@gmail.com', 'FortKnox')
+                    # SECURITY FIX: Use environment variables instead of hardcoded credentials
+                    import os
+                    rh_username = os.getenv('ROBINHOOD_USERNAME')
+                    rh_password = os.getenv('ROBINHOOD_PASSWORD')
+                    if not rh_username or not rh_password:
+                        raise ValueError("ROBINHOOD_USERNAME or ROBINHOOD_PASSWORD not found in environment")
+                    rh.login(rh_username, rh_password)
                     st.session_state['rh_calendar_logged_in'] = True
                 except Exception as e:
                     st.error(f"Failed to connect to Robinhood: {e}")
@@ -2023,7 +2121,6 @@ elif page == "Database Scan":
 
                 # Analyze button
                 if st.button("🔍 Find Calendar Spreads", type="primary", key="db_find_calendar_spreads_btn"):
-                    st.markdown("---")
                     st.markdown("### 🎯 Analysis Results")
 
                     # Progress tracking
@@ -2143,7 +2240,6 @@ elif page == "Database Scan":
                         )
 
                         # AI Research for top calendar spread opportunities
-                        st.markdown("---")
                         from src.components.ai_research_widget import display_consolidated_ai_research_section
                         top_symbols = [opp['symbol'] for opp in opportunities[:10]]
                         display_consolidated_ai_research_section(top_symbols, key_prefix="db_calendar")
@@ -2159,7 +2255,7 @@ elif page == "Database Scan":
         cur = conn.cursor()
 
         # Get all distinct symbols
-        cur.execute("SELECT DISTINCT ticker FROM stocks ORDER BY ticker LIMIT 500")
+        cur.execute("SELECT DISTINCT symbol FROM stocks ORDER BY symbol LIMIT 500")
         all_symbols = [row[0] for row in cur.fetchall()]
         cur.close()
         conn.close()
@@ -2205,7 +2301,7 @@ elif page == "Database Scan":
                         import plotly.express as px
                         fig = px.bar(x=sector_counts.index, y=sector_counts.values, labels={'x': 'Sector', 'y': 'Count'})
                         fig.update_layout(showlegend=False, height=300)
-                        st.plotly_chart(fig, use_container_width=True)
+                        st.plotly_chart(fig, width='stretch')
                     else:
                         st.info("No sector data available")
 
@@ -2222,7 +2318,7 @@ elif page == "Database Scan":
                             import plotly.express as px
                             fig = px.bar(x=price_dist.index.astype(str), y=price_dist.values, labels={'x': 'Price Range', 'y': 'Count'})
                             fig.update_layout(showlegend=False, height=300)
-                            st.plotly_chart(fig, use_container_width=True)
+                            st.plotly_chart(fig, width='stretch')
                         else:
                             st.info("No price data available")
                     else:
@@ -2264,27 +2360,20 @@ elif page == "XTrade Messages":
     from discord_messages_page import main as show_xtrade_messages
     show_xtrade_messages()
 
-elif page == "AI Sports Predictions":
-    from prediction_markets_enhanced import show_prediction_markets_enhanced
-    show_prediction_markets_enhanced()
+# elif page == "AI Sports Predictions":
+#     from prediction_markets_enhanced import show_prediction_markets_enhanced
+#     show_prediction_markets_enhanced()
+# NOTE: This page requires prediction_markets_enhanced.py to be created
 
 elif page == "Prediction Markets":
     from prediction_markets_page import show_prediction_markets
     show_prediction_markets()
 
-elif page == "Game-by-Game Analysis":
-    from game_by_game_analysis_page import show_game_by_game
-    show_game_by_game()
-
-elif page == "Sports Game Cards":
+elif page == "Sports Game Hub":
     from game_cards_visual_page import show_game_cards
     show_game_cards()
 
-elif page == "AVA Betting Picks":
-    from ava_betting_recommendations_page import main as show_ava_betting_picks
-    show_ava_betting_picks()
-
-elif page == "Supply/Demand Zones":
+elif page == "Technical Indicators":
     from supply_demand_zones_page import show_supply_demand_zones
     show_supply_demand_zones()
 
@@ -2293,37 +2382,24 @@ elif page == "Options Analysis":
     from options_analysis_page import render_options_analysis_page
     render_options_analysis_page()
 
-# Old pages kept for backwards compatibility (can be removed later)
-elif page == "AI Options Agent":
-    from ai_options_agent_page import render_ai_options_agent_page
-    render_ai_options_agent_page()
-
 elif page == "AVA Chatbot":
     from ava_chatbot_page import show_ava_chatbot_page
     show_ava_chatbot_page()
 
-elif page == "Comprehensive Strategy Analysis":
-    from comprehensive_strategy_page import render_comprehensive_strategy_page
-    render_comprehensive_strategy_page()
-
 elif page == "Agent Management":
-    if AGENT_MANAGEMENT_AVAILABLE:
-        try:
-            # Import and run agent management page
-            import sys
-            import os
-            sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-            from agent_management_page import main
-            main()
-        except Exception as e:
-            st.error(f"❌ Error loading Agent Management page: {e}")
-            import traceback
-            with st.expander("Error Details"):
-                st.code(traceback.format_exc())
-            st.info("Please ensure agent_management_page.py exists and all dependencies are installed")
-    else:
-        st.error("❌ Agent Management page not available")
-        st.info("Please ensure agent_management_page.py exists in the project root")
+    try:
+        # Import and run agent management page
+        import sys
+        import os
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        from agent_management_page import main
+        main()
+    except Exception as e:
+        st.error(f"❌ Error loading Agent Management page: {e}")
+        import traceback
+        with st.expander("Error Details"):
+            st.code(traceback.format_exc())
+        st.info("Please ensure agent_management_page.py exists and all dependencies are installed")
 
 elif page == "Settings":
     st.title("⚙️ Settings")
@@ -2343,7 +2419,6 @@ elif page == "Settings":
         st.number_input("Max Sector Exposure (%)", value=30.0, min_value=10.0, max_value=50.0)
         st.slider("Min Options Volume", 10, 1000, 100, 10)
     
-    st.markdown("---")
     
     # Alert settings
     st.subheader("🔔 Alert Settings")
@@ -2363,7 +2438,6 @@ elif page == "Settings":
             default=["Assignment Warnings", "Risk Alerts"]
         )
     
-    st.markdown("---")
 
     # TradingView Integration
     st.subheader("📈 TradingView Integration")
@@ -2406,18 +2480,13 @@ elif page == "Settings":
             st.markdown("💵 **Dividend Stocks**")
             st.caption("Income + premiums")
 
-    st.markdown("---")
 
     if st.button("💾 Save Settings", type="primary"):
         st.success("Settings saved successfully!")
 
-elif page == "Premium Options Flow":
-    from premium_flow_page import display_premium_flow_page
-    display_premium_flow_page()
-
 elif page == "Sector Analysis":
-    from sector_analysis_page import display_sector_analysis_page
-    display_sector_analysis_page()
+    from sector_analysis_page_enhanced import display_sector_analysis_enhanced
+    display_sector_analysis_enhanced()
 
 elif page == "Enhancement Agent":
     from enhancement_agent_page import show_enhancement_agent
@@ -2432,7 +2501,6 @@ elif page == "Cache Metrics":
     show_cache_metrics()
 
 # Footer
-st.markdown("---")
 st.markdown(
     "<div style='text-align: center; color: #888;'>Magnus Trading Platform v1.0 | "
     "Data updates every 5 minutes | Last update: " +

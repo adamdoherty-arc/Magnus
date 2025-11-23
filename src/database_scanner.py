@@ -6,8 +6,9 @@ from psycopg2.extras import RealDictCursor
 import pandas as pd
 from datetime import datetime, timedelta
 from typing import List, Dict, Optional, Any
-import yfinance as yf
 from dotenv import load_dotenv
+# PERFORMANCE: Using centralized rate-limited wrapper
+from src.yfinance_wrapper import get_ticker, get_ticker_info, get_ticker_history
 from src.yfinance_utils import (
     safe_get_ticker,
     safe_get_history,
@@ -19,7 +20,7 @@ from src.yfinance_utils import (
 )
 
 # Load environment variables
-load_dotenv()
+load_dotenv(override=True)
 
 class DatabaseScanner:
     """Scan PostgreSQL database for stocks and analyze option premiums"""
@@ -195,21 +196,21 @@ class DatabaseScanner:
         """Get all stocks from database"""
         try:
             # Map database columns to expected schema
-            # Database uses 'ticker' but code expects 'symbol'
+            # Database uses 'symbol' column
             # Database uses 'price' but code expects 'current_price'
             self.cursor.execute("""
                 SELECT
                     id,
-                    ticker as symbol,
-                    name,
+                    symbol,
+                    company_name as name,
                     sector,
                     industry,
                     market_cap,
-                    COALESCE(price, 0) as current_price,
-                    COALESCE(avg_volume, 0) as avg_volume,
-                    last_updated
+                    COALESCE(market_cap, 0) as current_price,
+                    COALESCE(average_volume, 0) as avg_volume,
+                    updated_at as last_updated
                 FROM stocks
-                ORDER BY ticker
+                ORDER BY symbol
             """)
             return self.cursor.fetchall()
         except Exception as e:
@@ -226,14 +227,14 @@ class DatabaseScanner:
             query = """
                 SELECT
                     id,
-                    ticker as symbol,
-                    name,
+                    symbol,
+                    company_name as name,
                     sector,
                     industry,
                     market_cap,
-                    COALESCE(price, 0) as current_price,
-                    COALESCE(avg_volume, 0) as avg_volume,
-                    last_updated
+                    COALESCE(market_cap, 0) as current_price,
+                    COALESCE(average_volume, 0) as avg_volume,
+                    updated_at as last_updated
                 FROM stocks
                 WHERE 1=1
             """

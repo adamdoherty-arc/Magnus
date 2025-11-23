@@ -1,0 +1,70 @@
+# Memory System Configuration
+# 100% Local Storage - ChromaDB + SQLite
+
+memory:
+  enabled: true
+
+  # Storage Configuration
+  storage:
+    short_term:
+      backend: chromadb
+      path: ".claude/orchestrator/databases/chromadb"
+      retention: session  # Clear on restart
+      max_size_mb: 100
+
+    medium_term:
+      backend: sqlite
+      path: ".claude/orchestrator/databases/memory.db"
+      retention_days: 7
+      auto_cleanup: true
+
+    long_term:
+      backend: sqlite
+      path: ".claude/orchestrator/databases/memory.db"
+      retention_days: 90
+      auto_cleanup: true
+
+  # Embedding Configuration (for semantic search)
+  embeddings:
+    model: "sentence-transformers/all-MiniLM-L6-v2"  # Local model
+    device: "cpu"  # or "cuda" if GPU available
+    batch_size: 32
+
+  # What to Remember
+  remember:
+    - successful_patterns
+    - common_errors
+    - optimal_agent_selection
+    - feature_contexts
+    - user_preferences
+    - performance_optimizations
+
+  # Knowledge Categories
+  categories:
+    - patterns  # Learned patterns
+    - errors    # Error solutions
+    - optimizations  # Performance tips
+    - contexts  # Feature contexts
+    - preferences  # User/system preferences
+
+  # Memory Management
+  management:
+    auto_consolidate: true  # Consolidate similar memories
+    consolidation_threshold: 0.9  # Similarity threshold
+    prune_low_confidence: true
+    confidence_threshold: 0.3
+    max_entries_per_category: 1000
+
+  # Retrieval Settings
+  retrieval:
+    semantic_search: true
+    relevance_threshold: 0.7
+    max_results: 10
+    boost_recent: true  # Boost recent memories
+    boost_frequently_accessed: true
+
+  # Cross-Session Persistence
+  persistence:
+    enabled: true
+    save_on_shutdown: true
+    load_on_startup: true

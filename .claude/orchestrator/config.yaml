@@ -1,0 +1,588 @@
+# Orchestrator Configuration - World-Class Edition
+# Controls automatic validation, QA, and agent coordination
+# Version: 2.0 - Full 45-Agent Integration
+
+# Orchestrator Behavior
+orchestrator:
+  enabled: true
+  mode: standard  # standard, aggressive, passive
+  auto_run_on_request: true
+  auto_qa_on_completion: true
+  state_persistence: true  # Enable state machine checkpointing
+  parallel_execution: true  # Enable parallel agent execution
+
+# Pre-Flight Validation
+pre_flight:
+  enabled: true
+  strict_mode: true
+  checks:
+    - ui_style_guide          # Check UI_STYLE_GUIDE.md rules
+    - deprecated_patterns     # Check for known anti-patterns
+    - feature_spec_exists     # Verify feature has spec
+    - breaking_changes        # Detect potential breaking changes
+    - security_scan           # Basic security checks
+    - performance_impact      # Estimate performance impact
+
+# Post-Execution QA
+post_execution:
+  enabled: true
+  auto_fix: false  # Auto-fix violations (use with caution!)
+  checks:
+    - horizontal_lines        # st.markdown("---") forbidden
+    - code_quality            # Linting, formatting
+    - test_coverage           # Verify tests exist
+    - performance_regression  # Check for performance issues
+    - security_vulnerabilities # Basic security checks
+    - documentation_complete  # Ensure docs updated
+  ui_testing:
+    enabled: true  # Enable Playwright UI testing
+    on_page_changes: true
+
+# Agent Configuration - ALL 45 AGENTS
+agents:
+  # PRIORITY GROUPS - Determines execution order
+  priority_groups:
+    critical:
+      # These run FIRST, sequential, block on failure
+      - spec-requirements-validator      # Validate requirements.md quality
+      - spec-breaking-change-detector    # Check for breaking changes
+      - rule_engine                      # Enforce project rules
+
+    high:
+      # These run SECOND, in parallel (up to 5 concurrent)
+      - spec-design-validator            # Validate design.md quality
+      - spec-dependency-analyzer         # Analyze task dependencies
+      - code-reviewer                    # Code quality review
+      - qa-tester                        # Manual QA checks
+      - bug-root-cause-analyzer          # Deep bug analysis (when needed)
+
+    medium:
+      # These run THIRD, in parallel (up to 10 concurrent)
+      - spec-performance-analyzer        # Performance analysis
+      - spec-duplication-detector        # Find duplicate code
+      - spec-test-generator              # Generate test cases
+      - spec-design-web-researcher       # Research latest patterns
+      - performance-engineer             # Performance optimization
+      - database-optimizer               # Query optimization
+
+    low:
+      # These run LAST, in parallel (up to 3 concurrent), non-blocking
+      - spec-documentation-generator     # Auto-generate docs
+      - steering-document-updater        # Update steering docs
+
+  # TRADING SPECIALISTS (5 agents)
+  trading_specialists:
+    calendar-spreads-specialist:
+      description: "Calendar spread analysis, theta decay, volatility skew"
+      features: [calendar-spreads]
+      auto_invoke_on: [calendar_spread, theta_decay, volatility_analysis]
+
+    earnings-specialist:
+      description: "Earnings calendar, avoidance strategies, IV analysis"
+      features: [earnings-calendar]
+      auto_invoke_on: [earnings, earnings_calendar, earnings_trade]
+
+    dte-scanner-specialist:
+      description: "7-day DTE scanner, theta strategies, weekly options"
+      features: [seven-day-dte]
+      auto_invoke_on: [dte, seven_day, weekly_options, theta_decay]
+
+    sports-betting-specialist:
+      description: "Sports betting, Kalshi integration, prediction markets"
+      features: [sports-betting, prediction-markets]
+      auto_invoke_on: [sports, betting, kalshi, prediction_market]
+
+  # SPEC WORKFLOW AGENTS (13 agents)
+  spec_workflow:
+    spec-requirements-validator:
+      description: "Validate requirements.md for completeness and clarity"
+      priority: critical
+      auto_invoke: always
+      timeout: 60
+
+    spec-design-validator:
+      description: "Validate design.md for technical soundness"
+      priority: high
+      auto_invoke: always
+      timeout: 90
+
+    spec-design-web-researcher:
+      description: "Research latest framework docs and best practices"
+      priority: medium
+      auto_invoke: on_new_design
+      timeout: 120
+
+    spec-task-validator:
+      description: "Validate task breakdown for atomicity and clarity"
+      priority: high
+      auto_invoke: on_task_creation
+      timeout: 60
+
+    spec-dependency-analyzer:
+      description: "Analyze task dependencies and parallelization opportunities"
+      priority: high
+      auto_invoke: on_task_creation
+      timeout: 90
+
+    spec-task-executor:
+      description: "Execute individual spec tasks"
+      priority: high
+      auto_invoke: on_task_execution
+      timeout: 300
+
+    spec-task-implementation-reviewer:
+      description: "Review task implementation for correctness"
+      priority: high
+      auto_invoke: after_task_execution
+      timeout: 120
+
+    spec-integration-tester:
+      description: "Run integration tests, validate integration points"
+      priority: high
+      auto_invoke: after_implementation
+      timeout: 300
+
+    spec-test-generator:
+      description: "Generate comprehensive test cases from requirements"
+      priority: medium
+      auto_invoke: on_implementation
+      timeout: 120
+
+    spec-performance-analyzer:
+      description: "Analyze algorithmic complexity and bottlenecks"
+      priority: medium
+      auto_invoke: on_implementation
+      timeout: 90
+
+    spec-duplication-detector:
+      description: "Detect duplicated code and suggest refactoring"
+      priority: medium
+      auto_invoke: on_implementation
+      timeout: 60
+
+    spec-breaking-change-detector:
+      description: "Detect API breaking changes and compatibility issues"
+      priority: critical
+      auto_invoke: always
+      timeout: 60
+
+    spec-completion-reviewer:
+      description: "Final validation when all tasks complete"
+      priority: high
+      auto_invoke: on_completion
+      timeout: 120
+
+    spec-documentation-generator:
+      description: "Auto-generate documentation from specs"
+      priority: low
+      auto_invoke: on_completion
+      timeout: 90
+
+  # CORE DEVELOPMENT AGENTS (14 agents)
+  development:
+    frontend-developer:
+      description: "React/Streamlit UI development, component architecture"
+      features: [dashboard, all_ui_pages]
+      auto_invoke_on: [ui, streamlit, page, component]
+
+    backend-architect:
+      description: "System design, scalable architecture, consultative design"
+      auto_invoke_on: [architecture, system_design, scalability]
+
+    ai-engineer:
+      description: "LLM, RAG, agentic systems, AI-powered features"
+      features: [ava-chatbot, rag-knowledge-base, options-analysis]
+      auto_invoke_on: [llm, rag, ai, chatbot, embeddings]
+
+    data-engineer:
+      description: "ETL pipelines, data integration, Spark, Airflow"
+      features: [xtrades-watchlists, discord-messages]
+      auto_invoke_on: [etl, pipeline, data_sync, kafka]
+
+    data-scientist:
+      description: "Analytics, SQL optimization, BigQuery, insights"
+      features: [supply-demand-zones, sector-analysis, premium-scanner]
+      auto_invoke_on: [analytics, sql, bigquery, analysis]
+
+    database-optimizer:
+      description: "Database performance, indexing, query optimization"
+      auto_invoke_on: [database, postgres, query, index, performance]
+
+    python-pro:
+      description: "Clean Python code, best practices, optimization"
+      auto_invoke_on: [python, refactor, optimization]
+
+    typescript-pro:
+      description: "TypeScript, type-safe code, Node.js"
+      auto_invoke_on: [typescript, node, types]
+
+    graphql-architect:
+      description: "GraphQL API design, schema, resolvers, federation"
+      auto_invoke_on: [graphql, api, schema]
+
+    cloud-architect:
+      description: "AWS, Azure, GCP, Terraform, FinOps, serverless"
+      auto_invoke_on: [aws, cloud, terraform, infrastructure]
+
+    deployment-engineer:
+      description: "CI/CD, Docker, Kubernetes, GitOps"
+      auto_invoke_on: [deployment, cicd, docker, kubernetes]
+
+    performance-engineer:
+      description: "Performance optimization, profiling, bottleneck analysis"
+      auto_invoke_on: [performance, optimization, profiling]
+
+    prompt-engineer:
+      description: "LLM prompt optimization, advanced prompting techniques"
+      features: [ava-chatbot, rag-knowledge-base]
+      auto_invoke_on: [prompt, llm_optimization]
+
+    full-stack-developer:
+      description: "End-to-end feature development, frontend + backend"
+      auto_invoke_on: [fullstack, end_to_end]
+
+  # QUALITY & TESTING AGENTS (4 agents)
+  quality:
+    qa-tester:
+      description: "Manual QA, test case execution, quality validation"
+      priority: high
+      auto_invoke: on_implementation
+
+    code-reviewer:
+      description: "Code review, best practices, style guide enforcement"
+      priority: high
+      auto_invoke: always
+
+    bug-root-cause-analyzer:
+      description: "Deep git history analysis, pattern recognition"
+      priority: high
+      auto_invoke_on: [bug, error, failure]
+
+    steering-document-updater:
+      description: "Keep product.md, tech.md, structure.md updated"
+      priority: low
+      auto_invoke: on_major_changes
+
+  # OPERATIONS & INCIDENT RESPONSE (2 agents)
+  operations:
+    devops-incident-responder:
+      description: "Production incident response, root cause analysis, monitoring"
+      priority: critical
+      auto_invoke_on: [incident, outage, error_spike]
+
+    incident-responder:
+      description: "Critical issue triage, incident commander"
+      priority: critical
+      auto_invoke_on: [critical, incident, emergency]
+
+  # DESIGN & UX AGENTS (3 agents)
+  design:
+    ui-designer:
+      description: "Visual design, design systems, UI patterns"
+      auto_invoke_on: [design, ui_design, visual]
+
+    ux-designer:
+      description: "User experience, usability, accessibility"
+      auto_invoke_on: [ux, usability, user_experience, accessibility]
+
+    architect:
+      description: "Overall architecture, technical leadership"
+      auto_invoke_on: [architecture, technical_design]
+
+  # SPECIALIZED TOOLS (4 agents)
+  specialized:
+    postgres-pro:
+      description: "PostgreSQL expertise, PGLite, database architecture"
+      auto_invoke_on: [postgresql, pglite, database_design]
+
+    nextjs-pro:
+      description: "Next.js, SSR, SSG, App Router, performance"
+      auto_invoke_on: [nextjs, react_framework]
+
+    react-pro:
+      description: "React optimization, hooks, performance, modern patterns"
+      auto_invoke_on: [react, hooks, components]
+
+    ml-engineer:
+      description: "ML model deployment, MLOps, model lifecycle"
+      auto_invoke_on: [ml, machine_learning, model, mlops]
+
+  # PARALLEL EXECUTION LIMITS
+  max_parallel:
+    critical: 1    # Sequential execution
+    high: 5        # Up to 5 agents in parallel
+    medium: 10     # Up to 10 agents in parallel
+    low: 3         # Up to 3 agents in parallel
+
+  # AGENT TIMEOUTS (seconds)
+  timeouts:
+    spec-requirements-validator: 60
+    spec-integration-tester: 300
+    ui-test-agent: 180
+    code-reviewer: 120
+    spec-task-executor: 300
+    bug-root-cause-analyzer: 180
+    default: 90
+
+# Feature Registry - Maps page files to features and specs
+features:
+  # Trading & Positions
+  positions_page_improved.py:
+    feature: robinhood-positions
+    specs:
+      requirements: .claude/specs/robinhood-positions/requirements.md
+      design: .claude/specs/robinhood-positions/design.md
+      tasks: .claude/specs/robinhood-positions/tasks.md
+    rules:
+      - no_horizontal_lines
+      - use_real_greeks
+      - rate_limited_api_calls
+
+  options_analysis_page.py:
+    feature: options-analysis
+    specs:
+      requirements: .claude/specs/options-analysis/requirements.md
+      design: .claude/specs/options-analysis/design.md
+      tasks: .claude/specs/options-analysis/tasks.md
+    rules:
+      - no_horizontal_lines
+      - accurate_greeks_display
+
+  premium_scanner_page.py:
+    feature: premium-scanner
+    specs:
+      requirements: .claude/specs/premium-scanner/requirements.md
+      design: .claude/specs/premium-scanner/design.md
+      tasks: .claude/specs/premium-scanner/tasks.md
+    rules:
+      - no_horizontal_lines
+      - real_time_updates
+
+  seven_day_dte_scanner_page.py:
+    feature: seven-day-dte
+    specs:
+      requirements: .claude/specs/seven-day-dte/requirements.md
+      design: .claude/specs/seven-day-dte/design.md
+      tasks: .claude/specs/seven-day-dte/tasks.md
+    rules:
+      - no_horizontal_lines
+      - accurate_dte_calculation
+
+  calendar_spreads_page.py:
+    feature: calendar-spreads
+    specs:
+      requirements: .claude/specs/calendar-spreads/requirements.md
+      design: .claude/specs/calendar-spreads/design.md
+      tasks: .claude/specs/calendar-spreads/tasks.md
+    rules:
+      - no_horizontal_lines
+      - accurate_spread_pricing
+
+  # Sports Betting
+  sports_betting_hub_page.py:
+    feature: sports-betting
+    specs:
+      requirements: .claude/specs/sports-betting/requirements.md
+      design: .claude/specs/sports-betting/design.md
+      tasks: .claude/specs/sports-betting/tasks.md
+    rules:
+      - no_horizontal_lines
+      - live_data_sync
+
+  game_cards_visual_page.py:
+    feature: sports-betting
+    specs:
+      requirements: .claude/specs/sports-betting/requirements.md
+      design: .claude/specs/sports-betting/design.md
+    rules:
+      - no_horizontal_lines
+
+  prediction_markets_page.py:
+    feature: prediction-markets
+    specs:
+      requirements: .claude/specs/prediction-markets/requirements.md
+      design: .claude/specs/prediction-markets/design.md
+      tasks: .claude/specs/prediction-markets/tasks.md
+    rules:
+      - no_horizontal_lines
+
+  earnings_calendar_page.py:
+    feature: earnings-calendar
+    specs:
+      requirements: .claude/specs/earnings-calendar/requirements.md
+      design: .claude/specs/earnings-calendar/design.md
+      tasks: .claude/specs/earnings-calendar/tasks.md
+    rules:
+      - no_horizontal_lines
+      - accurate_earnings_dates
+
+  # Data & Social
+  xtrades_watchlists_page.py:
+    feature: xtrades-watchlists
+    specs:
+      requirements: .claude/specs/xtrades-watchlists/requirements.md
+      design: .claude/specs/xtrades-watchlists/design.md
+      tasks: .claude/specs/xtrades-watchlists/tasks.md
+    rules:
+      - no_horizontal_lines
+      - alert_accuracy
+
+  discord_messages_page.py:
+    feature: discord-messages
+    specs:
+      requirements: .claude/specs/discord-messages/requirements.md
+      design: .claude/specs/discord-messages/design.md
+      tasks: .claude/specs/discord-messages/tasks.md
+    rules:
+      - no_horizontal_lines
+      - message_deduplication
+
+  # AI & Chatbot
+  ava_chatbot_page.py:
+    feature: ava-chatbot
+    specs:
+      requirements: .claude/specs/ava-chatbot/requirements.md
+      design: .claude/specs/ava-chatbot/design.md
+      tasks: .claude/specs/ava-chatbot/tasks.md
+    rules:
+      - no_horizontal_lines
+      - personality_consistency
+
+  rag_knowledge_base_page.py:
+    feature: rag-knowledge-base
+    specs:
+      requirements: .claude/specs/rag-knowledge-base/requirements.md
+      design: .claude/specs/rag-knowledge-base/design.md
+      tasks: .claude/specs/rag-knowledge-base/tasks.md
+    rules:
+      - no_horizontal_lines
+      - accurate_retrieval
+
+  # Dashboard & Hubs
+  dashboard.py:
+    feature: dashboard
+    specs:
+      requirements: .claude/specs/dashboard/requirements.md
+      design: .claude/specs/dashboard/design.md
+      tasks: .claude/specs/dashboard/tasks.md
+    rules:
+      - no_horizontal_lines
+      - performance_optimized
+
+  # Analysis & Tools
+  supply_demand_zones_page.py:
+    feature: supply-demand-zones
+    specs:
+      requirements: .claude/specs/supply-demand-zones/requirements.md
+      design: .claude/specs/supply-demand-zones/design.md
+      tasks: .claude/specs/supply-demand-zones/tasks.md
+    rules:
+      - no_horizontal_lines
+      - accurate_zone_calculation
+
+  sector_analysis_page.py:
+    feature: sector-analysis
+    specs:
+      requirements: .claude/specs/sector-analysis/requirements.md
+      design: .claude/specs/sector-analysis/design.md
+      tasks: .claude/specs/sector-analysis/tasks.md
+    rules:
+      - no_horizontal_lines
+      - real_time_data
+
+  # Management & Monitoring
+  health_dashboard_page.py:
+    feature: health-dashboard
+    specs:
+      requirements: .claude/specs/health-dashboard/requirements.md
+      design: .claude/specs/health-dashboard/design.md
+      tasks: .claude/specs/health-dashboard/tasks.md
+    rules:
+      - no_horizontal_lines
+      - real_time_monitoring
+
+# Project Rules
+rules:
+  # UI Rules
+  ui:
+    no_horizontal_lines:
+      severity: critical
+      message: "NO st.markdown('---') or st.divider() allowed. Use spacing instead."
+      patterns:
+        - "st\\.markdown\\([\"']---"
+        - "st\\.divider\\(\\)"
+      auto_fix: true
+      fix_action: remove_line
+
+    use_emojis_in_headers:
+      severity: warning
+      message: "Section headers should include emojis for visual hierarchy"
+      patterns:
+        - "st\\.markdown\\([\"']#{1,3} [^🎯📊💼🔧🎨📈]"
+
+  # Code Quality Rules
+  code:
+    use_rate_limiting:
+      severity: high
+      message: "Robinhood API calls must use rate-limited wrappers"
+      patterns:
+        - "rh\\.(get_open_stock_positions|get_open_option_positions|get_quotes)\\("
+      exclude_patterns:
+        - "@rate_limit"
+
+    use_real_greeks:
+      severity: high
+      message: "Use real Greeks from API, not hardcoded estimates"
+      patterns:
+        - "estimated_delta\\s*="
+        - "delta.*=.*0\\.[0-9]{1,2}"
+
+    no_deprecated_functions:
+      severity: critical
+      message: "Remove deprecated functions that are never called"
+      check_type: ast_analysis
+
+# QA Thresholds
+qa:
+  min_test_coverage: 70  # Target 70% coverage
+  max_complexity: 15
+  max_function_length: 150
+  test_strategy:
+    unit_tests_required: true
+    integration_tests_required: true
+    ui_tests_required: true
+
+# Logging
+logging:
+  enabled: true
+  level: INFO
+  file: .claude/orchestrator/orchestrator.log
+  console: true
+  structured_logging: true  # JSON-formatted logs
+
+# Performance
+performance:
+  max_parallel_agents: 10  # Increased from 5
+  timeout_seconds: 300
+  retry_attempts: 3
+  cache_results: true
+  cache_ttl: 3600  # 1 hour
+
+# State Machine (LangGraph-inspired)
+state_machine:
+  enabled: true
+  checkpoint_dir: .claude/orchestrator/checkpoints
+  checkpoint_frequency: on_state_change
+  max_checkpoints: 100
+  enable_rollback: true
+
+# MCP Integration
+mcp:
+  enabled: true
+  config_file: .claude/orchestrator/mcp_config.json
+  servers:
+    - orchestrator
+    - playwright
+    - github
+    - sequential-thinking
+    - memory-bank

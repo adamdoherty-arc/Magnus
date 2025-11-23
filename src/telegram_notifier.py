@@ -30,17 +30,24 @@ import time
 from dotenv import load_dotenv
 
 try:
-    from telegram import Bot, ParseMode
+    from telegram import Bot
     from telegram.error import TelegramError, NetworkError, RetryAfter, TimedOut
+    from telegram.constants import ParseMode
     TELEGRAM_AVAILABLE = True
 except ImportError:
-    TELEGRAM_AVAILABLE = False
-    Bot = None
-    ParseMode = None
-    TelegramError = Exception
-    NetworkError = Exception
-    RetryAfter = Exception
-    TimedOut = Exception
+    try:
+        # Try old version
+        from telegram import Bot, ParseMode
+        from telegram.error import TelegramError, NetworkError, RetryAfter, TimedOut
+        TELEGRAM_AVAILABLE = True
+    except ImportError:
+        TELEGRAM_AVAILABLE = False
+        Bot = None
+        ParseMode = None
+        TelegramError = Exception
+        NetworkError = Exception
+        RetryAfter = Exception
+        TimedOut = Exception
 
 
 # Configure logging
@@ -422,12 +429,33 @@ class TelegramNotifier:
 
         for attempt in range(self.max_retries):
             try:
-                message = self.bot.send_message(
+                # Handle both async (v20+) and sync (older) versions
+                import asyncio
+                import inspect
+
+                send_result = self.bot.send_message(
                     chat_id=self.chat_id,
                     text=text,
                     parse_mode=parse_mode,
                     disable_web_page_preview=disable_web_page_preview
                 )
+
+                # If it's a coroutine (async), run it with asyncio
+                if inspect.iscoroutine(send_result):
+                    try:
+                        loop = asyncio.get_event_loop()
+                        if loop.is_closed():
+                            loop = asyncio.new_event_loop()
+                            asyncio.set_event_loop(loop)
+                        message = loop.run_until_complete(send_result)
+                    except RuntimeError:
+                        # No event loop, create new one
+                        loop = asyncio.new_event_loop()
+                        asyncio.set_event_loop(loop)
+                        message = loop.run_until_complete(send_result)
+                else:
+                    message = send_result
+
                 logger.info(f"Telegram message sent successfully: {message.message_id}")
                 return str(message.message_id)
 

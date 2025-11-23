@@ -1,0 +1,115 @@
+# External service configurations
+# API keys should be in environment variables, not here
+
+services:
+  robinhood:
+    # Rate limiting
+    rate_limit: 60  # requests per minute
+    timeout: 30  # seconds
+    retry_attempts: 3
+    retry_delay: 2  # seconds
+
+    # Connection settings
+    connection_pool_size: 5
+    max_session_duration: 3600  # 1 hour
+
+  llm:
+    # LLM Provider configurations
+    providers:
+      claude:
+        model: "claude-sonnet-4-5"
+        max_tokens: 4000
+        temperature: 0.7
+        timeout: 60
+
+      deepseek:
+        model: "deepseek-chat"
+        max_tokens: 4000
+        temperature: 0.7
+        timeout: 60
+
+      gemini:
+        model: "gemini-2.5-flash"
+        max_tokens: 4000
+        temperature: 0.7
+        timeout: 60
+
+      openai:
+        model: "gpt-4o"
+        max_tokens: 4000
+        temperature: 0.7
+        timeout: 60
+
+    # Response caching
+    cache_responses: true
+    cache_ttl: 3600  # 1 hour
+
+    # Rate limiting
+    max_requests_per_minute: 20
+
+  yfinance:
+    # Yahoo Finance settings
+    timeout: 10
+    max_retries: 3
+    cache_ttl: 300  # 5 minutes
+
+    # Historical data
+    default_period: "1mo"
+    default_interval: "1d"
+
+  tradingview:
+    # TradingView sync settings
+    sync_interval: 3600  # 1 hour
+    timeout: 30
+    max_retries: 3
+
+    # Watchlist settings
+    max_watchlists: 20
+    max_symbols_per_watchlist: 500
+
+  xtrades:
+    # Xtrades integration settings
+    scrape_interval: 3600  # 1 hour
+    timeout: 60
+    max_retries: 3
+
+    # Profile settings
+    max_profiles_to_follow: 50
+    max_alerts_per_sync: 1000
+
+  kalshi:
+    # Kalshi prediction markets
+    api_base_url: "https://trading-api.kalshi.com/v2"
+    timeout: 30
+    max_retries: 3
+
+    # Market data refresh
+    refresh_interval: 300  # 5 minutes
+
+  polygon:
+    # Polygon.io settings
+    timeout: 15
+    max_retries: 3
+    rate_limit: 5  # requests per second
+
+  finnhub:
+    # Finnhub API settings
+    timeout: 15
+    max_retries: 3
+    rate_limit: 60  # requests per minute
+
+  news:
+    # News aggregation settings
+    max_articles_per_symbol: 20
+    cache_ttl: 1800  # 30 minutes
+    sources: ["finnhub", "polygon"]
+
+  telegram:
+    # Telegram bot settings
+    timeout: 30
+    max_retries: 3
+    rate_limit: 30  # messages per second
+
+    # Message settings
+    max_message_length: 4096
+    parse_mode: "Markdown"

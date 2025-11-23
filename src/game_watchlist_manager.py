@@ -10,6 +10,7 @@ from typing import List, Dict, Optional
 import psycopg2
 import psycopg2.extras
 from src.kalshi_db_manager import KalshiDBManager
+from src.telegram_notifier import TelegramNotifier
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +33,7 @@ class GameWatchlistManager:
 
     def __init__(self, db_manager: KalshiDBManager = None):
         self.db = db_manager or KalshiDBManager()
+        self.telegram = TelegramNotifier()
         self._create_watchlist_tables()
 
     def _create_watchlist_tables(self):
@@ -53,8 +55,27 @@ class GameWatchlistManager:
                     home_team TEXT,
                     selected_team TEXT,
                     added_at TIMESTAMP DEFAULT NOW(),
-                    is_active BOOLEAN DEFAULT TRUE
+                    is_active BOOLEAN DEFAULT TRUE,
+                    entry_price NUMERIC,
+                    entry_team TEXT,
+                    position_size NUMERIC DEFAULT 0,
+                    last_pnl_percent NUMERIC
                 )
+            """)
+            
+            # Add last_pnl_percent column if it doesn't exist
+            cur.execute("""
+                DO $$
+                BEGIN
+                    IF NOT EXISTS (
+                        SELECT 1 FROM information_schema.columns
+                        WHERE table_name = 'game_watchlist'
+                        AND column_name = 'last_pnl_percent'
+                    ) THEN
+                        ALTER TABLE game_watchlist
+                        ADD COLUMN last_pnl_percent NUMERIC;
+                    END IF;
+                END $$;
             """)
 
             # Drop old unique constraint if it exists and add new composite one
@@ -165,6 +186,10 @@ class GameWatchlistManager:
 
             conn.commit()
             logger.info(f"Added game {game_id} to watchlist for user {user_id}")
+
+            # Send Telegram notification
+            self._send_subscription_alert(game)
+
             return True
 
         except Exception as e:
@@ -177,6 +202,93 @@ class GameWatchlistManager:
                 cur.close()
             if conn:
                 conn.close()
+
+    def _send_subscription_alert(self, game: Dict) -> None:
+        """Send Telegram alert when user subscribes to a game"""
+        try:
+            away_team = game.get('away_team', 'TBD')
+            home_team = game.get('home_team', 'TBD')
+            status = game.get('status', 'Scheduled')
+            away_score = game.get('away_score', 0)
+            home_score = game.get('home_score', 0)
+            game_date = game.get('game_date', 'TBD')
+            sport = game.get('sport', 'NFL')
+
+            # Build nice game alert message
+            message = f"🏈 **GAME SUBSCRIPTION CONFIRMED**\n\n"
+            message += f"**{away_team}** @ **{home_team}**\n\n"
+
+            if status.lower() in ['live', 'in progress']:
+                message += f"📊 Live Score: {away_score} - {home_score}\n"
+                message += f"📺 Status: {status}\n"
+
+                # Enhanced live game data
+                possession = game.get('possession', '')
+                down_distance = game.get('down_distance', '')
+                is_red_zone = game.get('is_red_zone', False)
+                home_timeouts = game.get('home_timeouts', 3)
+                away_timeouts = game.get('away_timeouts', 3)
+                last_play = game.get('last_play', '')
+
+                if possession:
+                    message += f"🏈 Possession: {possession}\n"
+                if down_distance:
+                    redzone_emoji = "🔴 " if is_red_zone else ""
+                    message += f"{redzone_emoji}Down & Distance: {down_distance}\n"
+                if last_play:
+                    message += f"📝 Last Play: {last_play[:100]}\n"
+
+                # Timeouts
+                message += f"\n⏱️ Timeouts:\n"
+                message += f"{away_team}: {'●' * away_timeouts}{'○' * (3 - away_timeouts)}\n"
+                message += f"{home_team}: {'●' * home_timeouts}{'○' * (3 - home_timeouts)}\n"
+
+                # Leaders
+                passing_leader = game.get('passing_leader')
+                rushing_leader = game.get('rushing_leader')
+                if passing_leader or rushing_leader:
+                    message += f"\n📊 Game Leaders:\n"
+                    if passing_leader:
+                        message += f"🎯 Passing: {passing_leader.get('name')} - {passing_leader.get('stats')}\n"
+                    if rushing_leader:
+                        message += f"🏃 Rushing: {rushing_leader.get('name')} - {rushing_leader.get('stats')}\n"
+
+                message += "\n"
+            else:
+                message += f"📅 {game_date}\n"
+                message += f"📺 Status: {status}\n"
+
+                # Venue and broadcast info for upcoming games
+                venue = game.get('venue', '')
+                broadcast = game.get('broadcast', '')
+                if venue:
+                    message += f"🏟️ Venue: {venue}\n"
+                if broadcast:
+                    message += f"📺 TV: {broadcast}\n"
+
+                message += "\n"
+
+            message += f"You'll receive notifications for:\n"
+            message += f"• Score updates\n"
+            message += f"• Quarter changes\n"
+            message += f"• Game status changes\n"
+            message += f"• AI prediction updates\n\n"
+
+            # Add AI prediction if available
+            if game.get('ai_prediction'):
+                pred = game['ai_prediction']
+                message += f"🤖 **Multi-Agent AI Analysis**\n"
+                message += f"🎯 Prediction: {pred.get('predicted_winner', 'N/A')} {pred.get('point_spread', '')}\n"
+                message += f"✅ {pred.get('win_probability', 0):.0f}% win probability\n"
+                message += f"💡 {pred.get('confidence', 'Medium')} Confidence\n\n"
+
+            message += f"**Powered by Magnus {sport} Tracker**"
+
+            self.telegram.send_custom_message(message)
+            logger.info(f"Sent subscription alert for game: {away_team} @ {home_team}")
+
+        except Exception as e:
+            logger.error(f"Error sending subscription alert: {e}")
 
     def remove_game_from_watchlist(self, user_id: str, game_id: str) -> bool:
         """Remove a game from user's watchlist"""
@@ -228,7 +340,23 @@ class GameWatchlistManager:
 
             watchlist = cur.fetchall()
 
-            return [dict(row) for row in watchlist]
+            # Convert to list of dicts with game_data field for compatibility
+            result = []
+            for row in watchlist:
+                row_dict = dict(row)
+                # Create game_data structure for UI display
+                row_dict['game_data'] = {
+                    'away_team': row_dict.get('away_team', 'Away'),
+                    'home_team': row_dict.get('home_team', 'Home'),
+                    'away_score': 0,  # Will be updated by live data
+                    'home_score': 0,
+                    'status_detail': 'Scheduled',
+                    'is_live': False,
+                    'is_completed': False
+                }
+                result.append(row_dict)
+
+            return result
 
         except Exception as e:
             logger.error(f"Error getting watchlist: {e}")
@@ -261,6 +389,79 @@ class GameWatchlistManager:
 
         except Exception as e:
             logger.error(f"Error checking watchlist: {e}")
+            return False
+        finally:
+            if cur:
+                cur.close()
+            if conn:
+                conn.close()
+
+    def get_watchlist_entry(self, user_id: str, game_id: str) -> Optional[Dict]:
+        """Get a specific watchlist entry with position data"""
+        conn = None
+        cur = None
+        try:
+            if not game_id or str(game_id).strip() == '':
+                return None
+
+            conn = self.db.get_connection()
+            cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+            cur.execute("""
+                SELECT * FROM game_watchlist
+                WHERE user_id = %s AND game_id = %s AND is_active = TRUE
+                LIMIT 1
+            """, (user_id, str(game_id)))
+
+            row = cur.fetchone()
+            return dict(row) if row else None
+
+        except Exception as e:
+            logger.error(f"Error getting watchlist entry: {e}")
+            return None
+        finally:
+            if cur:
+                cur.close()
+            if conn:
+                conn.close()
+
+    def update_position(self, user_id: str, game_id: str, entry_price: float, entry_team: str) -> bool:
+        """Update position tracking data for a watched game"""
+        conn = None
+        cur = None
+        try:
+            if not game_id or str(game_id).strip() == '':
+                return False
+
+            conn = self.db.get_connection()
+            cur = conn.cursor()
+
+            # First ensure the game is in watchlist
+            cur.execute("""
+                SELECT id FROM game_watchlist
+                WHERE user_id = %s AND game_id = %s AND is_active = TRUE
+                LIMIT 1
+            """, (user_id, str(game_id)))
+
+            if not cur.fetchone():
+                logger.warning(f"Game {game_id} not in watchlist, cannot update position")
+                return False
+
+            # Update position data
+            cur.execute("""
+                UPDATE game_watchlist
+                SET entry_price = %s, entry_team = %s
+                WHERE user_id = %s AND game_id = %s AND is_active = TRUE
+            """, (entry_price, entry_team, user_id, str(game_id)))
+
+            conn.commit()
+            logger.info(f"Updated position for game {game_id}: {entry_team} @ {entry_price}¢")
+            return True
+
+        except Exception as e:
+            logger.error(f"Error updating position: {e}")
+            if conn:
+                conn.rollback()
             return False
         finally:
             if cur:
@@ -575,6 +776,109 @@ class GameWatchlistManager:
             logger.error(f"Error cleaning up old games: {e}")
             if conn:
                 conn.rollback()
+        finally:
+            if cur:
+                cur.close()
+            if conn:
+                conn.close()
+
+    def cleanup_finished_games(self, user_id: str, minutes_after_completion: int = 30) -> int:
+        """
+        Auto-cleanup: Remove finished games from user's watchlist after specified time
+
+        Args:
+            user_id: User identifier
+            minutes_after_completion: Minutes to wait after game completion before removing (default: 30)
+
+        Returns:
+            Number of games removed
+        """
+        conn = None
+        cur = None
+        try:
+            conn = self.db.get_connection()
+            cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+            # Get user's active watchlist
+            cur.execute("""
+                SELECT game_id, sport FROM game_watchlist
+                WHERE user_id = %s AND is_active = TRUE
+            """, (user_id,))
+
+            watched_games = cur.fetchall()
+
+            if not watched_games:
+                return 0
+
+            # Check each game's status from ESPN
+            from src.espn_live_data import get_espn_client
+            from src.espn_ncaa_live_data import get_espn_ncaa_client
+
+            removed_count = 0
+
+            for game_row in watched_games:
+                game_id = game_row['game_id']
+                sport = game_row.get('sport', 'NFL')
+
+                try:
+                    # Fetch live game data
+                    if sport == 'CFB':
+                        espn = get_espn_ncaa_client()
+                        games = espn.get_scoreboard(group='80')
+                    else:
+                        espn = get_espn_client()
+                        games = espn.get_scoreboard()
+
+                    # Find the game
+                    game_found = False
+                    game_completed = False
+                    completion_time = None
+
+                    for live_game in games:
+                        if str(live_game.get('game_id', '')) == str(game_id):
+                            game_found = True
+                            # Check if completed
+                            if live_game.get('is_completed', False) or 'STATUS_FINAL' in str(live_game.get('status', '')):
+                                game_completed = True
+                                # Get completion time from game state history
+                                last_state = self.get_last_game_state(game_id)
+                                if last_state:
+                                    completion_time = last_state.get('timestamp')
+                            break
+
+                    # Remove if completed AND past the wait time, or not found (game is old)
+                    should_remove = False
+
+                    if not game_found:
+                        should_remove = True  # Game not found, likely old
+                    elif game_completed and completion_time:
+                        # Check if enough time has passed since completion
+                        from datetime import timedelta
+                        time_since_completion = datetime.now() - completion_time
+                        if time_since_completion > timedelta(minutes=minutes_after_completion):
+                            should_remove = True
+
+                    if should_remove:
+                        cur.execute("""
+                            UPDATE game_watchlist
+                            SET is_active = FALSE
+                            WHERE user_id = %s AND game_id = %s
+                        """, (user_id, game_id))
+                        removed_count += 1
+                        logger.info(f"Auto-removed finished game {game_id} from watchlist ({minutes_after_completion} minutes after completion)")
+
+                except Exception as e:
+                    logger.warning(f"Could not check game status for {game_id}: {e}")
+                    continue
+
+            conn.commit()
+            return removed_count
+
+        except Exception as e:
+            logger.error(f"Error cleaning up finished games: {e}")
+            if conn:
+                conn.rollback()
+            return 0
         finally:
             if cur:
                 cur.close()

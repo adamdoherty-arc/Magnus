@@ -18,6 +18,7 @@ from datetime import datetime
 import math
 import json
 import os
+from thefuzz import fuzz, process
 
 from .base_predictor import BaseSportsPredictor
 
@@ -94,6 +95,20 @@ class NCAAPredictor(BaseSportsPredictor):
         # Add more teams as needed
     }
 
+    # Common mascots to remove from team names
+    MASCOTS = [
+        'seminoles', 'wolfpack', 'buckeyes', 'wolverines', 'broncos',
+        'bulldogs', 'tigers', 'bears', 'wildcats', 'eagles', 'hawks',
+        'panthers', 'lions', 'aggies', 'cowboys', 'knights', 'trojans',
+        'spartans', 'huskies', 'crimson', 'tide', 'gators', 'gamecocks',
+        'volunteers', 'rebels', 'commodores', 'razorbacks', 'sooners',
+        'longhorns', 'horns', 'hurricanes', 'hokies', 'cardinals', 'rams',
+        'ducks', 'beavers', 'cougars', 'utes', 'scarlet knights', 'nittany lions',
+        '49ers', 'golden eagles', 'blue devils', 'demon deacons', 'yellow jackets',
+        'fighting irish', 'black knights', 'midshipmen', 'red raiders', 'mountaineers',
+        'jayhawks', 'cyclones', 'horned frogs'
+    ]
+
     def __init__(self, db_config: Optional[Dict] = None):
         """
         Initialize NCAA predictor.
@@ -109,11 +124,55 @@ class NCAAPredictor(BaseSportsPredictor):
         self.recruiting_rankings = {}  # Team -> recruiting score
         self.coaching_data = {}  # Team -> coach info
         self.conference_map = {}  # Team -> conference
+        self.team_name_cache = {}  # Cache for fuzzy-matched team names
 
         # Load initial data
         self._load_team_data()
         self._load_elo_ratings()
         self._load_recruiting_data()
+
+    def _find_best_team_match(self, team_name: str, search_dict: Dict[str, Any], threshold: int = 60) -> Optional[str]:
+        """
+        Use fuzzy matching to find the best team name match in a dictionary.
+
+        Args:
+            team_name: Team name from ESPN (e.g., "Florida State Seminoles")
+            search_dict: Dictionary to search (e.g., self.elo_ratings)
+            threshold: Minimum similarity score (0-100)
+
+        Returns:
+            Best matching key from search_dict, or None if no good match
+        """
+        if not team_name or not search_dict:
+            return None
+
+        # Check cache first
+        cache_key = f"{team_name}:{id(search_dict)}"
+        if cache_key in self.team_name_cache:
+            return self.team_name_cache[cache_key]
+
+        # Try exact match first (fast path)
+        if team_name in search_dict:
+            self.team_name_cache[cache_key] = team_name
+            return team_name
+
+        # Use fuzzy matching to find best match
+        # process.extractOne returns (match, score, key)
+        result = process.extractOne(
+            team_name,
+            search_dict.keys(),
+            scorer=fuzz.token_sort_ratio  # Handles word order differences
+        )
+
+        if result and result[1] >= threshold:
+            best_match = result[0]
+            self.logger.debug(f"Fuzzy matched '{team_name}' -> '{best_match}' (score: {result[1]})")
+            self.team_name_cache[cache_key] = best_match
+            return best_match
+
+        # No good match found
+        self.logger.warning(f"No fuzzy match found for '{team_name}' (threshold: {threshold})")
+        return None
 
     def _load_team_data(self):
         """Load NCAA team data (conferences, divisions)."""
@@ -234,7 +293,7 @@ class NCAAPredictor(BaseSportsPredictor):
 
     def get_conference_power(self, team: str) -> float:
         """
-        Get conference power rating for a team.
+        Get conference power rating for a team (with fuzzy matching).
 
         Args:
             team: Team name
@@ -242,12 +301,16 @@ class NCAAPredictor(BaseSportsPredictor):
         Returns:
             Conference power multiplier (0.4-1.0)
         """
-        conference = self.conference_map.get(team, 'FCS')
+        # Try fuzzy match if exact match fails
+        matched_team = self._find_best_team_match(team, self.conference_map, threshold=60)
+        team_key = matched_team if matched_team else team
+
+        conference = self.conference_map.get(team_key, 'FCS')
         return self.CONFERENCE_POWER.get(conference, 0.50)
 
     def get_recruiting_score(self, team: str) -> float:
         """
-        Get recruiting ranking score for a team.
+        Get recruiting ranking score for a team (with fuzzy matching).
 
         Args:
             team: Team name
@@ -255,11 +318,15 @@ class NCAAPredictor(BaseSportsPredictor):
         Returns:
             Recruiting score (0-100, higher is better)
         """
-        return self.recruiting_rankings.get(team, 50.0)  # Default to average
+        # Try fuzzy match if exact match fails
+        matched_team = self._find_best_team_match(team, self.recruiting_rankings, threshold=60)
+        team_key = matched_team if matched_team else team
+
+        return self.recruiting_rankings.get(team_key, 50.0)  # Default to average
 
     def get_team_strength(self, team: str) -> Dict[str, Any]:
         """
-        Get team strength metrics.
+        Get team strength metrics (with fuzzy matching).
 
         Args:
             team: Team name
@@ -267,7 +334,11 @@ class NCAAPredictor(BaseSportsPredictor):
         Returns:
             Dictionary with offensive rank, defensive rank, recent form
         """
-        return self.TEAM_STRENGTHS.get(team, {
+        # Try fuzzy match if exact match fails
+        matched_team = self._find_best_team_match(team, self.TEAM_STRENGTHS, threshold=60)
+        team_key = matched_team if matched_team else team
+
+        return self.TEAM_STRENGTHS.get(team_key, {
             'offense': 50,  # Average for FBS
             'defense': 50,
             'form': 2
@@ -321,30 +392,51 @@ class NCAAPredictor(BaseSportsPredictor):
         Predict winner of NCAA football game.
 
         Args:
-            home_team: Home team name
-            away_team: Away team name
+            home_team: Home team name (may include mascot)
+            away_team: Away team name (may include mascot)
             game_date: Date/time of game
             **kwargs: Additional parameters (crowd_size, bowl_game, etc.)
 
         Returns:
             Prediction dictionary with winner, probability, confidence, etc.
         """
-        # Check cache first
-        cache_key = self.create_cache_key(home_team, away_team, game_date)
+        # Use fuzzy matching to find best match for team names
+        # ESPN sends "Florida State Seminoles", we need to match to "Florida State"
+        home_team_matched = self._find_best_team_match(home_team, self.elo_ratings)
+        away_team_matched = self._find_best_team_match(away_team, self.elo_ratings)
+
+        # Use original names for display, matched names for lookups
+        home_team_display = home_team
+        away_team_display = away_team
+
+        # Use matched names if found, otherwise use original
+        home_team_lookup = home_team_matched if home_team_matched else home_team
+        away_team_lookup = away_team_matched if away_team_matched else away_team
+
+        # Check cache first (use matched names)
+        cache_key = self.create_cache_key(home_team_lookup, away_team_lookup, game_date)
         cached = self.get_cached_prediction(cache_key)
         if cached:
+            # Update cached prediction with display names
+            cached['winner'] = home_team_display if cached.get('winner') == home_team_lookup else away_team_display
             return cached
 
-        # Calculate features
-        features = self.calculate_features(home_team, away_team, game_date)
+        # Calculate features (use matched names)
+        features = self.calculate_features(home_team_lookup, away_team_lookup, game_date)
 
-        # Get Elo-based probability
-        home_elo = self.elo_ratings.get(home_team, self.ELO_BASE)
-        away_elo = self.elo_ratings.get(away_team, self.ELO_BASE)
+        # Get Elo-based probability (use matched names)
+        home_elo = self.elo_ratings.get(home_team_lookup, self.ELO_BASE)
+        away_elo = self.elo_ratings.get(away_team_lookup, self.ELO_BASE)
 
-        # Adjust for conference strength
-        home_conf_power = self.get_conference_power(home_team)
-        away_conf_power = self.get_conference_power(away_team)
+        # Log if using default Elo (indicates no match found)
+        if home_elo == self.ELO_BASE and home_team_matched is None:
+            self.logger.warning(f"Using default Elo for home team '{home_team}' (no match found)")
+        if away_elo == self.ELO_BASE and away_team_matched is None:
+            self.logger.warning(f"Using default Elo for away team '{away_team}' (no match found)")
+
+        # Adjust for conference strength (use matched names)
+        home_conf_power = self.get_conference_power(home_team_lookup)
+        away_conf_power = self.get_conference_power(away_team_lookup)
 
         # Conference adjustment to Elo
         conf_diff = (home_conf_power - away_conf_power) * 100  # ~100 Elo points max
@@ -360,16 +452,16 @@ class NCAAPredictor(BaseSportsPredictor):
         # Calculate base probability
         base_prob = self._calculate_elo_win_prob(adjusted_home_elo, away_elo)
 
-        # Adjust for recruiting (talent gap)
-        recruiting_adjustment = self._calculate_recruiting_impact(home_team, away_team)
+        # Adjust for recruiting (talent gap) - use matched names
+        recruiting_adjustment = self._calculate_recruiting_impact(home_team_lookup, away_team_lookup)
 
-        # Adjust for momentum
-        momentum_adjustment = self._calculate_momentum_adjustment(home_team, away_team)
+        # Adjust for momentum - use matched names
+        momentum_adjustment = self._calculate_momentum_adjustment(home_team_lookup, away_team_lookup)
 
         adjusted_prob = base_prob + recruiting_adjustment + momentum_adjustment
 
-        # Adjust for rivalry games (closer, more intense)
-        if self.is_rivalry_game(home_team, away_team):
+        # Adjust for rivalry games (closer, more intense) - use matched names
+        if self.is_rivalry_game(home_team_lookup, away_team_lookup):
             # Regress toward 50%
             adjusted_prob = 0.5 + (adjusted_prob - 0.5) * 0.75
             is_rivalry = True
@@ -387,9 +479,9 @@ class NCAAPredictor(BaseSportsPredictor):
         # Ensure probability is in valid range
         adjusted_prob = max(0.01, min(0.99, adjusted_prob))
 
-        # Determine winner
-        winner = home_team if adjusted_prob >= 0.5 else away_team
-        win_prob = adjusted_prob if winner == home_team else (1 - adjusted_prob)
+        # Determine winner (use display names for output)
+        winner = home_team_display if adjusted_prob >= 0.5 else away_team_display
+        win_prob = adjusted_prob if adjusted_prob >= 0.5 else (1 - adjusted_prob)
 
         # Calculate confidence
         confidence = self.get_confidence(adjusted_prob)
@@ -420,8 +512,8 @@ class NCAAPredictor(BaseSportsPredictor):
             'explanation': self._generate_explanation(
                 winner,
                 win_prob,
-                home_team,
-                away_team,
+                home_team_display,
+                away_team_display,
                 features,
                 is_rivalry
             )

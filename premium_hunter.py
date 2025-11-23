@@ -124,7 +124,6 @@ else:
         high_iv = len(df[df['IV'] > 0.40])
         st.metric("High IV (>40%)", high_iv)
 
-    st.markdown("---")
 
     # Format display dataframe
     display_df = df.copy()
@@ -172,7 +171,6 @@ else:
     )
 
     # Best opportunities highlight
-    st.markdown("---")
     st.markdown("### ⭐ Top 10 Best Opportunities")
 
     top_10 = display_df.head(10)[key_cols]
@@ -207,5 +205,4 @@ if st.button("🔄 Refresh Data"):
     st.rerun()
 
 # Footer
-st.markdown("---")
 st.caption("💡 Best Practice: Target 30 delta for ~70% win rate | 30-45 DTE for optimal theta decay | High IV = Higher premiums")

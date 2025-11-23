@@ -1,0 +1,127 @@
+{
+  "mcpServers": {
+    "orchestrator": {
+      "command": "python",
+      "args": [".claude/orchestrator/mcp_server.py"],
+      "description": "Main orchestrator MCP server for request validation and QA",
+      "tools": [
+        {
+          "name": "validate_request",
+          "description": "Validate request against project rules before execution",
+          "auto_run": true
+        },
+        {
+          "name": "run_qa",
+          "description": "Run QA checks on modified files",
+          "auto_run": true
+        },
+        {
+          "name": "get_feature_context",
+          "description": "Get feature context and specs for files",
+          "auto_run": true
+        }
+      ]
+    },
+    "playwright": {
+      "command": "npx",
+      "args": ["@playwright/mcp"],
+      "description": "Microsoft Playwright MCP for automated UI testing",
+      "install_command": "npm install @playwright/mcp && npx playwright install",
+      "tools": [
+        {
+          "name": "navigate",
+          "description": "Navigate to a URL and capture accessibility tree"
+        },
+        {
+          "name": "click",
+          "description": "Click an element on the page"
+        },
+        {
+          "name": "fill",
+          "description": "Fill a form field"
+        },
+        {
+          "name": "screenshot",
+          "description": "Take a screenshot of the page"
+        },
+        {
+          "name": "execute_test",
+          "description": "Execute a Playwright test script"
+        }
+      ]
+    },
+    "github": {
+      "command": "npx",
+      "args": ["@modelcontextprotocol/server-github"],
+      "description": "GitHub MCP for PR management and CI integration",
+      "install_command": "npm install @modelcontextprotocol/server-github",
+      "env": {
+        "GITHUB_TOKEN": "${GITHUB_TOKEN}"
+      },
+      "tools": [
+        {
+          "name": "create_pull_request",
+          "description": "Create a new pull request"
+        },
+        {
+          "name": "review_pr",
+          "description": "Add review comments to a PR"
+        },
+        {
+          "name": "trigger_ci",
+          "description": "Trigger CI workflow"
+        },
+        {
+          "name": "get_issues",
+          "description": "List repository issues"
+        },
+        {
+          "name": "create_issue",
+          "description": "Create a new issue"
+        }
+      ]
+    },
+    "sequential-thinking": {
+      "command": "npx",
+      "args": ["@modelcontextprotocol/server-sequential-thinking"],
+      "description": "Sequential thinking MCP for complex problem-solving",
+      "install_command": "npm install @modelcontextprotocol/server-sequential-thinking",
+      "tools": [
+        {
+          "name": "think_step_by_step",
+          "description": "Break down complex problems into structured steps",
+          "auto_run_for": ["complex_analysis", "multi_feature_changes", "architecture_design"]
+        }
+      ]
+    },
+    "memory-bank": {
+      "command": "npx",
+      "args": ["@modelcontextprotocol/server-memory"],
+      "description": "Memory bank MCP for context persistence across sessions",
+      "install_command": "npm install @modelcontextprotocol/server-memory",
+      "tools": [
+        {
+          "name": "store_context",
+          "description": "Store context across sessions"
+        },
+        {
+          "name": "recall_context",
+          "description": "Recall stored context",
+          "auto_run": true
+        },
+        {
+          "name": "update_context",
+          "description": "Update existing context"
+        },
+        {
+          "name": "search_context",
+          "description": "Search through stored context"
+        }
+      ]
+    }
+  },
+  "installation_instructions": {
+    "install_all": "npm install @playwright/mcp @modelcontextprotocol/server-github @modelcontextprotocol/server-sequential-thinking @modelcontextprotocol/server-memory && npx playwright install",
+    "verify": "Run orchestrator test suite to verify all MCP servers are accessible"
+  }
+}

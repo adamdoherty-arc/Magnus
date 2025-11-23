@@ -82,7 +82,9 @@
       "Bash(if [ -f .env ])",
       "Bash(then grep -i kalshi .env)",
       "Bash(else echo \".env file not found\")",
-      "Bash(context_request.json)"
+      "Bash(context_request.json)",
+      "SlashCommand(/check-rules Before we start make sure this is using the new orchestration agent)",
+      "SlashCommand(/check-rules:*)"
     ],
     "deny": [],
     "ask": []

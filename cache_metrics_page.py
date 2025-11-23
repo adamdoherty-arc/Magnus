@@ -68,7 +68,6 @@ def show_cache_metrics():
             delta=f"Running"
         )
 
-    st.markdown("---")
 
     # Detailed Statistics
     st.markdown("### 📈 Detailed Statistics")
@@ -110,7 +109,6 @@ def show_cache_metrics():
 
         st.dataframe(impact_data, hide_index=True, use_container_width=True)
 
-    st.markdown("---")
 
     # Cache Status by Page
     st.markdown("### 📄 Cache Status by Feature")
@@ -138,7 +136,6 @@ def show_cache_metrics():
         use_container_width=True
     )
 
-    st.markdown("---")
 
     # Actions
     st.markdown("### ⚙️ Cache Management")
@@ -181,7 +178,6 @@ def show_cache_metrics():
                 time.sleep(1)
                 st.rerun()
 
-    st.markdown("---")
 
     # Best Practices
     with st.expander("💡 Cache Optimization Tips"):

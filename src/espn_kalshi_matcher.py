@@ -130,14 +130,20 @@ class ESPNKalshiMatcher:
         away_variations = self.get_team_variations(away_team)
         home_variations = self.get_team_variations(home_team)
 
-        # Extract date from game_time (format: "YYYY-MM-DD HH:MM")
+        # Extract date from game_time (can be datetime object or string)
         try:
             if game_time:
-                game_date = datetime.strptime(game_time[:10], '%Y-%m-%d').date()
+                if isinstance(game_time, datetime):
+                    game_date = game_time.date()
+                elif isinstance(game_time, str):
+                    game_date = datetime.strptime(game_time[:10], '%Y-%m-%d').date()
+                else:
+                    game_date = datetime.now().date()
             else:
                 # If no game time, use today
                 game_date = datetime.now().date()
-        except:
+        except Exception as e:
+            logger.warning(f"Could not parse game_time {game_time}: {e}")
             game_date = datetime.now().date()
 
         # Query Kalshi database for matching market
@@ -163,15 +169,30 @@ class ESPNKalshiMatcher:
                         no_price,
                         volume,
                         close_time,
-                        market_type
+                        market_type,
+                        raw_data->>'expected_expiration_time' as game_time_str
                     FROM kalshi_markets
                     WHERE
                         (
                             title ILIKE %s AND title ILIKE %s
                         )
-                        AND market_type IN ('nfl', 'cfb', 'winner')
-                        AND close_time >= %s
-                        AND close_time <= %s
+                        AND (
+                            market_type IN ('nfl', 'cfb', 'winner', 'all')
+                            OR raw_data->>'market_type' IN ('nfl', 'cfb', 'winner')
+                            OR ticker LIKE 'KXNFLGAME%%'
+                            OR ticker LIKE 'KXNCAAFGAME%%'
+                        )
+                        AND (
+                            -- Match by expected_expiration_time (actual game time) if available
+                            (raw_data->>'expected_expiration_time' IS NOT NULL
+                             AND (raw_data->>'expected_expiration_time')::timestamp >= %s
+                             AND (raw_data->>'expected_expiration_time')::timestamp <= %s)
+                            OR
+                            -- Fallback to close_time for older data
+                            (raw_data->>'expected_expiration_time' IS NULL
+                             AND close_time >= %s
+                             AND close_time <= %s)
+                        )
                         AND status != 'closed'
                         AND yes_price IS NOT NULL
                     ORDER BY volume DESC, close_time ASC
@@ -181,8 +202,10 @@ class ESPNKalshiMatcher:
                     cur.execute(query, (
                         f'%{away_var}%',
                         f'%{home_var}%',
-                        date_start,
-                        date_end
+                        date_start,  # For expected_expiration_time start
+                        date_end,    # For expected_expiration_time end
+                        date_start,  # For close_time start (fallback)
+                        date_end     # For close_time end (fallback)
                     ))
 
                     result = cur.fetchone()
@@ -195,12 +218,32 @@ class ESPNKalshiMatcher:
 
             if result:
                 # Determine which team is "yes" and which is "no"
-                ticker = result['ticker'].lower()
+                ticker = result['ticker']
                 title = result['title'].lower()
 
-                # Check if away team is in the "yes" position
-                away_is_yes = away_team.lower() in ticker or \
-                             (ticker.startswith('nfl') and away_team.split()[-1].lower() in ticker)
+                # Parse ticker to find which team is the "yes" option
+                # Kalshi tickers end with team abbreviation: KXNFLGAME-25NOV17DALLV-DAL or -LV
+                ticker_suffix = ticker.split('-')[-1].lower() if '-' in ticker else ''
+
+                # Get team name variations for matching
+                away_variations = [v.lower() for v in self.get_team_variations(away_team)]
+                home_variations = [v.lower() for v in self.get_team_variations(home_team)]
+
+                # Check if ticker suffix matches away team or home team
+                away_is_yes = False
+                if ticker_suffix:
+                    # Check if suffix matches any away team variation
+                    for var in away_variations:
+                        if ticker_suffix == var.lower() or ticker_suffix in var.lower():
+                            away_is_yes = True
+                            break
+
+                    # If not matched to away, check home team
+                    if not away_is_yes:
+                        for var in home_variations:
+                            if ticker_suffix == var.lower() or ticker_suffix in var.lower():
+                                away_is_yes = False
+                                break
 
                 if away_is_yes:
                     away_price = result['yes_price']
@@ -221,13 +264,13 @@ class ESPNKalshiMatcher:
             return None
 
         except Exception as e:
-            logger.error(f"Error matching game to Kalshi: {e}")
+            logger.error(f"Error matching game to Kalshi: {e}", exc_info=True)
             return None
         finally:
             if cur:
                 cur.close()
             if conn:
-                conn.close()
+                self.db.release_connection(conn)
 
     def enrich_espn_games_with_kalshi(self, espn_games: List[Dict]) -> List[Dict]:
         """
@@ -351,6 +394,85 @@ def enrich_games_with_kalshi_odds(espn_games: List[Dict]) -> List[Dict]:
     """
     matcher = ESPNKalshiMatcher()
     return matcher.enrich_espn_games_with_kalshi(espn_games)
+
+
+def enrich_games_with_kalshi_odds_nba(nba_games: List[Dict]) -> List[Dict]:
+    """
+    Enrich NBA games with Kalshi odds
+
+    Args:
+        nba_games: List of NBA game dicts from ESPN
+
+    Returns:
+        Same list with kalshi_odds added
+    """
+    from src.kalshi_db_manager import KalshiDBManager
+
+    db = KalshiDBManager()
+    conn = None
+    cur = None
+
+    try:
+        conn = db.get_connection()
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+        enriched = []
+        for game in nba_games:
+            away_team = game.get('away_team', '')
+            home_team = game.get('home_team', '')
+
+            # Query for NBA Kalshi markets for this matchup
+            # NBA markets use format like: KXNBAGAME-25NOV19NYKDAL-NYK
+            cur.execute("""
+                SELECT *
+                FROM kalshi_markets
+                WHERE status = 'active'
+                AND ticker LIKE 'KXNBAGAME%%'
+                AND (title ILIKE %s OR title ILIKE %s)
+                ORDER BY volume DESC NULLS LAST
+                LIMIT 1
+            """, (f'%{away_team}%', f'%{home_team}%'))
+
+            market = cur.fetchone()
+
+            if market and market.get('yes_price') is not None:
+                # Determine which team is "yes" based on ticker suffix
+                ticker = market['ticker']
+                ticker_suffix = ticker.split('-')[-1].lower() if '-' in ticker else ''
+
+                # Simple matching: if suffix contains team abbreviation, that's the "yes" team
+                away_abbr = game.get('away_abbr', '').lower()
+                home_abbr = game.get('home_abbr', '').lower()
+
+                # Check which team is "yes"
+                if ticker_suffix == away_abbr or away_abbr in ticker_suffix:
+                    away_price = float(market['yes_price']) if market['yes_price'] else 0
+                    home_price = float(market['no_price']) if market['no_price'] else 0
+                else:
+                    away_price = float(market['no_price']) if market['no_price'] else 0
+                    home_price = float(market['yes_price']) if market['yes_price'] else 0
+
+                game['kalshi_odds'] = {
+                    'away_win_price': away_price,
+                    'home_win_price': home_price,
+                    'ticker': market['ticker'],
+                    'title': market['title'],
+                    'volume': market.get('volume', 0)
+                }
+
+            enriched.append(game)
+
+        return enriched
+
+    except Exception as e:
+        logger.error(f"Error enriching NBA games with Kalshi odds: {e}")
+        return nba_games
+
+    finally:
+        if cur:
+            cur.close()
+        if conn:
+            db.release_connection(conn)
 
 
 if __name__ == "__main__":

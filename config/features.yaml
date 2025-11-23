@@ -1,0 +1,61 @@
+# Feature flags for A/B testing and gradual rollouts
+# Set to true to enable, false to disable
+
+features:
+  # AI Features
+  enable_ai_reasoning: true
+  enable_multi_model_consensus: true
+  enable_ai_research: true
+  enable_ai_options_agent: true
+
+  # Performance Tracking
+  enable_performance_tracking: true
+  enable_balance_history: true
+  enable_auto_balance_recorder: true
+
+  # Data Export
+  enable_csv_exports: false  # Removed from UI
+  enable_pdf_reports: false  # Future feature
+
+  # Advanced Filtering
+  enable_advanced_filters: true
+  enable_custom_screeners: false  # Future feature
+
+  # Notifications
+  enable_notifications: false  # Not yet implemented
+  enable_email_alerts: false
+  enable_sms_alerts: false
+  enable_discord_alerts: false  # Webhook not configured (code exists in alert_agent.py)
+  enable_telegram_alerts: true
+
+  # Auto Trading (Safety)
+  enable_auto_trading: false  # Disabled for safety
+  enable_paper_trading: false  # Future feature
+
+  # Market Data
+  enable_realtime_quotes: true
+  enable_after_hours_display: true
+  enable_news_integration: true
+
+  # Strategy Features
+  enable_calendar_spreads: true
+  enable_recovery_strategies: true
+  enable_theta_forecasts: true
+  enable_csp_opportunities: true
+
+  # Integration Features
+  enable_tradingview_sync: true
+  enable_xtrades_integration: true
+  enable_kalshi_markets: true
+  enable_robinhood_sync: true
+
+  # Analytics
+  enable_sector_analysis: true
+  enable_options_flow: true
+  enable_earnings_calendar: true
+
+  # Development Features
+  enable_debug_mode: false
+  enable_verbose_logging: false
+  enable_api_endpoints: true
+  enable_test_pages: false  # Test pages moved to dev_tests/ directory

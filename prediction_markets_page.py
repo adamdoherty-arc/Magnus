@@ -1,110 +1,355 @@
 """
 Prediction Markets Page - AI-Powered Event Contract Opportunities
-Displays prediction markets from Kalshi with quantitative scoring
+Displays non-sports prediction markets from Kalshi with AI ratings
 """
 
 import streamlit as st
 import pandas as pd
 from datetime import datetime
-from src.kalshi_db_manager import KalshiDBManager
-from src.kalshi_ai_evaluator import KalshiAIEvaluator
+from typing import Dict, List
+from src.kalshi_integration import KalshiIntegration
+from src.general_market_evaluator import GeneralMarketEvaluator
 
-# PERFORMANCE: Cached database manager - singleton pattern
+# PERFORMANCE: Cached Kalshi client - singleton pattern (using public elections API)
 @st.cache_resource
-def get_kalshi_db_manager():
-    """Cached Kalshi database manager"""
-    return KalshiDBManager()
+def get_kalshi_client():
+    """Get cached Kalshi API client (public elections API, no auth required)"""
+    return KalshiIntegration()
 
 # PERFORMANCE: Cached AI evaluator - singleton pattern
 @st.cache_resource
-def get_kalshi_ai_evaluator():
-    """Cached AI evaluator"""
-    return KalshiAIEvaluator()
+def get_market_evaluator():
+    """Get cached general market evaluator"""
+    return GeneralMarketEvaluator()
 
-# PERFORMANCE: Cached database stats query
-@st.cache_data(ttl=300)
-def get_db_stats_cached(_db):
-    """Get database stats with 5-minute cache"""
-    return _db.get_stats()
+# PERFORMANCE: Cached markets fetch
+@st.cache_data(ttl=300, show_spinner=False)
+def fetch_markets_cached(_client):
+    """Fetch non-sports markets with 5-minute cache"""
+    # Get all markets from public API
+    all_markets = _client.get_markets(limit=1000, status='active')
+
+    # Filter and categorize non-sports markets
+    return categorize_non_sports_markets(all_markets)
+
+
+def categorize_non_sports_markets(markets: List[Dict]) -> Dict[str, List[Dict]]:
+    """Filter out sports and categorize remaining markets by sector"""
+
+    # Sports keywords to exclude
+    sports_keywords = [
+        'nfl', 'nba', 'mlb', 'nhl', 'ncaa', 'ncaaf', 'ncaab',
+        'football', 'basketball', 'baseball', 'hockey', 'soccer',
+        'super bowl', 'playoffs', 'championship', 'world series',
+        'game', 'match', 'vs', 'vs.', 'versus',
+        'quarterback', 'touchdown', 'field goal', 'yards',
+        'points scored', 'to win', 'will win', 'to beat', 'beats',
+        'spread', 'over/under', 'prop', 'team', 'player'
+    ]
+
+    # Categorize by sector
+    markets_by_sector = {
+        'Politics': [],
+        'Economics': [],
+        'Crypto': [],
+        'Tech': [],
+        'Climate': [],
+        'World': [],
+        'Other': []
+    }
+
+    for market in markets:
+        title = market.get('title', '').lower()
+        subtitle = market.get('subtitle', '').lower()
+        ticker = market.get('ticker', '').lower()
+        category = market.get('category', '').lower()
+
+        combined_text = f"{title} {subtitle} {ticker} {category}"
+
+        # Skip sports markets
+        if any(keyword in combined_text for keyword in sports_keywords):
+            continue
+
+        # Categorize by keywords
+        if any(kw in combined_text for kw in ['election', 'president', 'congress', 'senate', 'vote', 'political', 'campaign', 'democrat', 'republican']):
+            markets_by_sector['Politics'].append(market)
+        elif any(kw in combined_text for kw in ['economy', 'gdp', 'inflation', 'unemployment', 'fed', 'interest rate', 'stock market', 'recession', 'dow', 's&p']):
+            markets_by_sector['Economics'].append(market)
+        elif any(kw in combined_text for kw in ['bitcoin', 'ethereum', 'crypto', 'btc', 'eth', 'blockchain', 'coin']):
+            markets_by_sector['Crypto'].append(market)
+        elif any(kw in combined_text for kw in ['tech', 'ai', 'apple', 'google', 'microsoft', 'tesla', 'amazon', 'meta', 'nvidia', 'artificial intelligence']):
+            markets_by_sector['Tech'].append(market)
+        elif any(kw in combined_text for kw in ['climate', 'temperature', 'weather', 'hurricane', 'wildfire', 'emission', 'global warming']):
+            markets_by_sector['Climate'].append(market)
+        elif any(kw in combined_text for kw in ['war', 'conflict', 'international', 'country', 'global', 'china', 'russia', 'ukraine']):
+            markets_by_sector['World'].append(market)
+        else:
+            markets_by_sector['Other'].append(market)
+
+    return markets_by_sector
+
+
+def categorize_all_markets(markets: List[Dict]) -> Dict[str, List[Dict]]:
+    """Categorize ALL markets including sports"""
+
+    # Categorize by sector (including Sports)
+    markets_by_sector = {
+        'Sports': [],
+        'Politics': [],
+        'Economics': [],
+        'Crypto': [],
+        'Tech': [],
+        'Climate': [],
+        'World': [],
+        'Other': []
+    }
+
+    # Sports keywords
+    sports_keywords = [
+        'nfl', 'nba', 'mlb', 'nhl', 'ncaa', 'ncaaf', 'ncaab',
+        'football', 'basketball', 'baseball', 'hockey', 'soccer',
+        'super bowl', 'playoffs', 'championship', 'world series',
+        'game', 'match', 'vs', 'vs.', 'versus',
+        'quarterback', 'touchdown', 'field goal', 'yards',
+        'points scored', 'to win', 'will win', 'to beat', 'beats',
+        'spread', 'over/under', 'prop', 'team', 'player'
+    ]
+
+    for market in markets:
+        title = market.get('title', '').lower()
+        subtitle = market.get('subtitle', '').lower()
+        ticker = market.get('ticker', '').lower()
+        category = market.get('category', '').lower()
+
+        combined_text = f"{title} {subtitle} {ticker} {category}"
+
+        # Check if sports market
+        if any(keyword in combined_text for keyword in sports_keywords):
+            markets_by_sector['Sports'].append(market)
+            continue
+
+        # Categorize non-sports by keywords
+        if any(kw in combined_text for kw in ['election', 'president', 'congress', 'senate', 'vote', 'political', 'campaign', 'democrat', 'republican']):
+            markets_by_sector['Politics'].append(market)
+        elif any(kw in combined_text for kw in ['economy', 'gdp', 'inflation', 'unemployment', 'fed', 'interest rate', 'stock market', 'recession', 'dow', 's&p']):
+            markets_by_sector['Economics'].append(market)
+        elif any(kw in combined_text for kw in ['bitcoin', 'ethereum', 'crypto', 'btc', 'eth', 'blockchain', 'coin']):
+            markets_by_sector['Crypto'].append(market)
+        elif any(kw in combined_text for kw in ['tech', 'ai', 'apple', 'google', 'microsoft', 'tesla', 'amazon', 'meta', 'nvidia', 'artificial intelligence']):
+            markets_by_sector['Tech'].append(market)
+        elif any(kw in combined_text for kw in ['climate', 'temperature', 'weather', 'hurricane', 'wildfire', 'emission', 'global warming']):
+            markets_by_sector['Climate'].append(market)
+        elif any(kw in combined_text for kw in ['war', 'conflict', 'international', 'country', 'global', 'china', 'russia', 'ukraine']):
+            markets_by_sector['World'].append(market)
+        else:
+            markets_by_sector['Other'].append(market)
+
+    return markets_by_sector
 
 def show_prediction_markets():
     """Main function to display prediction markets page"""
 
     st.title("🎲 Prediction Markets")
-    st.caption("AI-powered event contract opportunities from Kalshi")
+    st.caption("AI-powered non-sports opportunities from Kalshi")
 
     # Initialize integrations with cached singletons
-    db = get_kalshi_db_manager()
-    evaluator = get_kalshi_ai_evaluator()
+    client = get_kalshi_client()
+    evaluator = get_market_evaluator()
 
     # Filters in sidebar-style columns
-    col1, col2, col3, col4 = st.columns([2, 1, 1, 1])
+    col1, col2, col3, col4, col5 = st.columns([2, 1, 1, 1, 1])
+
+    # First get the sports checkbox value
+    with col4:
+        include_sports = st.checkbox("Include Sports", value=False, help="Show sports markets with AI ratings")
 
     with col1:
-        category_filter = st.selectbox(
-            "Category",
-            ["All", "Politics", "Sports", "Economics", "Crypto", "Companies", "Tech", "Climate", "World"],
-            index=0
-        )
+        # Sector filter - include Sports if checkbox is enabled
+        sector_options = ["All", "Politics", "Economics", "Crypto", "Tech", "Climate", "World", "Other"]
+        # Add Sports option at the beginning if sports are included
+        if include_sports:
+            sector_options.insert(1, "Sports")
+
+        sector_filter = st.selectbox("Sector", sector_options, index=0)
 
     with col2:
-        min_score = st.number_input("Min Score", min_value=0, max_value=100, value=60, step=5)
+        min_score = st.number_input("Min Score", min_value=0, max_value=100, value=65, step=5)
 
     with col3:
         max_days = st.number_input("Max Days", min_value=1, max_value=365, value=90, step=1)
 
-    with col4:
+    with col5:
         if st.button("🔄 Refresh", type="primary"):
             st.cache_data.clear()
             st.rerun()
 
-    # Fetch and analyze markets from database
-    with st.spinner("Loading markets from database..."):
-        markets = fetch_and_score_markets(db, evaluator, category_filter, limit=50)
+    # Fetch markets from Kalshi API
+    with st.spinner("Fetching markets from Kalshi..."):
+        try:
+            if include_sports:
+                # Fetch all markets without sports filtering
+                all_markets = client.get_markets(limit=1000, status='active')
+                # Categorize all markets (including sports as "Sports" sector)
+                markets_by_sector = categorize_all_markets(all_markets)
+            else:
+                # Fetch and filter non-sports markets (original behavior)
+                markets_by_sector = fetch_markets_cached(client)
+        except Exception as e:
+            st.error(f"Failed to fetch markets: {e}")
+            markets_by_sector = {}
 
-    if not markets:
-        st.warning("No markets found in database.")
-        st.info("💡 Run the sync script to pull NFL markets: `python pull_nfl_games.py`")
+    if not markets_by_sector or all(len(markets) == 0 for markets in markets_by_sector.values()):
+        if include_sports:
+            st.error("⚠️ Failed to fetch markets from Kalshi")
+            st.info("Check your network connection and try refreshing the page.")
+        else:
+            st.warning("⚠️ No non-sports markets currently available")
 
-        # PERFORMANCE: Show cached database stats
-        stats = get_db_stats_cached(db)
-        st.write(f"**Database Status:** {stats.get('total_markets', 0)} total markets, {stats.get('active_markets', 0)} active")
+            st.info("""
+            **No Politics, Economics, or Crypto markets found.**
+
+            The public API is currently sports-focused. To see markets and AI ratings in action:
+            1. ✅ **Check "Include Sports"** above to see all markets with AI evaluation
+            2. Wait for non-sports markets to become available (elections, economic events, etc.)
+
+            The AI evaluation system works with any market type!
+            """)
+
         return
 
-    # Filter by score and days
-    filtered_markets = [
-        m for m in markets
-        if m.get('ai_score', 0) >= min_score
-        and m.get('days_to_close', 0) <= max_days
-        and m.get('days_to_close', 0) > 0
-    ]
+    # Select markets based on filter
+    if sector_filter == "All":
+        all_markets = []
+        for sector_markets in markets_by_sector.values():
+            all_markets.extend(sector_markets)
+        markets_to_evaluate = all_markets
+    else:
+        markets_to_evaluate = markets_by_sector.get(sector_filter, [])
 
-    # Sort by score
-    filtered_markets.sort(key=lambda x: x.get('ai_score', 0), reverse=True)
+    if not markets_to_evaluate:
+        st.warning(f"No {sector_filter} markets found.")
+        return
+
+    # Evaluate markets with AI
+    with st.spinner("Analyzing markets with AI..."):
+        evaluated_markets = evaluator.evaluate_markets(markets_to_evaluate)
+
+    # Filter by score and timing
+    filtered_markets = [
+        m for m in evaluated_markets
+        if m.get('overall_score', 0) >= min_score
+        and calculate_days_to_close(m.get('close_time', '')) <= max_days
+        and calculate_days_to_close(m.get('close_time', '')) > 0
+    ]
 
     # Display summary metrics
     col1, col2, col3, col4 = st.columns(4)
     with col1:
-        st.metric("Total Markets", len(markets))
+        st.metric("Total Markets", len(evaluated_markets))
     with col2:
-        st.metric("High Quality (>75)", len([m for m in filtered_markets if m.get('ai_score', 0) >= 75]))
+        st.metric("Excellent (≥80)", len([m for m in filtered_markets if m.get('overall_score', 0) >= 80]))
     with col3:
-        st.metric("Avg Score", f"{sum(m.get('ai_score', 0) for m in filtered_markets) / len(filtered_markets):.1f}" if filtered_markets else "N/A")
+        avg_score = sum(m.get('overall_score', 0) for m in filtered_markets) / len(filtered_markets) if filtered_markets else 0
+        st.metric("Avg Score", f"{avg_score:.1f}")
     with col4:
         st.metric("Showing", len(filtered_markets))
 
-    st.markdown("---")
 
     # Display markets
     if not filtered_markets:
-        st.info(f"No markets found with score >= {min_score} and <= {max_days} days to close.")
+        st.info(f"No markets found with score ≥ {min_score} and ≤ {max_days} days to close.")
         return
 
-    for market in filtered_markets[:20]:  # Show top 20
+    # Show top 25 markets
+    for market in filtered_markets[:25]:
         display_market_card(market)
 
-@st.cache_data(ttl=300)  # PERFORMANCE: Cache for 5 minutes - slow-changing data
-def fetch_and_score_markets(_db, _evaluator, category, limit=50):
+def display_market_card(market):
+    """Display a single market opportunity card with AI rating"""
+
+    ticker = market.get('ticker', 'Unknown')
+    title = market.get('title', 'Unknown Market')
+    sector = market.get('sector', 'Other')
+    yes_price = market.get('yes_price', 0)
+    overall_score = market.get('overall_score', 0)
+    reasoning = market.get('reasoning', 'No analysis available')
+    recommendation = market.get('recommended_action', 'PASS')
+    days_to_close = calculate_days_to_close(market.get('close_time', ''))
+
+    # Component scores
+    value_score = market.get('value_score', 0)
+    liquidity_score = market.get('liquidity_score', 0)
+    timing_score = market.get('timing_score', 0)
+    clarity_score = market.get('clarity_score', 0)
+    momentum_score = market.get('momentum_score', 0)
+
+    # Score color coding
+    if overall_score >= 85:
+        score_emoji = "🔥"
+        score_color = "#00C851"  # Green
+    elif overall_score >= 75:
+        score_emoji = "⭐"
+        score_color = "#33B5E5"  # Blue
+    elif overall_score >= 65:
+        score_emoji = "👍"
+        score_color = "#FFBB33"  # Yellow
+    else:
+        score_emoji = "⚠️"
+        score_color = "#FF4444"  # Red
+
+    # Recommendation styling
+    rec_styles = {
+        'BUY_YES': ('🟢', '#00C851'),
+        'BUY_NO': ('🔵', '#33B5E5'),
+        'WATCH': ('🟡', '#FFBB33'),
+        'PASS': ('⚪', '#999999')
+    }
+    rec_emoji, rec_color = rec_styles.get(recommendation, ('⚪', '#999999'))
+
+    # Create expandable card
+    header = f"{score_emoji} **{overall_score:.0f}/100** | {sector} | {days_to_close}d | {title}"
+
+    with st.expander(header, expanded=False):
+        # Header row with key info
+        col1, col2, col3, col4 = st.columns([2, 1, 1, 1])
+
+        with col1:
+            st.markdown(f"**Ticker:** `{ticker}`")
+        with col2:
+            st.markdown(f"**YES Price:** {yes_price*100:.1f}%")
+        with col3:
+            st.markdown(f"**Action:** {rec_emoji} {recommendation.replace('_', ' ')}")
+        with col4:
+            st.markdown(f"**Days Left:** {days_to_close}")
+
+
+        # AI Reasoning
+        st.markdown("**🤖 AI Analysis:**")
+        st.info(reasoning)
+
+
+        # Component Scores
+        st.markdown("**📊 Score Breakdown:**")
+
+        col1, col2, col3, col4, col5 = st.columns(5)
+
+        with col1:
+            st.metric("Value", f"{value_score:.0f}/100")
+        with col2:
+            st.metric("Liquidity", f"{liquidity_score:.0f}/100")
+        with col3:
+            st.metric("Timing", f"{timing_score:.0f}/100")
+        with col4:
+            st.metric("Clarity", f"{clarity_score:.0f}/100")
+        with col5:
+            st.metric("Momentum", f"{momentum_score:.0f}/100")
+
+        # Progress bar for overall score
+        st.progress(overall_score / 100, f"Overall AI Rating: {overall_score:.1f}/100")
+
+# Keep old fetch function for backwards compatibility (now unused)
+@st.cache_data(ttl=300)
+def fetch_and_score_markets_old(_db, _evaluator, category, limit=50):
     """Fetch markets from database with AI predictions"""
     try:
         # Fetch markets with predictions from database
@@ -225,93 +470,3 @@ def get_risk_level(confidence):
     else:
         return "High"
 
-def display_market_card(market):
-    """Display a single market opportunity card"""
-
-    ticker = market.get('ticker', 'Unknown')
-    title = market.get('title', 'Unknown Market')
-    category = market.get('category', 'Other')
-    yes_price = market.get('yes_price', 0)
-    no_price = market.get('no_price', 0)
-    volume_24h = market.get('volume_24h', 0)
-    days_to_close = market.get('days_to_close', 0)
-    ai_score = market.get('ai_score', 0)
-    reasoning = market.get('ai_reasoning', 'No analysis available')
-    recommendation = market.get('recommended_position', 'Skip')
-    risk_level = market.get('risk_level', 'Unknown')
-    expected_value = market.get('expected_value', 0)
-    bid_ask_spread = market.get('bid_ask_spread', 0)
-
-    # Score color coding
-    if ai_score >= 85:
-        score_color = "🔥"
-        score_emoji = "🟢"
-    elif ai_score >= 75:
-        score_color = "⭐"
-        score_emoji = "🟢"
-    elif ai_score >= 60:
-        score_color = "👍"
-        score_emoji = "🟡"
-    else:
-        score_color = "👎"
-        score_emoji = "🔴"
-
-    # Create expandable card
-    with st.expander(f"{score_emoji} **Score: {ai_score:.0f}** {score_color} | {category} | {days_to_close}d | {title}", expanded=False):
-
-        # Market details in columns
-        col1, col2, col3 = st.columns(3)
-
-        with col1:
-            st.markdown("**📊 Pricing**")
-            st.metric("Yes Price", f"{yes_price:.1%}" if yes_price else "N/A")
-            st.metric("No Price", f"{no_price:.1%}" if no_price else "N/A")
-
-        with col2:
-            st.markdown("**💹 Volume & Liquidity**")
-            st.metric("24h Volume", f"{volume_24h:,} contracts")
-            st.metric("Spread", f"{bid_ask_spread:.1%}" if bid_ask_spread else "N/A")
-
-        with col3:
-            st.markdown("**🎯 Recommendation**")
-            st.metric("Position", recommendation)
-            st.metric("Risk Level", risk_level)
-
-        # Analysis
-        st.markdown("**🤖 Analysis:**")
-        st.write(reasoning)
-
-        # Expected value
-        if expected_value and expected_value > 0:
-            st.success(f"💰 Expected Value: +{expected_value:.1f}%")
-        else:
-            st.warning("Expected value is near zero or negative")
-
-        # Action buttons
-        col1, col2 = st.columns(2)
-        with col1:
-            robinhood_url = f"https://robinhood.com/markets/events/{ticker}"
-            st.link_button("📱 View on Robinhood", robinhood_url, width='stretch')
-
-        with col2:
-            kalshi_url = f"https://kalshi.com/markets/{ticker}"
-            st.link_button("📈 View on Kalshi", kalshi_url, width='stretch')
-
-        # Market details
-        with st.expander("📋 Market Details"):
-            st.markdown(f"**Ticker:** `{ticker}`")
-            st.markdown(f"**Category:** {category}")
-            st.markdown(f"**Days to Close:** {days_to_close}")
-            if market.get('close_date'):
-                st.markdown(f"**Close Date:** {market['close_date']}")
-            if market.get('description'):
-                st.markdown(f"**Description:** {market['description']}")
-
-        st.markdown("---")
-
-def show():
-    """Entry point for dashboard integration"""
-    show_prediction_markets()
-
-if __name__ == "__main__":
-    show_prediction_markets()
