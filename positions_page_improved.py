@@ -887,30 +887,9 @@ def show_positions_page():
 
                 # Display Theta Decay Forecasts for CSP, Covered Calls, and Long Call positions
                 if csp_positions or cc_positions or long_call_positions:
-                    # Create title with info icon
-                    col_title, col_info = st.columns([6, 1])
-                    with col_title:
-                        expander_open = st.expander("📉 Theta Decay Forecasts", expanded=False)
-                    with col_info:
-                        with st.popover("ℹ️"):
-                            st.markdown("**Theta Decay Forecasts**")
-                            st.markdown("""
-Theta Decay shows how much premium you'll earn/lose each day as time passes.
+                    with st.expander("📉 Theta Decay Forecasts", expanded=False):
+                        st.caption("Day-by-day profit projections showing how much premium you'll earn/lose as time passes")
 
-**What you'll see:**
-- **Daily Theta:** Premium earned per day (CSP/CC) or lost per day (Long Calls)
-- **7-Day Forecast:** Expected premium over next week
-- **30-Day Forecast:** Total premium to expiration
-- **Cumulative:** Running total of earned/lost premium
-
-**How to use:**
-1. Expand to see daily forecasts
-2. Compare theta across positions
-3. Identify positions earning/losing the most per day
-4. Plan when to close or roll based on remaining premium
-                            """)
-
-                    with expander_open:
                         # Build list of available position types
                         available_types = []
                         if csp_positions:
