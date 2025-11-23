@@ -27,6 +27,7 @@ pre_flight:
 post_execution:
   enabled: true
   auto_fix: false  # Auto-fix violations (use with caution!)
+  auto_commit: true  # Auto-commit QA'd changes to prevent data loss (SAFETY FEATURE)
   checks:
     - horizontal_lines        # st.markdown("---") forbidden
     - code_quality            # Linting, formatting

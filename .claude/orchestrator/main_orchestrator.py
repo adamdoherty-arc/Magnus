@@ -6,6 +6,7 @@ import os
 import sys
 import yaml
 import logging
+import subprocess
 from pathlib import Path
 from typing import Dict, Any, List, Optional, Tuple
 from datetime import datetime
@@ -246,11 +247,174 @@ class MainOrchestrator:
                     fix_results = self.rule_engine.auto_fix(qa_results["violations"])
                     qa_results["auto_fixed"] = fix_results
 
+            # Auto-commit changes if QA passed and auto-commit is enabled
+            if qa_results.get("passed", False):
+                if self.config.get("post_execution", {}).get("auto_commit", True):
+                    self.logger.info("QA passed - auto-committing changes...")
+                    commit_result = self._auto_commit_changes(files_modified, qa_results, context)
+                    qa_results["committed"] = commit_result.get("success", False)
+                    qa_results["commit_sha"] = commit_result.get("commit_sha")
+
             return qa_results
 
         except Exception as e:
             self.logger.error(f"Post-execution QA error: {e}", exc_info=True)
             return {"passed": False, "error": str(e)}
+
+    def _auto_commit_changes(
+        self,
+        files_modified: List[str],
+        qa_results: Dict[str, Any],
+        context: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """
+        Auto-commit QA'd changes to prevent data loss
+
+        Args:
+            files_modified: List of files that were changed
+            qa_results: Results from QA checks
+            context: Additional context (may include request description)
+
+        Returns:
+            Commit result with success status and commit SHA
+        """
+        try:
+            # Get repository root
+            repo_root = Path(__file__).parent.parent.parent
+
+            # Check if we're in a git repository
+            result = subprocess.run(
+                ["git", "rev-parse", "--git-dir"],
+                cwd=repo_root,
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+
+            if result.returncode != 0:
+                self.logger.warning("Not in a git repository - skipping auto-commit")
+                return {"success": False, "reason": "not_a_git_repo"}
+
+            # Check if there are changes to commit
+            status_result = subprocess.run(
+                ["git", "status", "--porcelain"],
+                cwd=repo_root,
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
+
+            if not status_result.stdout.strip():
+                self.logger.info("No changes to commit")
+                return {"success": False, "reason": "no_changes"}
+
+            # Stage the modified files
+            for file_path in files_modified:
+                subprocess.run(
+                    ["git", "add", file_path],
+                    cwd=repo_root,
+                    capture_output=True,
+                    timeout=5
+                )
+
+            # Generate commit message
+            commit_msg = self._generate_commit_message(files_modified, qa_results, context)
+
+            # Create commit
+            commit_result = subprocess.run(
+                ["git", "commit", "--no-verify", "-m", commit_msg],
+                cwd=repo_root,
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
+
+            if commit_result.returncode != 0:
+                self.logger.error(f"Commit failed: {commit_result.stderr}")
+                return {"success": False, "reason": "commit_failed", "error": commit_result.stderr}
+
+            # Get commit SHA
+            sha_result = subprocess.run(
+                ["git", "rev-parse", "HEAD"],
+                cwd=repo_root,
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+
+            commit_sha = sha_result.stdout.strip() if sha_result.returncode == 0 else None
+
+            self.logger.info(f"✅ Auto-committed changes: {commit_sha[:8] if commit_sha else 'unknown'}")
+
+            return {
+                "success": True,
+                "commit_sha": commit_sha,
+                "files_committed": len(files_modified),
+                "message": commit_msg
+            }
+
+        except subprocess.TimeoutExpired:
+            self.logger.error("Git command timeout during auto-commit")
+            return {"success": False, "reason": "timeout"}
+        except Exception as e:
+            self.logger.error(f"Auto-commit error: {e}", exc_info=True)
+            return {"success": False, "reason": "exception", "error": str(e)}
+
+    def _generate_commit_message(
+        self,
+        files_modified: List[str],
+        qa_results: Dict[str, Any],
+        context: Optional[Dict[str, Any]] = None
+    ) -> str:
+        """
+        Generate a descriptive commit message
+
+        Args:
+            files_modified: List of modified files
+            qa_results: QA results
+            context: Additional context
+
+        Returns:
+            Commit message string
+        """
+        # Get base description from context or use default
+        description = (context or {}).get("description", "Auto-commit after QA validation")
+
+        # Identify features
+        features = self.identify_features(files_modified)
+        feature_str = f" ({', '.join(features)})" if features else ""
+
+        # Build commit message
+        lines = [
+            f"chore: {description}{feature_str}",
+            "",
+            f"✅ QA Validation: PASSED",
+            f"📁 Files modified: {len(files_modified)}",
+        ]
+
+        # Add file list if not too many
+        if len(files_modified) <= 10:
+            lines.append("")
+            lines.append("Modified files:")
+            for file_path in files_modified:
+                lines.append(f"  - {Path(file_path).name}")
+
+        # Add QA summary
+        if qa_results.get("checks_run"):
+            lines.append("")
+            lines.append(f"QA checks run: {qa_results['checks_run']}")
+
+        # Footer
+        lines.extend([
+            "",
+            "🤖 Auto-committed by Orchestrator to prevent data loss",
+            "",
+            "Generated with Claude Code",
+            "",
+            "Co-Authored-By: Claude <noreply@anthropic.com>"
+        ])
+
+        return "\n".join(lines)
 
     def identify_features(self, files: List[str]) -> List[str]:
         """
