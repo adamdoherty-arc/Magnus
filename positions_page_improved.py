@@ -18,8 +18,12 @@ from collections import defaultdict
 from dotenv import load_dotenv
 from src.trade_history_sync import TradeHistorySyncService
 from src.theta_forecast_display import display_theta_forecasts
+from src.services.rate_limiter import rate_limit
 
 load_dotenv()
+
+# PERFORMANCE FIX: Set global timeout for all external API calls (prevents page hangs)
+import src.api_timeout_config  # Auto-configures 10-second timeout on import
 from src.components.ai_research_widget import (
     display_consolidated_ai_research_section,
     display_quick_links_section
@@ -28,52 +32,51 @@ from src.components.expert_position_advisory import display_expert_position_advi
 from src.yfinance_utils import safe_get_history, safe_get_current_price
 from src.recovery_strategies_tab import display_recovery_strategies_tab
 from src.portfolio_balance_display import display_portfolio_balance_dashboard
+
+# PERFORMANCE FIX: Rate-limited Robinhood API wrappers to prevent account bans
+@rate_limit("robinhood", tokens=1, timeout=30)
+def get_open_stock_positions_rate_limited():
+    """Rate-limited wrapper for rh.get_open_stock_positions()"""
+    return rh.get_open_stock_positions()
+
+@rate_limit("robinhood", tokens=1, timeout=30)
+def get_instrument_by_url_rate_limited(url):
+    """Rate-limited wrapper for rh.get_instrument_by_url()"""
+    return rh.get_instrument_by_url(url)
+
+@rate_limit("robinhood", tokens=1, timeout=30)
+def get_latest_price_rate_limited(symbol):
+    """Rate-limited wrapper for rh.get_latest_price()"""
+    return rh.get_latest_price(symbol)
+
+@rate_limit("robinhood", tokens=1, timeout=30)
+def get_open_option_positions_rate_limited():
+    """Rate-limited wrapper for rh.get_open_option_positions()"""
+    return rh.get_open_option_positions()
+
+@rate_limit("robinhood", tokens=1, timeout=30)
+def get_option_instrument_data_rate_limited(option_id):
+    """Rate-limited wrapper for rh.get_option_instrument_data_by_id()"""
+    return rh.get_option_instrument_data_by_id(option_id)
+
+@rate_limit("robinhood", tokens=1, timeout=30)
+def get_option_market_data_rate_limited(option_id):
+    """Rate-limited wrapper for rh.get_option_market_data_by_id()"""
+    return rh.get_option_market_data_by_id(option_id)
+
+@rate_limit("robinhood", tokens=1, timeout=30)
+def get_quotes_rate_limited(symbol):
+    """Rate-limited wrapper for rh.get_quotes()"""
+    return rh.get_quotes(symbol)
 from src.auto_balance_recorder import AutoBalanceRecorder
-from src.components.sync_status_widget import SyncStatusWidget
+from src.components.position_summary_dashboard import (
+    display_position_summary,
+    display_quick_glance_table,
+    display_actionable_alerts,
+    display_position_grouping_by_symbol
+)
 
 logger = logging.getLogger(__name__)
-
-
-# ========================================================================
-# PERFORMANCE OPTIMIZATION: Cached Database Queries
-# ========================================================================
-
-@st.cache_data(ttl=300)  # 5-minute cache
-def get_closed_trades_cached(days_back=None):
-    """
-    Cached wrapper for get_closed_trades_from_db to avoid repeated database queries.
-
-    Args:
-        days_back: Number of days to look back, None for all trades
-
-    Returns:
-        List of trade dictionaries from database
-    """
-    sync_service = TradeHistorySyncService()
-    return sync_service.get_closed_trades_from_db(days_back)
-
-
-@st.cache_data(ttl=60)  # 1-minute cache for stock prices
-def get_stock_prices_batch(symbols):
-    """
-    Fetch current stock prices for multiple symbols with caching.
-    Much faster than fetching one at a time in a loop.
-
-    Args:
-        symbols: List of stock ticker symbols
-
-    Returns:
-        Dictionary mapping symbol -> current price
-    """
-    prices = {}
-    for symbol in symbols:
-        try:
-            price = safe_get_current_price(symbol, suppress_warnings=True)
-            prices[symbol] = price
-        except Exception as e:
-            logger.warning(f"Failed to fetch price for {symbol}: {e}")
-            prices[symbol] = None
-    return prices
 
 
 def display_news_section(symbols):
@@ -176,14 +179,6 @@ def show_positions_page():
 
     st.title("💼 Active Positions")
     st.caption("Live option positions from Robinhood with auto-refresh")
-    
-    # Sync status widget
-    sync_widget = SyncStatusWidget()
-    sync_widget.display(
-        table_name="stock_data",
-        title="Position Data Sync",
-        compact=True
-    )
 
     # Auto-Refresh Controls and Navigation
     col1, col2, col3, col4 = st.columns([1, 1, 2, 2])
@@ -288,9 +283,16 @@ def show_positions_page():
         portfolio = rh.profiles.load_portfolio_profile()
         total_equity = float(portfolio.get('equity', 0)) if portfolio else 0
 
+        # Get buying power early
+        try:
+            buying_power = float(account_profile.get('buying_power', 0))
+        except:
+            buying_power = 0
+
         # === STOCK POSITIONS ===
         try:
-            stock_positions_raw = rh.get_open_stock_positions()
+            # PERFORMANCE: Rate-limited API call
+            stock_positions_raw = get_open_stock_positions_rate_limited()
             stock_positions_data = []
 
             for stock_pos in stock_positions_raw:
@@ -301,7 +303,8 @@ def show_positions_page():
                 # Get instrument URL and extract symbol
                 instrument_url = stock_pos.get('instrument')
                 if instrument_url:
-                    instrument_data = rh.get_instrument_by_url(instrument_url)
+                    # PERFORMANCE: Rate-limited API call
+                    instrument_data = get_instrument_by_url_rate_limited(instrument_url)
                     symbol = instrument_data.get('symbol', 'Unknown')
                 else:
                     continue
@@ -311,7 +314,8 @@ def show_positions_page():
 
                 # Get current stock price
                 try:
-                    stock_quote = rh.get_latest_price(symbol)
+                    # PERFORMANCE: Rate-limited API call
+                    stock_quote = get_latest_price_rate_limited(symbol)
                     current_price = float(stock_quote[0]) if stock_quote else 0
                 except:
                     current_price = 0
@@ -341,7 +345,7 @@ def show_positions_page():
 
             # Display stock positions if any
             if stock_positions_data:
-                with st.expander(f"📊 Stock Positions ({len(stock_positions_data)})", expanded=False):
+                with st.expander(f"📊 Stock Positions ({len(stock_positions_data)})", expanded=True):
                     # Add refresh button for stock positions
                     col_refresh1, col_refresh2 = st.columns([5, 1])
                     with col_refresh1:
@@ -404,7 +408,8 @@ def show_positions_page():
             st.warning(f"Could not load stock positions: {e}")
 
         # Get all open option positions
-        positions_raw = rh.get_open_option_positions()
+        # PERFORMANCE: Rate-limited API call
+        positions_raw = get_open_option_positions_rate_limited()
 
         if positions_raw:
             positions_data = []
@@ -415,7 +420,8 @@ def show_positions_page():
                 if not opt_id:
                     continue
 
-                opt_data = rh.get_option_instrument_data_by_id(opt_id)
+                # PERFORMANCE: Rate-limited API call
+                opt_data = get_option_instrument_data_rate_limited(opt_id)
                 symbol = opt_data.get('chain_symbol', 'Unknown')
                 strike = float(opt_data.get('strike_price', 0))
                 exp_date = opt_data.get('expiration_date', 'Unknown')
@@ -431,7 +437,8 @@ def show_positions_page():
 
                 # Get current market price
                 # adjusted_mark_price is in dollars per share, need to multiply by 100 (shares per contract)
-                market_data = rh.get_option_market_data_by_id(opt_id)
+                # PERFORMANCE: Rate-limited API call
+                market_data = get_option_market_data_rate_limited(opt_id)
                 if market_data and len(market_data) > 0:
                     current_price_per_share = float(market_data[0].get('adjusted_mark_price', 0))  # dollars per share
                     current_value = current_price_per_share * 100 * quantity  # dollars total
@@ -470,7 +477,8 @@ def show_positions_page():
 
                 try:
                     # Use get_quotes which includes both regular and extended hours data
-                    quote_data = rh.get_quotes(symbol)
+                    # PERFORMANCE: Rate-limited API call
+                    quote_data = get_quotes_rate_limited(symbol)
                     if quote_data and len(quote_data) > 0:
                         quote = quote_data[0]
 
@@ -487,7 +495,8 @@ def show_positions_page():
                     logger.debug(f"Could not get prices for {symbol}: {e}")
                     # Fallback to get_latest_price
                     try:
-                        stock_quote = rh.get_latest_price(symbol)
+                        # PERFORMANCE: Rate-limited API call
+                        stock_quote = get_latest_price_rate_limited(symbol)
                         stock_price = float(stock_quote[0]) if stock_quote else 0
                     except:
                         stock_price = 0
@@ -618,50 +627,25 @@ def show_positions_page():
                     logger.error(f"Error auto-recording balance: {e}")
                     balance_status = "⚠️ Auto-record error"
 
-                # Display metrics in two rows
-                col1, col2, col3, col4, col5 = st.columns([1.5, 1, 1, 1, 1.5])
-                with col1:
-                    st.metric("Total Account Value", f'${total_equity:,.2f}')
-                with col2:
-                    st.metric("Buying Power", f'${buying_power:,.2f}')
-                with col3:
-                    st.metric("Active Positions", len(positions_data))
-                with col4:
-                    st.metric("Total Premium", f'${total_premium:,.2f}')
-                with col5:
-                    pl_color = "normal" if total_pl >= 0 else "inverse"
-                    st.metric(
-                        "Total P/L",
-                        f'${total_pl:,.2f}',
-                        delta=f'{(total_pl/total_premium*100):.1f}%' if total_premium > 0 else '0%',
-                        delta_color=pl_color
-                    )
+                # === NEW: POSITION SUMMARY DASHBOARD ===
+                display_position_summary(
+                    stock_positions=stock_positions_data,
+                    option_positions=positions_data,
+                    total_equity=total_equity,
+                    buying_power=buying_power
+                )
 
-                # Second row with after-hours metrics
-                if has_ah_data:
-                    col1, col2, col3, col4, col5 = st.columns([1.5, 1, 1, 1, 1.5])
-                    with col1:
-                        ah_diff = ah_account_value - total_equity
-                        st.metric(
-                            "After-Hours Value",
-                            f'${ah_account_value:,.2f}',
-                            delta=f'${ah_diff:+,.2f}',
-                            delta_color="normal" if ah_diff >= 0 else "inverse"
-                        )
-                    with col2:
-                        st.caption("") # Spacer
-                    with col3:
-                        st.caption("") # Spacer
-                    with col4:
-                        st.caption("") # Spacer
-                    with col5:
-                        ah_pl_color = "normal" if total_ah_pl >= 0 else "inverse"
-                        st.metric(
-                            "After-Hours P/L",
-                            f'${total_ah_pl:,.2f}',
-                            delta=f'${total_ah_pl - total_pl:+,.2f}' if total_pl else None,
-                            delta_color="normal" if (total_ah_pl - total_pl) >= 0 else "inverse"
-                        )
+                # === NEW: ACTIONABLE ALERTS ===
+                display_actionable_alerts(
+                    stock_positions=stock_positions_data,
+                    option_positions=positions_data
+                )
+
+                # === NEW: QUICK GLANCE TABLE ===
+                display_quick_glance_table(
+                    stock_positions=stock_positions_data,
+                    option_positions=positions_data
+                )
 
                 # Display balance recording status
                 st.caption(f"📊 {balance_status}")
@@ -816,11 +800,11 @@ def show_positions_page():
                                     st.session_state.page = "Options Analysis"
                                     st.rerun()
 
-                # Display each strategy section
-                display_strategy_table("Cash-Secured Puts", "💰", csp_positions, "csp", expanded=True)
-                display_strategy_table("Covered Calls", "📞", cc_positions, "cc", expanded=True)
-                display_strategy_table("Long Calls", "📈", long_call_positions, "long_calls", expanded=True)
-                display_strategy_table("Long Puts", "📉", long_put_positions, "long_puts", expanded=True)
+                # Display each strategy section (smart defaults: expand if has positions)
+                display_strategy_table("Cash-Secured Puts", "💰", csp_positions, "csp", expanded=len(csp_positions) > 0)
+                display_strategy_table("Covered Calls", "📞", cc_positions, "cc", expanded=len(cc_positions) > 0)
+                display_strategy_table("Long Calls", "📈", long_call_positions, "long_calls", expanded=len(long_call_positions) > 0)
+                display_strategy_table("Long Puts", "📉", long_put_positions, "long_puts", expanded=len(long_put_positions) > 0)
 
                 # Display Next CSP Opportunities (30-day, ~0.3 delta)
                 if csp_positions:
@@ -916,31 +900,23 @@ def show_positions_page():
                         else:
                             st.info(f"No {position_type} positions to display")
 
+                # === POSITION GROUPING BY SYMBOL ===
+                display_position_grouping_by_symbol(
+                    stock_positions=stock_positions_data,
+                    option_positions=positions_data
+                )
+
                 # === EXPERT POSITION ADVISORY ===
                 # Comprehensive AI-powered trade analysis for all positions
-                col_title, col_info = st.columns([6, 1])
-                with col_title:
-                    expander_advisory = st.expander("💼 Expert Position Advisory - AI Trade Analysis", expanded=False)
-                with col_info:
-                    with st.popover("ℹ️"):
-                        st.markdown("**Expert Position Advisory**")
-                        st.markdown("""
-Get comprehensive expert analysis for any position:
+                with st.expander("💼 Expert Position Advisory - AI Trade Analysis", expanded=False):
+                    st.markdown("""
+**Get AI-powered analysis for any position:**
+- Current position assessment with risk level
+- Scenario analysis (Hold, Close, or Roll)
+- Expert recommendation with clear reasoning
+- Risk management guidance
+                    """)
 
-**What you'll see:**
-- **Current Position Assessment:** Risk level, time decay, probability analysis
-- **Scenario Analysis:** Pros & cons for Hold, Close, or Roll
-- **Expert Recommendation:** Single best action with clear reasoning
-- **Risk Management:** Key risks and protective actions
-
-**How to use:**
-1. Select a position from the dropdown
-2. Click 'Generate Expert Analysis'
-3. Review the comprehensive pros/cons analysis
-4. Follow the expert recommendation
-                        """)
-
-                with expander_advisory:
                     # Display advisory for all positions combined
                     all_positions = csp_positions + cc_positions + long_call_positions + long_put_positions
                     if all_positions:
@@ -1043,10 +1019,10 @@ Get comprehensive expert analysis for any position:
             st.warning(f"Could not load news section: {e}")
 
     # === TRADE HISTORY ===
-    # Use cached function to get count for expander title (PERFORMANCE OPTIMIZATION)
-    db_trades_temp = get_closed_trades_cached()  # Cached 5-minute TTL (default: 365 days)
-    trade_count = len(db_trades_temp) if db_trades_temp else 0
+    # Initialize sync service to get count for expander title
     sync_service_temp = TradeHistorySyncService()
+    db_trades_temp = sync_service_temp.get_closed_trades_from_db(days_back=365)
+    trade_count = len(db_trades_temp) if db_trades_temp else 0
     last_sync_temp = sync_service_temp.get_last_sync_time()
     sync_info = f" - Last sync: {last_sync_temp.strftime('%I:%M %p')}" if last_sync_temp else ""
 
@@ -1055,7 +1031,7 @@ Get comprehensive expert analysis for any position:
     with st.expander(f"📊 Trade History ({trade_count} trades{sync_info})", expanded=False):
         col1, col2 = st.columns([3, 1])
         with col1:
-            st.caption("Complete trade history with P/L calculations (all trades from database)")
+            st.caption("Closed trades with P/L calculations (loaded from database)")
         with col2:
             if st.button("🔄 Sync Now", key="sync_trades"):
                 with st.spinner("Syncing trades from Robinhood..."):
@@ -1067,8 +1043,9 @@ Get comprehensive expert analysis for any position:
                         st.error(f"Sync failed: {e}")
 
         try:
-            # Use cached database query (PERFORMANCE: Avoids duplicate DB call)
-            db_trades = get_closed_trades_cached(days_back=None)  # Reuses cache from above
+            # Use fast database query instead of slow Robinhood API
+            sync_service = TradeHistorySyncService()
+            db_trades = sync_service.get_closed_trades_from_db(days_back=365)
 
             # Convert to format expected by display code
             from datetime import timezone
@@ -1096,12 +1073,16 @@ Get comprehensive expert analysis for any position:
                     'close_timestamp': close_timestamp  # For performance analytics filtering
                 })
 
-            # Fetch current stock prices using cached batch function (PERFORMANCE)
+            # Fetch current stock prices for after-hours display
             if closed_trades:
                 unique_symbols = list(set([t['Symbol'] for t in closed_trades]))
+                current_prices = {}
 
-                # Batch fetch with caching - much faster than individual calls
-                current_prices = get_stock_prices_batch(tuple(unique_symbols))  # Tuple for hashable cache key
+                with st.spinner("Fetching current stock prices..."):
+                    for symbol in unique_symbols:
+                        # Use safe wrapper to handle delisted symbols gracefully
+                        price = safe_get_current_price(symbol, suppress_warnings=True)
+                        current_prices[symbol] = price
 
                 # Add current prices to trades
                 for trade in closed_trades:
@@ -1126,35 +1107,8 @@ Get comprehensive expert analysis for any position:
                 with col4:
                     st.metric("Avg P/L", f'${avg_pl:.2f}')
 
-                # PERFORMANCE: Pagination for large trade histories
-                PAGE_SIZE = 50
-                if 'trade_history_page' not in st.session_state:
-                    st.session_state.trade_history_page = 0
-
-                total_trades = len(closed_trades)
-                total_pages = (total_trades + PAGE_SIZE - 1) // PAGE_SIZE  # Ceiling division
-
-                # Pagination controls
-                if total_pages > 1:
-                    col_prev, col_info, col_next = st.columns([1, 2, 1])
-                    with col_prev:
-                        if st.button("← Previous", key="prev_trades") and st.session_state.trade_history_page > 0:
-                            st.session_state.trade_history_page -= 1
-                            st.rerun()
-                    with col_info:
-                        st.caption(f"Page {st.session_state.trade_history_page + 1} of {total_pages} ({total_trades} total trades)")
-                    with col_next:
-                        if st.button("Next →", key="next_trades") and st.session_state.trade_history_page < total_pages - 1:
-                            st.session_state.trade_history_page += 1
-                            st.rerun()
-
-                # Slice trades for current page
-                start_idx = st.session_state.trade_history_page * PAGE_SIZE
-                end_idx = min(start_idx + PAGE_SIZE, total_trades)
-                paginated_trades = closed_trades[start_idx:end_idx]
-
-                # Display paginated trades
-                df_history = pd.DataFrame(paginated_trades)
+                # Display trades table with color coding
+                df_history = pd.DataFrame(closed_trades[:50])  # Show last 50
 
                 # Add TradingView links
                 df_history['TradingView'] = df_history['Symbol'].apply(
