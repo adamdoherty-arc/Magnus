@@ -239,6 +239,19 @@ st.markdown("""
         max-height: 400px !important;
         overflow-y: auto !important;
     }
+
+    /* Green sync button for watchlist */
+    button[data-testid="baseButton-secondary"]:has([data-testid*="watchlist_sync"]),
+    button[kind="secondary"] {
+        background-color: #28a745 !important;
+        color: white !important;
+        border: none !important;
+    }
+
+    button[data-testid="baseButton-secondary"]:has([data-testid*="watchlist_sync"]):hover,
+    button[kind="secondary"]:hover {
+        background-color: #218838 !important;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -721,13 +734,27 @@ elif page == "TradingView Watchlists":
         watchlists_db = st.session_state.get('watchlists_db', {})
 
         if watchlists_db:
-            # Watchlist selector (no redundant subheader)
-            selected_watchlist = st.selectbox(
-                "Select Watchlist",
-                list(watchlists_db.keys()),
-                format_func=lambda x: f"{x} ({len(watchlists_db[x])} stocks)",
-                help="Choose a watchlist to view premium opportunities"
-            )
+            # Watchlist selector in compact layout
+            col_dropdown, col_button = st.columns([3, 1])
+
+            with col_dropdown:
+                selected_watchlist = st.selectbox(
+                    "Select Watchlist",
+                    list(watchlists_db.keys()),
+                    format_func=lambda x: f"{x} ({len(watchlists_db[x])} stocks)",
+                    help="Choose a watchlist to view premium opportunities"
+                )
+
+            with col_button:
+                st.write("")  # Align with dropdown height
+                if st.button("🔄 Sync", key="watchlist_sync_btn", help="Sync prices and premiums"):
+                    if 'selected_watchlist' in locals():
+                        st.success("⚡ Syncing in background...")
+                        # Start background sync (truly non-blocking)
+                        import subprocess
+                        subprocess.Popen([
+                            "python", "src/watchlist_sync_service.py", selected_watchlist
+                        ], creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
 
             if selected_watchlist:
                 symbols = watchlists_db[selected_watchlist]
@@ -738,17 +765,6 @@ elif page == "TradingView Watchlists":
                 if not stock_symbols:
                     st.warning(f"No stock symbols found in {selected_watchlist}. This watchlist contains only crypto/non-stock symbols.")
                 else:
-                    # Sync button
-                    col1, col2, col3 = st.columns([2, 1, 2])
-                    with col2:
-                        if st.button("🔄 Sync", type="primary", use_container_width=True, help="Sync prices and premiums for this watchlist"):
-                            st.success("⚡ Syncing in background...")
-                            # Start background sync (truly non-blocking)
-                            import subprocess
-                            subprocess.Popen([
-                                "python", "src/watchlist_sync_service.py", selected_watchlist
-                            ], creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
-
                     st.write("")  # Spacing
 
                     # Section header
