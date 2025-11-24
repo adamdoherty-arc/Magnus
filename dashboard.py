@@ -738,12 +738,10 @@ elif page == "TradingView Watchlists":
                 if not stock_symbols:
                     st.warning(f"No stock symbols found in {selected_watchlist}. This watchlist contains only crypto/non-stock symbols.")
                 else:
-                    # Sync section - compact 2-column layout
-                    col_main, col_sync = st.columns([3, 1])
-                    with col_main:
-                        st.metric("Stocks", len(stock_symbols))
-                    with col_sync:
-                        if st.button("🔄 Sync", type="primary", use_container_width=True):
+                    # Sync button
+                    col1, col2, col3 = st.columns([2, 1, 2])
+                    with col2:
+                        if st.button("🔄 Sync", type="primary", use_container_width=True, help="Sync prices and premiums for this watchlist"):
                             st.success("⚡ Syncing in background...")
                             # Start background sync (truly non-blocking)
                             import subprocess
@@ -751,7 +749,9 @@ elif page == "TradingView Watchlists":
                                 "python", "src/watchlist_sync_service.py", selected_watchlist
                             ], creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
 
-                    # SIMPLE IMPLEMENTATION - Just show 30-day options with 0.25-0.40 delta
+                    st.write("")  # Spacing
+
+                    # Section header
                     st.markdown("💵 **Cash-Secured Put Options** • 30 DTE • Δ 0.25-0.40")
 
                     # Compact filters
