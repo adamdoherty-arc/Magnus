@@ -6,10 +6,20 @@
 orchestrator:
   enabled: true
   mode: standard  # standard, aggressive, passive
-  auto_run_on_request: true
+  auto_run_on_request: false  # CHANGED: Require plan approval before execution
   auto_qa_on_completion: true
   state_persistence: true  # Enable state machine checkpointing
   parallel_execution: true  # Enable parallel agent execution
+
+  # Plan-First Workflow (NEW)
+  require_plan_approval: true  # Show detailed plan before execution
+  plan_research_enabled: true  # Research current code and modern patterns
+  research_sources:
+    - current_codebase       # Analyze existing implementation
+    - github_projects        # Search similar implementations
+    - modern_frameworks      # Look up 2025 patterns and best practices
+    - documentation          # Check official docs
+  research_depth: medium     # quick, medium, deep
 
 # Pre-Flight Validation
 pre_flight:
@@ -358,6 +368,8 @@ features:
     rules:
       - no_horizontal_lines
       - real_time_updates
+      - no_data_export
+      - main_page_filters
 
   seven_day_dte_scanner_page.py:
     feature: seven-day-dte
@@ -520,6 +532,33 @@ rules:
       message: "Section headers should include emojis for visual hierarchy"
       patterns:
         - "st\\.markdown\\([\"']#{1,3} [^🎯📊💼🔧🎨📈]"
+
+    no_data_export:
+      severity: critical
+      message: "FORBIDDEN: Excel/CSV export functionality not allowed. Users can copy data or use database exports."
+      patterns:
+        - "to_excel\\("
+        - "to_csv\\("
+        - "xlsxwriter"
+        - "ExcelWriter"
+        - "download_button.*\\.csv"
+        - "download_button.*\\.xlsx"
+        - "download_button.*\\.xls"
+        - "BytesIO.*Excel"
+      auto_fix: false
+
+    main_page_filters:
+      severity: high
+      message: "Filters must be on main page in expanders or columns, not in sidebar."
+      patterns:
+        - "with st\\.sidebar:.*st\\.form"
+        - "st\\.sidebar.*st\\.slider"
+        - "st\\.sidebar.*st\\.multiselect"
+        - "st\\.sidebar.*st\\.number_input"
+        - "st\\.sidebar.*st\\.selectbox"
+      exclude_patterns:
+        - "# EXCEPTION: Navigation only"
+      auto_fix: false
 
   # Code Quality Rules
   code:

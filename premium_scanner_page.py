@@ -10,7 +10,6 @@ from datetime import datetime, timedelta
 import logging
 from typing import Optional, Tuple, Dict, Any, List
 import time
-from io import BytesIO
 
 # Import connection pool
 from src.database import get_db_connection
@@ -406,83 +405,6 @@ def apply_advanced_filters(df: pd.DataFrame, filters: Dict[str, Any]) -> pd.Data
 
 
 # ============================================================================
-# EXPORT FUNCTIONS
-# ============================================================================
-
-def export_to_csv(df: pd.DataFrame, filename: str):
-    """Export DataFrame to CSV with download button"""
-    if df.empty:
-        st.warning("No data to export")
-        return
-
-    csv = df.to_csv(index=False)
-    st.download_button(
-        label="📥 Download CSV",
-        data=csv,
-        file_name=f"{filename}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-        mime="text/csv",
-        key=f"download_csv_{filename}"
-    )
-
-
-def export_to_excel(df: pd.DataFrame, filename: str):
-    """Export DataFrame to Excel with formatting"""
-    if df.empty:
-        st.warning("No data to export")
-        return
-
-    try:
-        buffer = BytesIO()
-
-        with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
-            df.to_excel(writer, sheet_name='Opportunities', index=False)
-
-            # Get workbook and worksheet
-            workbook = writer.book
-            worksheet = writer.sheets['Opportunities']
-
-            # Add formats
-            header_format = workbook.add_format({
-                'bold': True,
-                'bg_color': '#4CAF50',
-                'font_color': 'white',
-                'border': 1
-            })
-
-            money_format = workbook.add_format({'num_format': '$#,##0.00'})
-            percent_format = workbook.add_format({'num_format': '0.00%'})
-
-            # Apply header formatting
-            for col_num, col_name in enumerate(df.columns):
-                worksheet.write(0, col_num, col_name, header_format)
-
-                # Auto-adjust column width
-                max_len = max(
-                    df[col_name].astype(str).apply(len).max(),
-                    len(col_name)
-                ) + 2
-                worksheet.set_column(col_num, col_num, min(max_len, 30))
-
-                # Apply number formatting
-                if any(word in col_name.lower() for word in ['premium', 'price', 'strike']):
-                    worksheet.set_column(col_num, col_num, 12, money_format)
-                elif any(word in col_name.lower() for word in ['pct', 'return', 'iv', 'volatility']):
-                    # Note: percentages are already in the right format from database
-                    pass
-
-        st.download_button(
-            label="📊 Download Excel",
-            data=buffer.getvalue(),
-            file_name=f"{filename}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            key=f"download_excel_{filename}"
-        )
-
-    except Exception as e:
-        st.error(f"Error creating Excel file: {str(e)}")
-
-
-# ============================================================================
 # VISUALIZATION FUNCTIONS
 # ============================================================================
 
@@ -685,13 +607,6 @@ def render_scanner_section(
                 best_premium = df_filtered['premium_pct'].max()
                 st.metric(f"Best {period}", f"{best_premium:.2f}%")
 
-            # Export buttons
-            export_col1, export_col2 = st.columns(2)
-            with export_col1:
-                export_to_csv(df_filtered, f"{scanner_type}_premiums")
-            with export_col2:
-                export_to_excel(df_filtered, f"{scanner_type}_premiums")
-
             # All opportunities table
             st.markdown(f"### 🏆 {title} Opportunities")
 
@@ -752,95 +667,107 @@ def main():
     Automatically scans all database stocks for cash-secured put opportunities with advanced filtering and analytics.
     """)
 
-    # Sidebar filters
-    with st.sidebar:
-        st.header("🎯 Filters")
-
+    # Filters on main page in expander
+    with st.expander("🎯 Filters", expanded=False):
         with st.form("filter_form"):
-            st.subheader("Basic Filters")
+            # Basic Filters in columns
+            st.markdown("**Basic Filters**")
+            col1, col2, col3 = st.columns(3)
 
-            max_stock_price = st.number_input(
-                "Max Stock Price ($)",
-                min_value=0,
-                value=st.session_state.scanner_filters['max_stock_price'],
-                step=10,
-                help="Maximum stock price to include in scan"
-            )
+            with col1:
+                max_stock_price = st.number_input(
+                    "Max Stock Price ($)",
+                    min_value=0,
+                    value=st.session_state.scanner_filters['max_stock_price'],
+                    step=10,
+                    help="Maximum stock price to include in scan"
+                )
 
-            delta_range = st.slider(
-                "Delta Range",
-                min_value=-1.0,
-                max_value=0.0,
-                value=st.session_state.scanner_filters['delta_range'],
-                step=0.05,
-                help="Delta represents probability of option expiring ITM. -0.30 ≈ 70% PoP"
-            )
+                min_premium = st.number_input(
+                    "Min Premium ($)",
+                    min_value=0.0,
+                    value=st.session_state.scanner_filters['min_premium'],
+                    step=10.0,
+                    help="Minimum premium per contract"
+                )
 
-            min_premium = st.number_input(
-                "Min Premium ($)",
-                min_value=0.0,
-                value=st.session_state.scanner_filters['min_premium'],
-                step=10.0,
-                help="Minimum premium per contract"
-            )
+            with col2:
+                delta_range = st.slider(
+                    "Delta Range",
+                    min_value=-1.0,
+                    max_value=0.0,
+                    value=st.session_state.scanner_filters['delta_range'],
+                    step=0.05,
+                    help="Delta represents probability of option expiring ITM. -0.30 ≈ 70% PoP"
+                )
 
-            min_annual_return = st.number_input(
-                "Min Annualized (%)",
-                min_value=0.0,
-                value=st.session_state.scanner_filters['min_annual_return'],
-                step=5.0,
-                help="Minimum annualized return percentage"
-            )
+                min_annual_return = st.number_input(
+                    "Min Annualized (%)",
+                    min_value=0.0,
+                    value=st.session_state.scanner_filters['min_annual_return'],
+                    step=5.0,
+                    help="Minimum annualized return percentage"
+                )
 
-            min_volume = st.number_input(
-                "Min Volume",
-                min_value=0,
-                value=st.session_state.scanner_filters['min_volume'],
-                step=100,
-                help="Minimum option volume for liquidity"
-            )
+            with col3:
+                min_volume = st.number_input(
+                    "Min Volume",
+                    min_value=0,
+                    value=st.session_state.scanner_filters['min_volume'],
+                    step=100,
+                    help="Minimum option volume for liquidity"
+                )
 
-            st.subheader("Advanced Filters")
+            # Advanced Filters in columns
+            st.markdown("**Advanced Filters**")
+            adv_col1, adv_col2, adv_col3 = st.columns(3)
 
-            # Sector filter
-            available_sectors = get_available_sectors()
-            selected_sectors = st.multiselect(
-                "Sectors",
-                options=available_sectors,
-                default=st.session_state.scanner_filters['selected_sectors'],
-                help="Filter by specific sectors"
-            )
+            with adv_col1:
+                # Sector filter
+                available_sectors = get_available_sectors()
+                selected_sectors = st.multiselect(
+                    "Sectors",
+                    options=available_sectors,
+                    default=st.session_state.scanner_filters['selected_sectors'],
+                    help="Filter by specific sectors"
+                )
 
-            # IV range
-            iv_range = st.slider(
-                "IV Range (%)",
-                min_value=0,
-                max_value=200,
-                value=st.session_state.scanner_filters['iv_range'],
-                help="Implied volatility range filter"
-            )
+            with adv_col2:
+                # IV range
+                iv_range = st.slider(
+                    "IV Range (%)",
+                    min_value=0,
+                    max_value=200,
+                    value=st.session_state.scanner_filters['iv_range'],
+                    help="Implied volatility range filter"
+                )
 
-            # Open interest
-            min_open_interest = st.number_input(
-                "Min Open Interest",
-                min_value=0,
-                value=st.session_state.scanner_filters['min_open_interest'],
-                step=100,
-                help="Minimum open interest for liquidity"
-            )
+                # Open interest
+                min_open_interest = st.number_input(
+                    "Min Open Interest",
+                    min_value=0,
+                    value=st.session_state.scanner_filters['min_open_interest'],
+                    step=100,
+                    help="Minimum open interest for liquidity"
+                )
 
-            # Bid-ask spread
-            max_bid_ask_spread = st.number_input(
-                "Max Bid-Ask Spread ($)",
-                min_value=0.0,
-                max_value=10.0,
-                value=st.session_state.scanner_filters['max_bid_ask_spread'],
-                step=0.1,
-                help="Maximum bid-ask spread (lower is better)"
-            )
+            with adv_col3:
+                # Bid-ask spread
+                max_bid_ask_spread = st.number_input(
+                    "Max Bid-Ask Spread ($)",
+                    min_value=0.0,
+                    max_value=10.0,
+                    value=st.session_state.scanner_filters['max_bid_ask_spread'],
+                    step=0.1,
+                    help="Maximum bid-ask spread (lower is better)"
+                )
 
-            # Submit button
-            apply_filters = st.form_submit_button("🔍 Apply Filters", type="primary", use_container_width=True)
+            # Submit button and help
+            submit_col1, submit_col2 = st.columns([2, 1])
+            with submit_col1:
+                apply_filters = st.form_submit_button("🔍 Apply Filters", type="primary", use_container_width=True)
+            with submit_col2:
+                st.caption("💡 **Tip**: Delta -0.30 ≈ 70% PoP")
 
             if apply_filters:
                 st.session_state.scanner_filters = {
@@ -857,21 +784,6 @@ def main():
                 # Clear caches
                 fetch_opportunities.clear()
                 st.rerun()
-
-        # Help section
-        st.divider()
-        with st.expander("❓ Quick Help"):
-            st.markdown("""
-            **Understanding Metrics:**
-            - **Delta**: ~-0.30 = 70% profit probability
-            - **IV**: Higher = more expensive options
-            - **DTE**: Days to expiration
-            - **Annual%**: Return if repeated 52 weeks
-
-            **Recommended Settings:**
-            - Conservative: Delta -0.30 to -0.20
-            - Aggressive: Delta -0.40 to -0.30
-            """)
 
     # Main content tabs
     tab1, tab2, tab3 = st.tabs(["⚡ 7-Day Scanner", "📅 30-Day Scanner", "📊 Analytics"])
