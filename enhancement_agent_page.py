@@ -207,7 +207,6 @@ def show_enhancement_agent():
         completed_todos = sum(sum(1 for t in f['todos'] if t['completed']) for f in features)
         st.metric("Completed TODOs", completed_todos)
 
-    st.markdown("---")
 
     # Tabs for different views
     tab1, tab2, tab3, tab4 = st.tabs(["📋 Feature Overview", "📝 All TODOs", "💡 Recommendations", "📈 Analytics"])
@@ -251,7 +250,6 @@ def show_enhancement_agent():
         )
 
         # Detailed view selector
-        st.markdown("---")
         st.subheader("📖 Feature Details")
 
         selected_feature = st.selectbox(
@@ -399,7 +397,6 @@ def show_enhancement_agent():
                     for rec in recommendations:
                         st.markdown(f"- {rec}")
 
-        st.markdown("---")
         st.markdown("### 🎯 Top Priority Actions:")
 
         # Calculate top priorities
@@ -455,5 +452,4 @@ def show_enhancement_agent():
             st.info("No TODO data available")
 
     # Footer with last scan time
-    st.markdown("---")
     st.caption(f"Last scan: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | Auto-refresh: Daily at 2:00 AM")

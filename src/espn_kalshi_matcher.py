@@ -130,14 +130,20 @@ class ESPNKalshiMatcher:
         away_variations = self.get_team_variations(away_team)
         home_variations = self.get_team_variations(home_team)
 
-        # Extract date from game_time (format: "YYYY-MM-DD HH:MM")
+        # Extract date from game_time (can be datetime object or string)
         try:
             if game_time:
-                game_date = datetime.strptime(game_time[:10], '%Y-%m-%d').date()
+                if isinstance(game_time, datetime):
+                    game_date = game_time.date()
+                elif isinstance(game_time, str):
+                    game_date = datetime.strptime(game_time[:10], '%Y-%m-%d').date()
+                else:
+                    game_date = datetime.now().date()
             else:
                 # If no game time, use today
                 game_date = datetime.now().date()
-        except:
+        except Exception as e:
+            logger.warning(f"Could not parse game_time {game_time}: {e}")
             game_date = datetime.now().date()
 
         # Query Kalshi database for matching market
@@ -173,14 +179,14 @@ class ESPNKalshiMatcher:
                         AND (
                             market_type IN ('nfl', 'cfb', 'winner', 'all')
                             OR raw_data->>'market_type' IN ('nfl', 'cfb', 'winner')
-                            OR ticker LIKE 'KXNFLGAME%'
-                            OR ticker LIKE 'KXNCAAFGAME%'
+                            OR ticker LIKE 'KXNFLGAME%%'
+                            OR ticker LIKE 'KXNCAAFGAME%%'
                         )
                         AND (
                             -- Match by expected_expiration_time (actual game time) if available
                             (raw_data->>'expected_expiration_time' IS NOT NULL
-                             AND (raw_data->>'expected_expiration_time')::timestamp >= %s::timestamp
-                             AND (raw_data->>'expected_expiration_time')::timestamp <= %s::timestamp)
+                             AND (raw_data->>'expected_expiration_time')::timestamp >= %s
+                             AND (raw_data->>'expected_expiration_time')::timestamp <= %s)
                             OR
                             -- Fallback to close_time for older data
                             (raw_data->>'expected_expiration_time' IS NULL
@@ -258,7 +264,7 @@ class ESPNKalshiMatcher:
             return None
 
         except Exception as e:
-            logger.error(f"Error matching game to Kalshi: {e}")
+            logger.error(f"Error matching game to Kalshi: {e}", exc_info=True)
             return None
         finally:
             if cur:
@@ -421,7 +427,7 @@ def enrich_games_with_kalshi_odds_nba(nba_games: List[Dict]) -> List[Dict]:
                 SELECT *
                 FROM kalshi_markets
                 WHERE status = 'active'
-                AND ticker LIKE 'KXNBAGAME%'
+                AND ticker LIKE 'KXNBAGAME%%'
                 AND (title ILIKE %s OR title ILIKE %s)
                 ORDER BY volume DESC NULLS LAST
                 LIMIT 1

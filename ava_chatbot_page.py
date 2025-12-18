@@ -25,7 +25,9 @@ import json
 
 # Magnus imports
 from src.ava.nlp_handler import NaturalLanguageHandler
+from src.ava.agent_aware_nlp_handler import get_agent_aware_handler  # NEW: Agent-aware routing
 from src.ava.enhanced_project_handler import integrate_with_ava, EnhancedProjectHandler
+from src.ava.web_voice_handler import WebVoiceHandler  # NEW: Voice interface
 from src.watchlist_strategy_analyzer import WatchlistStrategyAnalyzer
 from src.services.llm_service import LLMService
 
@@ -50,11 +52,13 @@ class AVAChatbot:
 
     def __init__(self):
         """Initialize AVA with all capabilities"""
-        # Initialize AVA NLP handler
-        self.ava = NaturalLanguageHandler()
+        # Initialize AVA with agent-aware NLP handler
+        # This connects AVA to all 33 specialized agents + LLM services
+        self.ava = get_agent_aware_handler()
 
-        # Enhance with project knowledge
-        self.ava = integrate_with_ava(self.ava)
+        # Keep legacy handler for backward compatibility (project questions)
+        self.legacy_ava = NaturalLanguageHandler()
+        self.legacy_ava = integrate_with_ava(self.legacy_ava)
 
         # Initialize watchlist analyzer
         self.watchlist_analyzer = WatchlistStrategyAnalyzer()
@@ -62,7 +66,7 @@ class AVAChatbot:
         # Initialize LLM service for conversational responses
         self.llm_service = LLMService()
 
-        logger.info("AVA chatbot initialized successfully")
+        logger.info("AVA chatbot initialized with agent-aware routing (33 agents + 2 LLM services)")
 
     def process_message(self, user_message: str, context: Optional[Dict] = None) -> Dict:
         """
@@ -86,8 +90,23 @@ class AVAChatbot:
             if self._is_strategy_ranking_request(user_message):
                 return self._handle_strategy_ranking(user_message)
 
-            # Use AVA's NLP handler for intent detection
-            intent_result = self.ava.parse_intent(user_message, context)
+            # Use agent-aware NLP handler for intelligent routing
+            # This will route to specialized agents, LLM services, or generic LLM
+            agent_result = self.ava.parse_query(user_message, context)
+
+            # If agent routing succeeded, use that response
+            if agent_result.get('response'):
+                return {
+                    'response': agent_result['response'],
+                    'intent': agent_result.get('intent', 'AGENT_ROUTED'),
+                    'agent_used': agent_result.get('agent_used'),
+                    'service_used': agent_result.get('service_used'),
+                    'response_quality': agent_result.get('response_quality', 'unknown'),
+                    'confidence': 0.9  # High confidence for agent responses
+                }
+
+            # Fallback to legacy handler for project questions
+            intent_result = self.legacy_ava.parse_intent(user_message, context)
 
             # Handle different intents
             if intent_result['intent'] == 'PROJECT_QUESTION':
@@ -456,6 +475,9 @@ def show_ava_chatbot_page():
 
     st.markdown(css_styles, unsafe_allow_html=True)
 
+    # Inject voice controls JavaScript
+    WebVoiceHandler.inject_voice_controls()
+
     # PERFORMANCE: Initialize chatbot with cached singleton
     if 'ava_chatbot' not in st.session_state:
         with st.spinner("Initializing AVA..."):
@@ -466,7 +488,14 @@ def show_ava_chatbot_page():
         st.session_state.messages = [
             {
                 "role": "assistant",
-                "content": "👋 Hi! I'm AVA. Ask me to analyze watchlists, rank strategies, or answer questions about Magnus."
+                "content": "👋 Hi! I'm AVA - now powered by 33 specialized agents! Ask me to:\n\n"
+                          "- 📊 Analyze your portfolio with Greeks\n"
+                          "- 📈 Perform technical analysis on stocks\n"
+                          "- 💹 Find unusual options flow\n"
+                          "- 🎯 Generate custom options strategies\n"
+                          "- 🏈 Predict sports games with AI\n"
+                          "- 📋 Analyze watchlists and rank trades\n\n"
+                          "Just ask naturally - I'll route your query to the right specialist!"
             }
         ]
 
@@ -573,6 +602,159 @@ def show_ava_chatbot_page():
 
         st.markdown('</div>', unsafe_allow_html=True)
 
+        # Voice command button with Web Speech API integration
+        st.markdown("**🎤 Voice Commands**")
+
+        # Compact voice button
+        voice_button_html = """
+        <div id="voice-command-wrapper" style="margin: 1rem 0;">
+            <button id="voice-btn" style="
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+                padding: 0.75rem 1.5rem;
+                border-radius: 25px;
+                border: none;
+                font-size: 1rem;
+                font-weight: 600;
+                cursor: pointer;
+                box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+                transition: all 0.3s ease;
+                width: 100%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 0.5rem;
+            ">
+                <span id="voice-icon">🎤</span>
+                <span id="voice-text">Press to Speak</span>
+            </button>
+            <div id="voice-transcript" style="
+                margin-top: 0.5rem;
+                padding: 0.5rem;
+                background: #f8f9fa;
+                border-radius: 8px;
+                font-size: 0.9rem;
+                min-height: 2rem;
+                display: none;
+            "></div>
+        </div>
+
+        <script>
+        (function() {
+            const voiceBtn = document.getElementById('voice-btn');
+            const voiceIcon = document.getElementById('voice-icon');
+            const voiceText = document.getElementById('voice-text');
+            const voiceTranscript = document.getElementById('voice-transcript');
+            const chatInput = document.querySelector('textarea[data-testid="stChatInputTextArea"]') ||
+                             document.querySelector('textarea');
+
+            let recognition = null;
+            let isListening = false;
+
+            // Check for Web Speech API support
+            if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                recognition = new SpeechRecognition();
+
+                recognition.continuous = false;
+                recognition.interimResults = true;
+                recognition.lang = 'en-US';
+
+                recognition.onstart = () => {
+                    isListening = true;
+                    voiceBtn.style.background = 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)';
+                    voiceBtn.style.animation = 'pulse 1.5s ease-in-out infinite';
+                    voiceIcon.textContent = '🔴';
+                    voiceText.textContent = 'Listening...';
+                    voiceTranscript.style.display = 'block';
+                    voiceTranscript.textContent = 'Say "Hey AVA" followed by your command...';
+                };
+
+                recognition.onresult = (event) => {
+                    const transcript = Array.from(event.results)
+                        .map(result => result[0].transcript)
+                        .join('');
+
+                    voiceTranscript.textContent = `You said: "${transcript}"`;
+
+                    // If final result, submit to chat
+                    if (event.results[0].isFinal) {
+                        if (chatInput) {
+                            chatInput.value = transcript;
+                            chatInput.dispatchEvent(new Event('input', { bubbles: true }));
+
+                            // Trigger send
+                            setTimeout(() => {
+                                const sendBtn = document.querySelector('button[kind="primary"]');
+                                if (sendBtn) {
+                                    sendBtn.click();
+                                }
+                            }, 100);
+                        }
+                    }
+                };
+
+                recognition.onend = () => {
+                    isListening = false;
+                    voiceBtn.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+                    voiceBtn.style.animation = 'none';
+                    voiceIcon.textContent = '🎤';
+                    voiceText.textContent = 'Press to Speak';
+
+                    // Hide transcript after 3 seconds
+                    setTimeout(() => {
+                        voiceTranscript.style.display = 'none';
+                    }, 3000);
+                };
+
+                recognition.onerror = (event) => {
+                    console.error('Speech recognition error:', event.error);
+                    isListening = false;
+                    voiceBtn.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+                    voiceBtn.style.animation = 'none';
+                    voiceIcon.textContent = '🎤';
+                    voiceText.textContent = 'Error - Try Again';
+
+                    voiceTranscript.textContent = `Error: ${event.error}. Please try again.`;
+                    voiceTranscript.style.background = '#ffebee';
+
+                    setTimeout(() => {
+                        voiceText.textContent = 'Press to Speak';
+                        voiceTranscript.style.display = 'none';
+                        voiceTranscript.style.background = '#f8f9fa';
+                    }, 3000);
+                };
+
+                voiceBtn.addEventListener('click', () => {
+                    if (isListening) {
+                        recognition.stop();
+                    } else {
+                        recognition.start();
+                    }
+                });
+            } else {
+                voiceBtn.disabled = true;
+                voiceText.textContent = 'Voice Not Supported';
+                voiceBtn.style.opacity = '0.5';
+                voiceBtn.style.cursor = 'not-allowed';
+            }
+
+            // Add pulse animation
+            const style = document.createElement('style');
+            style.textContent = `
+                @keyframes pulse {
+                    0%, 100% { transform: scale(1); }
+                    50% { transform: scale(1.05); }
+                }
+            `;
+            document.head.appendChild(style);
+        })();
+        </script>
+        """
+
+        st.markdown(voice_button_html, unsafe_allow_html=True)
+
+
         # Process message if sent
         if (send_clicked or chat_input_text) and chat_input_text:
             if 'last_msg' not in st.session_state or st.session_state.last_msg != chat_input_text:
@@ -584,7 +766,22 @@ def show_ava_chatbot_page():
                     user_message=chat_input_text,
                     context={'history': st.session_state.messages[-5:], 'timestamp': datetime.now().isoformat()}
                 )
-                st.session_state.messages.append({"role": "assistant", "content": response_data['response']})
+
+                # Add response with metadata
+                assistant_message = {"role": "assistant", "content": response_data['response']}
+
+                # Add agent/service metadata if available
+                if response_data.get('agent_used'):
+                    assistant_message['metadata'] = f"🤖 Agent: {response_data['agent_used']}"
+                elif response_data.get('service_used'):
+                    assistant_message['metadata'] = f"⚡ Service: {response_data['service_used']}"
+
+                if response_data.get('response_quality'):
+                    quality = response_data['response_quality']
+                    quality_emoji = "✨" if quality == 'specialized' else "⚡" if quality == 'llm_specialized' else "💬"
+                    assistant_message['quality'] = f"{quality_emoji} {quality}"
+
+                st.session_state.messages.append(assistant_message)
                 st.rerun()
 
     with right_col:
@@ -621,6 +818,13 @@ def show_ava_chatbot_page():
             for message in st.session_state.messages:
                 with st.chat_message(message["role"]):
                     st.markdown(message["content"])
+
+                    # Show agent metadata if available (for assistant messages)
+                    if message["role"] == "assistant":
+                        if message.get('metadata'):
+                            st.caption(message['metadata'])
+                        if message.get('quality'):
+                            st.caption(message['quality'])
         else:
             st.info("👋 Start a conversation using the input on the left or quick actions above!")
 
@@ -633,7 +837,113 @@ def show_ava_chatbot_page():
             label_visibility="collapsed"
         )
 
-        st.markdown("---")
+
+        # Agent usage statistics
+        st.subheader("🤖 Agent Status")
+        try:
+            ava_instance = st.session_state.ava_chatbot.ava
+            stats = ava_instance.get_agent_stats()
+
+            st.metric("Total Agents", stats['total_agents'])
+            st.metric("Specialized Services", stats['specialized_services'])
+
+            # Show agent categories
+            with st.expander("📊 Agent Categories"):
+                for category, count in stats['by_category'].items():
+                    st.write(f"**{category}**: {count} agents")
+
+            # Show recent agent usage (if available)
+            if 'recent_usage' in stats and stats['recent_usage']:
+                with st.expander("📈 Recent Activity"):
+                    for agent_name, usage_count in list(stats['recent_usage'].items())[:5]:
+                        st.write(f"- {agent_name}: {usage_count} uses")
+
+        except Exception as e:
+            st.caption("Agent stats unavailable")
+
+
+        # Voice settings panel
+        WebVoiceHandler.create_voice_settings(key_prefix="ava_chat_")
+
+
+        # Personality mode selector
+        st.subheader("🎭 AVA Personality")
+        from src.ava.ava_personality import PersonalityMode
+
+        # Personality mode descriptions
+        personality_descriptions = {
+            "Professional": "📊 Formal, data-focused (CFA-style)",
+            "Friendly": "😊 Warm, approachable (default)",
+            "Witty": "😏 Humorous, clever banter",
+            "Mentor": "📚 Teaching, patient guidance",
+            "Concise": "⚡ Brief, essential data only",
+            "Charming": "💋 Flirty, playful",
+            "Analyst": "📈 Bloomberg terminal style, quantitative",
+            "Coach": "💪 Motivational, performance-focused",
+            "Rebel": "🔥 Contrarian, challenges conventional wisdom",
+            "Guru": "🙏 Zen master, philosophical"
+        }
+
+        # Get current personality mode from session state
+        current_mode = st.session_state.get('ava_personality_mode', 'Friendly')
+
+        # Display current mode with emoji
+        st.caption(f"Current: {personality_descriptions.get(current_mode, current_mode)}")
+
+        # Mode selector
+        new_mode = st.selectbox(
+            "Select Personality",
+            list(personality_descriptions.keys()),
+            index=list(personality_descriptions.keys()).index(current_mode) if current_mode in personality_descriptions else 1,
+            format_func=lambda x: personality_descriptions[x],
+            key="personality_selector",
+            label_visibility="collapsed"
+        )
+
+        # Update personality if changed
+        if new_mode != current_mode:
+            st.session_state.ava_personality_mode = new_mode
+
+            # Update AVA instance if it exists
+            if 'ava_chatbot' in st.session_state and hasattr(st.session_state.ava_chatbot, 'ava'):
+                try:
+                    # Map display name to enum value
+                    mode_mapping = {
+                        'Professional': PersonalityMode.PROFESSIONAL,
+                        'Friendly': PersonalityMode.FRIENDLY,
+                        'Witty': PersonalityMode.WITTY,
+                        'Mentor': PersonalityMode.MENTOR,
+                        'Concise': PersonalityMode.CONCISE,
+                        'Charming': PersonalityMode.CHARMING,
+                        'Analyst': PersonalityMode.ANALYST,
+                        'Coach': PersonalityMode.COACH,
+                        'Rebel': PersonalityMode.REBEL,
+                        'Guru': PersonalityMode.GURU
+                    }
+
+                    if hasattr(st.session_state.ava_chatbot.ava, 'personality'):
+                        st.session_state.ava_chatbot.ava.personality.set_mode(mode_mapping[new_mode])
+                        st.success(f"Switched to {new_mode} mode!")
+                        st.rerun()
+                except Exception as e:
+                    st.warning(f"Personality mode updated for next session")
+
+        # Quick preset buttons
+        st.caption("Quick Presets:")
+        preset_cols = st.columns(3)
+        with preset_cols[0]:
+            if st.button("📊 Data", use_container_width=True, key="preset_analyst"):
+                st.session_state.ava_personality_mode = 'Analyst'
+                st.rerun()
+        with preset_cols[1]:
+            if st.button("💪 Coach", use_container_width=True, key="preset_coach"):
+                st.session_state.ava_personality_mode = 'Coach'
+                st.rerun()
+        with preset_cols[2]:
+            if st.button("🙏 Zen", use_container_width=True, key="preset_guru"):
+                st.session_state.ava_personality_mode = 'Guru'
+                st.rerun()
+
 
         if st.button("🗑️ Clear Chat", use_container_width=True):
             st.session_state.messages = [

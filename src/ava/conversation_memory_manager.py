@@ -26,7 +26,7 @@ from datetime import datetime, timedelta
 from dotenv import load_dotenv
 import json
 
-load_dotenv()
+load_dotenv(override=True)
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -72,7 +72,12 @@ class ConversationMemoryManager:
                 logger.warning(f"Schema file not found: {schema_file}")
 
         except Exception as e:
-            logger.error(f"Error initializing schema: {e}")
+            # Ignore "already exists" errors for triggers
+            error_str = str(e).lower()
+            if 'already exists' in error_str and 'trigger' in error_str:
+                logger.debug(f"Schema already initialized (trigger exists)")
+            else:
+                logger.error(f"Error initializing schema: {e}")
 
     # =================================================================
     # CONVERSATION MANAGEMENT

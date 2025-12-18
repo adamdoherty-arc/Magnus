@@ -14,21 +14,38 @@ def display_theta_forecasts(positions: list):
     """Display theta decay forecasts for option positions (CSP, CC, or Long Calls)"""
 
     if not positions:
+        st.info("No positions available for theta decay analysis")
         return
 
-    st.markdown("---")
-    st.markdown("### 📉 Theta Decay Forecasts")
-    st.caption("Day-by-day profit projections until expiration")
+    # Position selector with enhanced formatting
+    position_labels = []
+    for p in positions:
+        try:
+            # Calculate DTE for display
+            exp_date = datetime.strptime(p['Expiration'], '%Y-%m-%d')
+            dte = (exp_date - datetime.now()).days
 
-    # Position selector
-    position_labels = [f"{p['Symbol']} ${p['Strike']:.2f} exp {p['Expiration']}"
-                      for p in positions]
+            # Get strategy type
+            strategy = p.get('Strategy', 'Option')
+
+            # Format label with DTE and strategy
+            label = f"{p['Symbol']} ${p['Strike']:.2f} {strategy} - exp {p['Expiration']} ({dte}d)"
+            position_labels.append(label)
+        except Exception as e:
+            # Fallback to basic format if anything fails
+            label = f"{p.get('Symbol', 'Unknown')} ${p.get('Strike', 0):.2f} exp {p.get('Expiration', 'Unknown')}"
+            position_labels.append(label)
+
     selected_idx = st.selectbox(
-        "Select position:",
+        "Select position to analyze:",
         options=range(len(positions)),
         format_func=lambda i: position_labels[i],
-        key="theta_forecast_selector"
+        key="theta_forecast_selector",
+        help="Choose a position to see detailed theta decay forecast and profit projections"
     )
+
+    # Show selected position summary
+    st.caption(f"📊 Analyzing: {position_labels[selected_idx]}")
 
     position = positions[selected_idx]
 
@@ -210,19 +227,10 @@ def display_theta_forecasts(positions: list):
         df_display = df.copy()
 
     with st.expander("📊 View Daily Forecast Table", expanded=False):
-        st.dataframe(df_display, hide_index=True, width='stretch')
-
-        # Export button for full data
-        csv = df.to_csv(index=False)
-        st.download_button(
-            label="📥 Export Full Forecast to CSV",
-            data=csv,
-            file_name=f"{symbol}_{strike}_theta_forecast.csv",
-            mime="text/csv"
-        )
+        st.dataframe(df_display, hide_index=True, use_container_width=True)
 
         # Analysis summary
-        st.markdown("---")
+        st.write("")
         st.markdown("**📊 Forecast Analysis:**")
 
         # Calculate key insights

@@ -15,7 +15,7 @@ from datetime import datetime, timedelta
 from typing import List, Dict, Optional
 import json
 
-from src.kalshi_db_manager import KalshiDBManager
+from src.services import get_kalshi_manager  # Use centralized service registry
 from src.kalshi_ai_evaluator import KalshiAIEvaluator
 
 # Import Telegram notifier
@@ -353,10 +353,15 @@ def send_team_selection_notification(team_name: str, opponent: str, game_time: s
 # ============================================================================
 
 class MarketDataManager:
-    """Manages market data fetching and caching"""
+    """
+    Manages market data fetching and caching.
+
+    Uses centralized service registry for database manager to ensure
+    singleton behavior and efficient resource utilization.
+    """
 
     def __init__(self):
-        self.db = KalshiDBManager()
+        self.db = get_kalshi_manager()  # Use centralized registry
         self.evaluator = KalshiAIEvaluator()
 
     @st.cache_data(ttl=300)
@@ -1050,7 +1055,6 @@ def render_enhanced_market_card(market: pd.Series, data_manager: MarketDataManag
             </div>
         """, unsafe_allow_html=True)
 
-        st.markdown("---")
 
         # ========== MARKET DETAILS ==========
         col1, col2, col3, col4 = st.columns([2, 1, 1, 1])
@@ -1398,7 +1402,6 @@ def render_live_games_tab(df: pd.DataFrame):
         st.info("No games currently live")
 
     # Show upcoming games
-    st.markdown("---")
     st.subheader("📅 Upcoming Games")
 
     games_today = df[df['days_to_close'] == 0]
@@ -1452,7 +1455,6 @@ def show_kalshi_nfl_markets():
     # Render dashboard metrics
     render_dashboard_metrics(df, filtered_df)
 
-    st.markdown("---")
 
     # Main content tabs
     main_tabs = st.tabs([
@@ -1558,7 +1560,6 @@ def show_kalshi_nfl_markets():
     render_export_section(filtered_df)
 
     # Footer
-    st.markdown("---")
     st.caption(f"Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | Markets in database: {len(df)} | Showing: {len(filtered_df)}")
 
 

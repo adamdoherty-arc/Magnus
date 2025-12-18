@@ -654,7 +654,6 @@ get_all_agents(): {all_agents}
             st.info("Execution log requires database connection.")
     
     # Footer
-    st.markdown("---")
     st.markdown("**Agent Management Dashboard** - Monitor and manage all AVA agents")
 
 if __name__ == "__main__":

@@ -6,7 +6,7 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-from src.tradingview_db_manager import TradingViewDBManager
+from src.services import get_tradingview_manager  # Use centralized service registry
 from src.components.pagination_component import paginate_dataframe
 import logging
 
@@ -21,8 +21,12 @@ st.set_page_config(page_title="Sector Analysis", layout="wide")
 
 @st.cache_resource
 def get_sector_tv_manager():
-    """Cached database manager for connection pooling"""
-    return TradingViewDBManager()
+    """
+    Get TradingViewDBManager from centralized service registry.
+
+    The registry ensures singleton behavior across the application.
+    """
+    return get_tradingview_manager()
 
 
 @st.cache_data(ttl=300)  # 5-minute cache

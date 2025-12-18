@@ -162,6 +162,59 @@ class ESPNNCAALiveData:
             broadcast = competition.get('broadcasts', [])
             tv_network = broadcast[0].get('names', [''])[0] if broadcast else ''
 
+            # Extract situation data (possession, down & distance) - only available during live games
+            situation = competition.get('situation', {})
+            possession = situation.get('possession')  # Team ID that has possession
+            down_distance_text = situation.get('downDistanceText', '')  # e.g., "1st & 10"
+            short_down_distance = situation.get('shortDownDistanceText', '')  # e.g., "1st & 10"
+            possession_text = situation.get('possessionText', '')  # e.g., "ALA"
+            is_red_zone = situation.get('isRedZone', False)
+            home_timeouts = situation.get('homeTimeouts', 3)
+            away_timeouts = situation.get('awayTimeouts', 3)
+            last_play = situation.get('lastPlay', {})
+            last_play_text = last_play.get('text', '') if last_play else ''
+
+            # Extract leaders (passing, rushing, receiving)
+            leaders_data = competition.get('leaders', [])
+            passing_leader = None
+            rushing_leader = None
+            receiving_leader = None
+
+            for leader_category in leaders_data:
+                category_name = leader_category.get('name', '')
+                leaders_list = leader_category.get('leaders', [])
+
+                if leaders_list:
+                    leader_info = leaders_list[0]  # Get top leader
+                    athlete = leader_info.get('athlete', {})
+                    display_value = leader_info.get('displayValue', '')
+                    team = leader_info.get('team', {})
+                    team_abbr = team.get('abbreviation', '') if team else ''
+
+                    leader_dict = {
+                        'name': athlete.get('shortName', ''),
+                        'stats': display_value,
+                        'team': team_abbr
+                    }
+
+                    if category_name == 'passingYards':
+                        passing_leader = leader_dict
+                    elif category_name == 'rushingYards':
+                        rushing_leader = leader_dict
+                    elif category_name == 'receivingYards':
+                        receiving_leader = leader_dict
+
+            # Extract venue city
+            venue_city = venue.get('address', {}).get('city', '')
+
+            # Extract notes (injuries, weather, etc.)
+            notes = competition.get('notes', [])
+            game_notes = [note.get('headline', '') for note in notes] if notes else []
+
+            # Extract headlines
+            headlines = competition.get('headlines', [])
+            headline_text = headlines[0].get('shortLinkText', '') if headlines else ''
+
             return {
                 'game_id': game_id,
                 'name': name,
@@ -192,7 +245,21 @@ class ESPNNCAALiveData:
                 'period': period,
                 'game_time': game_datetime,
                 'venue': venue_name,
-                'tv_network': tv_network
+                'tv_network': tv_network,
+                # Enhanced live game data
+                'possession': possession_text,
+                'down_distance': short_down_distance or down_distance_text,
+                'is_red_zone': is_red_zone,
+                'home_timeouts': home_timeouts,
+                'away_timeouts': away_timeouts,
+                'last_play': last_play_text,
+                'passing_leader': passing_leader,
+                'rushing_leader': rushing_leader,
+                'receiving_leader': receiving_leader,
+                'venue_city': venue_city,
+                'broadcast': tv_network,
+                'notes': game_notes,
+                'headline': headline_text
             }
 
         except Exception as e:

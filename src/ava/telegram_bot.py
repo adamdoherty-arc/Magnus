@@ -51,6 +51,13 @@ except ImportError:
     logger.warning("AVA voice handler not available, text-only mode")
     AVAVoiceHandler = None
 
+try:
+    from src.ava.discord_knowledge import get_discord_knowledge
+    DISCORD_AVAILABLE = True
+except ImportError:
+    logger.warning("Discord knowledge not available")
+    DISCORD_AVAILABLE = False
+
 
 class AVATelegramBot:
     """AVA Telegram Bot with voice support"""
@@ -106,6 +113,8 @@ Try asking me: "How's my portfolio?" or "What are you working on?"
 /portfolio - Portfolio status
 /tasks - What AVA is working on
 /status - AVA system status
+/signals - Recent Discord trading signals
+/ticker SYMBOL - Discord signals for specific ticker
 /help - This help message
 
 **Questions you can ask:**
@@ -114,6 +123,7 @@ Try asking me: "How's my portfolio?" or "What are you working on?"
 • "What did you complete today?"
 • "Any important alerts?"
 • "What's the market doing?"
+• "What are the latest Discord signals?"
 
 Send voice messages and I'll transcribe them!
 """
@@ -136,6 +146,78 @@ Send voice messages and I'll transcribe them!
 
         response = self.voice_handler.process_query("What are you working on?")
         await update.message.reply_text(response['response_text'])
+
+    async def signals_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle /signals command - show recent Discord trading signals"""
+        if not DISCORD_AVAILABLE:
+            await update.message.reply_text("Discord integration not available")
+            return
+
+        try:
+            dk = get_discord_knowledge()
+            signals = dk.get_recent_signals(hours_back=24, limit=5)
+
+            if not signals:
+                await update.message.reply_text("No recent Discord signals found")
+                return
+
+            response = "**Recent Discord Trading Signals:**\n\n"
+
+            for i, signal in enumerate(signals[:5], 1):
+                timestamp = signal['timestamp'].strftime('%m/%d %H:%M')
+                channel = signal.get('channel_name', 'Unknown')
+                author = signal.get('author_name', 'Unknown')
+                content = signal['content'][:150] + "..." if len(signal['content']) > 150 else signal['content']
+
+                response += f"**{i}. {channel}** ({timestamp})\n"
+                response += f"👤 {author}\n"
+                response += f"💬 {content}\n\n"
+
+            await update.message.reply_text(response, parse_mode='Markdown')
+            logger.info(f"Sent {len(signals)} Discord signals to user")
+
+        except Exception as e:
+            logger.error(f"Error getting signals: {e}")
+            await update.message.reply_text(f"Error fetching signals: {str(e)}")
+
+    async def ticker_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle /ticker command - show Discord signals for specific ticker"""
+        if not DISCORD_AVAILABLE:
+            await update.message.reply_text("Discord integration not available")
+            return
+
+        if not context.args:
+            await update.message.reply_text("Usage: /ticker SYMBOL\nExample: /ticker AAPL")
+            return
+
+        ticker = context.args[0].upper()
+
+        try:
+            dk = get_discord_knowledge()
+            signals = dk.get_signals_by_ticker(ticker, days_back=7)
+
+            if not signals:
+                await update.message.reply_text(f"No Discord signals found for ${ticker}")
+                return
+
+            response = f"**Discord Signals for ${ticker}:**\n\n"
+
+            for i, signal in enumerate(signals[:5], 1):
+                timestamp = signal['timestamp'].strftime('%m/%d %H:%M')
+                channel = signal.get('channel_name', 'Unknown')
+                author = signal.get('author_name', 'Unknown')
+                content = signal['content'][:150] + "..." if len(signal['content']) > 150 else signal['content']
+
+                response += f"**{i}. {channel}** ({timestamp})\n"
+                response += f"👤 {author}\n"
+                response += f"💬 {content}\n\n"
+
+            await update.message.reply_text(response, parse_mode='Markdown')
+            logger.info(f"Sent {len(signals)} Discord signals for {ticker} to user")
+
+        except Exception as e:
+            logger.error(f"Error getting ticker signals: {e}")
+            await update.message.reply_text(f"Error fetching signals: {str(e)}")
 
     async def status_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle /status command"""
@@ -279,6 +361,8 @@ AVA is working 24/7 to improve your trading platform!
         app.add_handler(CommandHandler("portfolio", self.portfolio_command))
         app.add_handler(CommandHandler("tasks", self.tasks_command))
         app.add_handler(CommandHandler("status", self.status_command))
+        app.add_handler(CommandHandler("signals", self.signals_command))
+        app.add_handler(CommandHandler("ticker", self.ticker_command))
         app.add_handler(MessageHandler(filters.VOICE, self.handle_voice))
         app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_text))
 

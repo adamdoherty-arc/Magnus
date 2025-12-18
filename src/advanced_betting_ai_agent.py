@@ -14,6 +14,15 @@ from typing import Dict, List, Optional, Tuple
 from datetime import datetime
 import math
 
+# Import unified EV calculator for consistent calculations
+try:
+    from src.betting.unified_ev_calculator import UnifiedEVCalculator
+    UNIFIED_EV_AVAILABLE = True
+except ImportError:
+    UNIFIED_EV_AVAILABLE = False
+    logger_import = logging.getLogger(__name__)
+    logger_import.warning("UnifiedEVCalculator not available, using legacy calculation")
+
 logger = logging.getLogger(__name__)
 
 
@@ -207,15 +216,29 @@ class AdvancedBettingAIAgent:
             'value_detected': False
         }
 
-        # Extract Kalshi odds (in cents, 0-100)
-        kalshi_odds = game_data.get('kalshi_odds', {})
+        # Try to get odds from market_data first (widget format)
+        # Then fall back to game_data['kalshi_odds'] (game cards format)
+        away_price = None
+        home_price = None
 
-        if kalshi_odds:
-            # Convert to float to handle Decimal types from database
-            away_price = float(kalshi_odds.get('away_win_price', 0.5))
-            home_price = float(kalshi_odds.get('home_win_price', 0.5))
+        if market_data and ('yes_price' in market_data or 'no_price' in market_data):
+            # Widget format: market_data has yes_price/no_price (probabilities 0-1)
+            # For generic markets, yes=home, no=away
+            yes_price = market_data.get('yes_price', 0.5)
+            no_price = market_data.get('no_price', 0.5)
 
-            # Convert to probabilities
+            # Assume YES = home team wins, NO = away team wins
+            home_price = yes_price
+            away_price = no_price
+
+        elif 'kalshi_odds' in game_data:
+            # Game cards format: odds embedded in game_data
+            kalshi_odds = game_data['kalshi_odds']
+            away_price = kalshi_odds.get('away_win_price', 0.5)
+            home_price = kalshi_odds.get('home_win_price', 0.5)
+
+        if away_price is not None and home_price is not None:
+            # Odds are already in probability form (0-1)
             analysis['away_odds'] = away_price
             analysis['home_odds'] = home_price
             analysis['away_implied_prob'] = away_price
@@ -224,6 +247,10 @@ class AdvancedBettingAIAgent:
             # Check market efficiency (should sum to ~1.0)
             total_prob = away_price + home_price
             analysis['market_efficiency'] = abs(1.0 - total_prob)
+
+            # Detect value if there's significant market inefficiency
+            if analysis['market_efficiency'] > 0.05:
+                analysis['value_detected'] = True
 
         return analysis
 
@@ -332,7 +359,7 @@ class AdvancedBettingAIAgent:
 
     def _calculate_expected_value(self, win_prob: Dict, odds_analysis: Dict) -> Dict:
         """
-        Calculate expected value and confidence
+        Calculate expected value and confidence using unified calculator
 
         EV = (Win Probability × Potential Profit) - (Loss Probability × Stake)
         Confidence based on edge size and certainty
@@ -347,6 +374,20 @@ class AdvancedBettingAIAgent:
         else:
             market_odds = odds_analysis['home_odds']
 
+        # Use unified EV calculator if available
+        if UNIFIED_EV_AVAILABLE and market_odds > 0:
+            metrics = UnifiedEVCalculator.calculate_all(
+                ai_win_prob=probability,
+                market_price=market_odds,
+                market_efficiency=odds_analysis.get('market_efficiency', 0.0)
+            )
+            return {
+                'ev': metrics['ev_percentage'],
+                'edge': metrics['edge'],
+                'confidence': metrics['confidence']
+            }
+
+        # Legacy calculation (fallback)
         # Calculate edge (difference between true prob and market prob)
         edge = probability - market_odds
 

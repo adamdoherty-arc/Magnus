@@ -564,7 +564,7 @@ class KalshiDBManager:
                         p.reasoning
                     FROM kalshi_markets m
                     LEFT JOIN kalshi_predictions p ON m.id = p.market_id
-                    WHERE m.status = 'open'
+                    WHERE m.status IN ('open', 'active')
                     AND m.market_type = %s
                     ORDER BY p.overall_rank ASC NULLS LAST
                     LIMIT %s
@@ -593,7 +593,7 @@ class KalshiDBManager:
                         p.reasoning
                     FROM kalshi_markets m
                     LEFT JOIN kalshi_predictions p ON m.id = p.market_id
-                    WHERE m.status = 'open'
+                    WHERE m.status IN ('open', 'active')
                     ORDER BY p.overall_rank ASC NULLS LAST
                     LIMIT %s
                 """
@@ -928,7 +928,7 @@ class KalshiDBManager:
                     p.reasoning
                 FROM kalshi_markets m
                 INNER JOIN kalshi_predictions p ON m.id = p.market_id
-                WHERE m.status = 'open'
+                WHERE m.status IN ('open', 'active')
                 AND p.confidence_score >= %s
                 AND p.edge_percentage >= %s
             """

@@ -10,6 +10,7 @@ from typing import List, Dict, Optional
 import psycopg2
 import psycopg2.extras
 from src.kalshi_db_manager import KalshiDBManager
+from src.telegram_notifier import TelegramNotifier
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +33,7 @@ class GameWatchlistManager:
 
     def __init__(self, db_manager: KalshiDBManager = None):
         self.db = db_manager or KalshiDBManager()
+        self.telegram = TelegramNotifier()
         self._create_watchlist_tables()
 
     def _create_watchlist_tables(self):
@@ -184,6 +186,10 @@ class GameWatchlistManager:
 
             conn.commit()
             logger.info(f"Added game {game_id} to watchlist for user {user_id}")
+
+            # Send Telegram notification
+            self._send_subscription_alert(game)
+
             return True
 
         except Exception as e:
@@ -196,6 +202,93 @@ class GameWatchlistManager:
                 cur.close()
             if conn:
                 conn.close()
+
+    def _send_subscription_alert(self, game: Dict) -> None:
+        """Send Telegram alert when user subscribes to a game"""
+        try:
+            away_team = game.get('away_team', 'TBD')
+            home_team = game.get('home_team', 'TBD')
+            status = game.get('status', 'Scheduled')
+            away_score = game.get('away_score', 0)
+            home_score = game.get('home_score', 0)
+            game_date = game.get('game_date', 'TBD')
+            sport = game.get('sport', 'NFL')
+
+            # Build nice game alert message
+            message = f"🏈 **GAME SUBSCRIPTION CONFIRMED**\n\n"
+            message += f"**{away_team}** @ **{home_team}**\n\n"
+
+            if status.lower() in ['live', 'in progress']:
+                message += f"📊 Live Score: {away_score} - {home_score}\n"
+                message += f"📺 Status: {status}\n"
+
+                # Enhanced live game data
+                possession = game.get('possession', '')
+                down_distance = game.get('down_distance', '')
+                is_red_zone = game.get('is_red_zone', False)
+                home_timeouts = game.get('home_timeouts', 3)
+                away_timeouts = game.get('away_timeouts', 3)
+                last_play = game.get('last_play', '')
+
+                if possession:
+                    message += f"🏈 Possession: {possession}\n"
+                if down_distance:
+                    redzone_emoji = "🔴 " if is_red_zone else ""
+                    message += f"{redzone_emoji}Down & Distance: {down_distance}\n"
+                if last_play:
+                    message += f"📝 Last Play: {last_play[:100]}\n"
+
+                # Timeouts
+                message += f"\n⏱️ Timeouts:\n"
+                message += f"{away_team}: {'●' * away_timeouts}{'○' * (3 - away_timeouts)}\n"
+                message += f"{home_team}: {'●' * home_timeouts}{'○' * (3 - home_timeouts)}\n"
+
+                # Leaders
+                passing_leader = game.get('passing_leader')
+                rushing_leader = game.get('rushing_leader')
+                if passing_leader or rushing_leader:
+                    message += f"\n📊 Game Leaders:\n"
+                    if passing_leader:
+                        message += f"🎯 Passing: {passing_leader.get('name')} - {passing_leader.get('stats')}\n"
+                    if rushing_leader:
+                        message += f"🏃 Rushing: {rushing_leader.get('name')} - {rushing_leader.get('stats')}\n"
+
+                message += "\n"
+            else:
+                message += f"📅 {game_date}\n"
+                message += f"📺 Status: {status}\n"
+
+                # Venue and broadcast info for upcoming games
+                venue = game.get('venue', '')
+                broadcast = game.get('broadcast', '')
+                if venue:
+                    message += f"🏟️ Venue: {venue}\n"
+                if broadcast:
+                    message += f"📺 TV: {broadcast}\n"
+
+                message += "\n"
+
+            message += f"You'll receive notifications for:\n"
+            message += f"• Score updates\n"
+            message += f"• Quarter changes\n"
+            message += f"• Game status changes\n"
+            message += f"• AI prediction updates\n\n"
+
+            # Add AI prediction if available
+            if game.get('ai_prediction'):
+                pred = game['ai_prediction']
+                message += f"🤖 **Multi-Agent AI Analysis**\n"
+                message += f"🎯 Prediction: {pred.get('predicted_winner', 'N/A')} {pred.get('point_spread', '')}\n"
+                message += f"✅ {pred.get('win_probability', 0):.0f}% win probability\n"
+                message += f"💡 {pred.get('confidence', 'Medium')} Confidence\n\n"
+
+            message += f"**Powered by Magnus {sport} Tracker**"
+
+            self.telegram.send_custom_message(message)
+            logger.info(f"Sent subscription alert for game: {away_team} @ {home_team}")
+
+        except Exception as e:
+            logger.error(f"Error sending subscription alert: {e}")
 
     def remove_game_from_watchlist(self, user_id: str, game_id: str) -> bool:
         """Remove a game from user's watchlist"""

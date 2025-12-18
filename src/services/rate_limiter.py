@@ -5,11 +5,13 @@ Thread-safe token bucket rate limiter with decorator support
 
 import time
 import threading
+import logging
 from typing import Dict, Callable, Optional
 from functools import wraps
-from loguru import logger
 
 from src.services.config import ServiceConfig, get_service_config
+
+logger = logging.getLogger(__name__)
 
 
 class TokenBucket:

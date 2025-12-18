@@ -44,15 +44,11 @@ def render_ai_options_agent_page():
     """Main UI for AI Options Agent"""
 
     st.title("🤖 AI Options Agent")
-    
-    # Deprecation notice
-    st.warning("⚠️ **This page is deprecated.** All features have been merged into the **Options Analysis** page. Please use that page instead.")
-    if st.button("📌 Go to Options Analysis", type="primary"):
-        st.session_state.page = "Options Analysis"
-        st.rerun()
-    
+
     st.markdown("""
     **AI-Powered Options Analysis** using Multi-Criteria Decision Making (MCDM) + LLM Reasoning
+
+    Scan hundreds of stocks at once to find the best cash-secured put opportunities using advanced multi-criteria scoring.
     """)
     
     # Sync status widget
@@ -83,7 +79,6 @@ def render_ai_options_agent_page():
     llm_manager = st.session_state.llm_manager
 
     # === LLM PROVIDER SECTION ===
-    st.markdown("---")
     llm_config = LLMConfigUI(llm_manager)
     selected_provider = llm_config.render_provider_selector(
         show_add_provider=True,
@@ -91,7 +86,6 @@ def render_ai_options_agent_page():
     )
 
     # === ANALYSIS SETTINGS ===
-    st.markdown("---")
     st.subheader("⚙️ Analysis Settings")
 
     col1, col2, col3 = st.columns(3)
@@ -141,7 +135,6 @@ def render_ai_options_agent_page():
                                        help="Add AI-generated reasoning (slower, uses API)")
 
     # Run Analysis button
-    st.markdown("---")
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         run_analysis = st.button("🚀 Run Analysis", type="primary", use_container_width=True)
@@ -213,7 +206,6 @@ def render_ai_options_agent_page():
             col3.metric("Average Score", f"{avg_score:.0f}/100")
             col4.metric("Total Analyzed", len(analyses))
 
-            st.markdown("---")
 
             # Display each analysis
             for analysis in analyses:

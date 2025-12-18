@@ -11,9 +11,6 @@ from typing import Dict, List, Optional, Any, Tuple
 from dotenv import load_dotenv
 import logging
 
-# Import centralized data layer
-from src.data.options_queries import get_premium_opportunities
-
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -56,31 +53,55 @@ class AIOptionsDBManager:
             List of option opportunities with all relevant data
         """
         try:
-            # Convert premium from dollars to percentage for the centralized query
-            # Note: min_premium is in cents in the database, premium_pct is percentage
-            # We'll use a minimal premium_pct and filter by volume/OI instead
+            # Query database directly for premium opportunities
+            conn = self.get_connection()
+            cur = conn.cursor(cursor_factory=RealDictCursor)
 
-            filters = {
-                'min_delta': delta_range[0],
-                'max_delta': delta_range[1],
-                'min_dte': dte_range[0],
-                'max_dte': dte_range[1],
-                'min_premium_pct': 0.5,  # Minimum 0.5% premium
-                'min_annual_return': 0,  # Get all, we'll filter later
-                'min_volume': 10,
-                'min_open_interest': 50,
-                'limit': limit * 2  # Get more results for filtering
-            }
+            # Build query to get options opportunities
+            query = """
+                SELECT DISTINCT ON (sp.symbol)
+                    sp.symbol,
+                    sp.strike_price,
+                    sp.expiration_date,
+                    sp.dte,
+                    sp.delta,
+                    sp.premium,
+                    sp.bid,
+                    sp.ask,
+                    sp.volume,
+                    sp.open_interest as oi,
+                    sp.implied_volatility as iv,
+                    sp.monthly_return,
+                    sp.annual_return,
+                    sd.current_price,
+                    sd.pe_ratio,
+                    sd.market_cap,
+                    sd.sector,
+                    sd.dividend_yield
+                FROM stock_premiums sp
+                LEFT JOIN stock_data sd ON sp.symbol = sd.symbol
+                WHERE sp.dte BETWEEN %s AND %s
+                    AND (sp.delta BETWEEN %s AND %s OR sp.delta IS NULL)
+                    AND sp.volume >= 10
+                    AND sp.open_interest >= 50
+                    {symbol_filter}
+                ORDER BY sp.symbol, sp.annual_return DESC NULLS LAST
+                LIMIT %s
+            """
 
-            # Use centralized data layer
-            opportunities = get_premium_opportunities(filters)
-
-            # Filter by symbols if provided
+            # Add symbol filter if provided
             if symbols:
-                opportunities = [
-                    opp for opp in opportunities
-                    if opp.get('symbol') in symbols
-                ]
+                symbol_placeholders = ','.join(['%s'] * len(symbols))
+                query = query.format(symbol_filter=f"AND sp.symbol IN ({symbol_placeholders})")
+                params = (dte_range[0], dte_range[1], delta_range[0], delta_range[1]) + tuple(symbols) + (limit * 2,)
+            else:
+                query = query.format(symbol_filter='')
+                params = (dte_range[0], dte_range[1], delta_range[0], delta_range[1], limit * 2)
+
+            cur.execute(query, params)
+            opportunities = [dict(row) for row in cur.fetchall()]
+            cur.close()
+            conn.close()
 
             # Filter by minimum premium (premium is in cents in our data)
             if min_premium > 0:
@@ -89,24 +110,27 @@ class AIOptionsDBManager:
                     if opp.get('premium', 0) >= min_premium
                 ]
 
-            # Get only the top results by annual_return, one per symbol
-            seen_symbols = set()
+            # Process and normalize field names
             filtered_opportunities = []
             for opp in opportunities:
-                symbol = opp.get('symbol')
-                if symbol not in seen_symbols:
-                    seen_symbols.add(symbol)
-                    # Rename fields to match expected format
-                    opp['stock_price'] = opp.get('current_price', 0)
+                # Normalize field names to match expected format
+                opp['stock_price'] = opp.get('current_price', 0)
+                if opp.get('iv') is None:
                     opp['iv'] = opp.get('implied_volatility', 0)
+                if opp.get('oi') is None:
                     opp['oi'] = opp.get('open_interest', 0)
-                    opp['breakeven'] = opp.get('strike_price', 0) - (opp.get('premium', 0) / 100)
-                    filtered_opportunities.append(opp)
 
-                    if len(filtered_opportunities) >= limit:
-                        break
+                # Calculate breakeven
+                strike = opp.get('strike_price', 0)
+                premium_dollars = (opp.get('premium', 0) / 100) if opp.get('premium') else 0
+                opp['breakeven'] = strike - premium_dollars
 
-            logger.info(f"Found {len(filtered_opportunities)} opportunities using centralized data layer")
+                filtered_opportunities.append(opp)
+
+                if len(filtered_opportunities) >= limit:
+                    break
+
+            logger.info(f"Found {len(filtered_opportunities)} opportunities from database")
             return filtered_opportunities
 
         except Exception as e:

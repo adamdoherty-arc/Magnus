@@ -190,7 +190,9 @@ class LLMService:
             self._providers = {}
             self._cache = ResponseCache(ttl=3600)  # 1 hour cache
             self._usage = UsageTracker()
+            self._router = None  # Intelligent router (initialized after providers)
             self._initialize_providers()
+            self._initialize_router()
             self._initialized = True
             logger.info("LLM service initialized")
 
@@ -264,6 +266,18 @@ class LLMService:
         except ImportError as e:
             logger.error(f"Failed to import LLM providers: {e}")
 
+    def _initialize_router(self):
+        """Initialize intelligent LLM router for cost optimization"""
+        try:
+            from src.services.intelligent_llm_router import IntelligentLLMRouter
+
+            available_providers = list(self._providers.keys())
+            self._router = IntelligentLLMRouter(available_providers)
+            logger.info("✅ Intelligent LLM router initialized for cost optimization")
+        except ImportError as e:
+            logger.warning(f"Intelligent router not available: {e}")
+            self._router = None
+
     def _get_provider(self, provider_name: str):
         """Get provider instance by name"""
         if provider_name not in self._providers:
@@ -300,19 +314,28 @@ class LLMService:
         """
         # Auto-select provider if not specified
         if provider is None or provider not in self._providers:
-            # Priority: Ollama (free) > Groq (free) > HuggingFace (free tier) > DeepSeek (cheap) > Gemini > others
-            for fallback in ["ollama", "groq", "huggingface", "deepseek", "gemini"]:
-                if fallback in self._providers:
-                    provider = fallback
-                    logger.info(f"Auto-selected provider: {fallback}")
-                    break
+            # Use intelligent router for cost optimization
+            if self._router:
+                routing = self._router.get_optimal_provider(prompt)
+                provider = routing['provider']
+                if not model:  # Only use router's model if not explicitly specified
+                    model = routing['model']
+                logger.info(f"🎯 Intelligent routing: {routing['routing_reason']} -> {provider}/{model}")
+            else:
+                # Fallback to simple priority if router not available
+                # Priority: Ollama (free) > Groq (free) > HuggingFace (free tier) > DeepSeek (cheap) > Gemini > others
+                for fallback in ["ollama", "groq", "huggingface", "deepseek", "gemini"]:
+                    if fallback in self._providers:
+                        provider = fallback
+                        logger.info(f"Auto-selected provider (no router): {fallback}")
+                        break
 
-            if provider is None:
-                # Use any available provider
-                if self._providers:
-                    provider = list(self._providers.keys())[0]
-                else:
-                    raise RuntimeError("No LLM providers available")
+                if provider is None:
+                    # Use any available provider
+                    if self._providers:
+                        provider = list(self._providers.keys())[0]
+                    else:
+                        raise RuntimeError("No LLM providers available")
 
         provider_instance = self._get_provider(provider)
 
@@ -452,6 +475,55 @@ class LLMService:
         """Reset usage statistics"""
         self._usage.reset()
 
+    def get_routing_stats(self) -> Dict[str, Any]:
+        """
+        Get intelligent routing statistics and cost savings
+
+        Returns:
+            Routing statistics including tier distribution and savings
+        """
+        if not self._router:
+            return {"intelligent_routing": False, "message": "Router not initialized"}
+
+        # Calculate queries by tier from usage stats
+        usage_stats = self._usage.get_stats()
+
+        # Map providers to tiers
+        provider_to_tier = {
+            "ollama": "free",
+            "groq": "free",
+            "huggingface": "free",
+            "deepseek": "cheap",
+            "gemini": "cheap",
+            "openai": "standard",
+            "anthropic": "premium"
+        }
+
+        queries_by_tier = {"free": 0, "cheap": 0, "standard": 0, "premium": 0}
+
+        for key, stats in usage_stats.items():
+            provider = stats['provider']
+            tier = provider_to_tier.get(provider, "standard")
+            queries_by_tier[tier] += stats['calls']
+
+        # Get savings report
+        savings = self._router.get_savings_report(queries_by_tier)
+
+        return {
+            "intelligent_routing": True,
+            "total_queries": savings['total_queries'],
+            "actual_cost": savings['actual_cost'],
+            "premium_cost": savings['premium_cost'],
+            "savings": savings['savings'],
+            "savings_percent": savings['savings_percent'],
+            "cost_reduction": savings['cost_reduction'],
+            "queries_by_tier": queries_by_tier,
+            "free_tier_percentage": round(
+                (queries_by_tier['free'] / savings['total_queries'] * 100)
+                if savings['total_queries'] > 0 else 0, 1
+            )
+        }
+
     def get_service_info(self) -> Dict[str, Any]:
         """Get service information and health status"""
         return {
@@ -459,7 +531,8 @@ class LLMService:
             "total_providers": len(self._providers),
             "cache_enabled": True,
             "cache_ttl": self._cache.ttl,
-            "total_cost": self._usage.get_total_cost()
+            "total_cost": self._usage.get_total_cost(),
+            "intelligent_routing_enabled": self._router is not None
         }
 
 

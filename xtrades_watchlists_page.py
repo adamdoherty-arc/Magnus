@@ -23,19 +23,25 @@ from typing import List, Dict, Optional, Any
 import time
 
 # Import Xtrades modules
-from src.xtrades_db_manager import XtradesDBManager
+from src.services import get_xtrades_manager  # Use centralized service registry
 from src.xtrades_scraper import XtradesScraper, LoginFailedException, ProfileNotFoundException
 from src.telegram_notifier import TelegramNotifier
 
 
 # ============================================================================
-# PERFORMANCE: Connection Pooling & Caching
+# PERFORMANCE: Connection Pooling & Caching (Using Service Registry)
 # ============================================================================
 
 @st.cache_resource
 def get_xtrades_db_manager():
-    """Cached database manager - singleton pattern for connection pooling"""
-    return XtradesDBManager()
+    """
+    Get XtradesDBManager from centralized service registry.
+
+    The registry ensures singleton behavior - only one instance exists
+    across the entire application, reducing database connections and
+    improving memory efficiency.
+    """
+    return get_xtrades_manager()
 
 
 @st.cache_data(ttl=60)  # 1-minute cache for active trades
@@ -154,7 +160,6 @@ def show_xtrades_page():
                 with col4:
                     st.metric("Total Contracts", total_contracts)
 
-                st.markdown("---")
 
                 # Filters
                 st.markdown("### 🔍 Filter Trades")
@@ -164,18 +169,38 @@ def show_xtrades_page():
                     # PERFORMANCE: Use cached profiles query
                     all_profiles = get_active_profiles_cached()
                     profile_names = ['All'] + [p['username'] for p in all_profiles]
-                    selected_profile = st.selectbox("Profile", profile_names, key="active_profile_filter")
+                    selected_profile = st.selectbox(
+                        "Profile",
+                        profile_names,
+                        key="active_profile_filter",
+                        help="Filter trades by profile"
+                    )
 
                 with col_f2:
                     strategies = ['All', 'CSP', 'CC', 'Long Call', 'Long Put', 'Put Credit Spread', 'Call Credit Spread']
-                    selected_strategy = st.selectbox("Strategy", strategies, key="active_strategy_filter")
+                    selected_strategy = st.selectbox(
+                        "Strategy",
+                        strategies,
+                        key="active_strategy_filter",
+                        help="Filter trades by strategy type"
+                    )
 
                 with col_f3:
                     tickers = ['All'] + sorted(list(set([t['ticker'] for t in active_trades if t['ticker']])))
-                    selected_ticker = st.selectbox("Ticker", tickers, key="active_ticker_filter")
+                    selected_ticker = st.selectbox(
+                        "Ticker",
+                        tickers,
+                        key="active_ticker_filter",
+                        help="Filter trades by ticker symbol"
+                    )
 
                 with col_f4:
-                    sort_by = st.selectbox("Sort By", ['Date (Newest)', 'Date (Oldest)', 'Ticker', 'P/L (Est)'], key="active_sort")
+                    sort_by = st.selectbox(
+                        "Sort By",
+                        ['Date (Newest)', 'Date (Oldest)', 'Ticker', 'P/L (Est)'],
+                        key="active_sort",
+                        help="Sort trades by selected criteria"
+                    )
 
                 # Apply filters
                 filtered_trades = active_trades.copy()
@@ -270,9 +295,8 @@ def show_xtrades_page():
                     st.dataframe(
                         styled_df,
                         hide_index=True,
-                        width='stretch',
-                        height=600,
-                        key="active_trades_table"
+                        use_container_width=True,
+                        height=600
                     )
                 else:
                     st.info("No trades match the current filters")
@@ -323,7 +347,6 @@ def show_xtrades_page():
                 with col5:
                     st.metric("Best / Worst", f'${best_trade:.2f} / ${worst_trade:.2f}')
 
-                st.markdown("---")
 
                 # Filters
                 st.markdown("### 🔍 Filter Closed Trades")
@@ -333,14 +356,29 @@ def show_xtrades_page():
                     # PERFORMANCE: Use cached profiles query
                     all_profiles = get_active_profiles_cached()
                     profile_names = ['All'] + [p['username'] for p in all_profiles]
-                    selected_profile = st.selectbox("Profile", profile_names, key="closed_profile_filter")
+                    selected_profile = st.selectbox(
+                        "Profile",
+                        profile_names,
+                        key="closed_profile_filter",
+                        help="Filter closed trades by profile"
+                    )
 
                 with col_f2:
                     strategies = ['All', 'CSP', 'CC', 'Long Call', 'Long Put']
-                    selected_strategy = st.selectbox("Strategy", strategies, key="closed_strategy_filter")
+                    selected_strategy = st.selectbox(
+                        "Strategy",
+                        strategies,
+                        key="closed_strategy_filter",
+                        help="Filter closed trades by strategy"
+                    )
 
                 with col_f3:
-                    date_range = st.selectbox("Date Range", ['All Time', 'Last 7 Days', 'Last 30 Days', 'Last 3 Months', 'Last Year'], key="closed_date_filter")
+                    date_range = st.selectbox(
+                        "Date Range",
+                        ['All Time', 'Last 7 Days', 'Last 30 Days', 'Last 3 Months', 'Last Year'],
+                        key="closed_date_filter",
+                        help="Filter closed trades by date range"
+                    )
 
                 # Apply filters
                 filtered_closed = all_closed.copy()
@@ -437,9 +475,8 @@ def show_xtrades_page():
                     st.dataframe(
                         styled_df,
                         hide_index=True,
-                        width='stretch',
-                        height=600,
-                        key="closed_trades_table"
+                        use_container_width=True,
+                        height=600
                     )
                 else:
                     st.info("No closed trades match the current filters")
@@ -472,7 +509,6 @@ def show_xtrades_page():
                 win_rate = overall_stats.get('win_rate', 0)
                 st.metric("Win Rate", f"{win_rate:.1f}%")
 
-            st.markdown("---")
 
             # Performance by Profile
             st.markdown("### 👥 Performance by Profile")
@@ -503,7 +539,7 @@ def show_xtrades_page():
                 df_profiles['Win Rate'] = df_profiles['Win Rate'].apply(lambda x: f'{x:.1f}%' if x else '0%')
                 df_profiles['Avg P/L'] = df_profiles['Avg P/L'].apply(lambda x: f'${x:.2f}')
 
-                st.dataframe(df_profiles, hide_index=True, width='stretch')
+                st.dataframe(df_profiles, hide_index=True, use_container_width=True)
 
                 # Chart: Total P/L by Profile
                 if profile_perf:
@@ -516,11 +552,10 @@ def show_xtrades_page():
                         color='Total P/L',
                         color_continuous_scale=['red', 'yellow', 'green']
                     )
-                    st.plotly_chart(fig, width='stretch')
+                    st.plotly_chart(fig, use_container_width=True)
             else:
                 st.info("No profiles to analyze yet")
 
-            st.markdown("---")
 
             # Performance by Strategy
             st.markdown("### 📈 Performance by Strategy")
@@ -569,7 +604,7 @@ def show_xtrades_page():
                 df_strategy_display['Win Rate'] = df_strategy_display['Win Rate'].apply(lambda x: f'{x:.1f}%')
                 df_strategy_display['Avg P/L'] = df_strategy_display['Avg P/L'].apply(lambda x: f'${x:.2f}')
 
-                st.dataframe(df_strategy_display, hide_index=True, width='stretch')
+                st.dataframe(df_strategy_display, hide_index=True, use_container_width=True)
 
                 # Chart
                 fig = px.pie(
@@ -578,11 +613,10 @@ def show_xtrades_page():
                     names='Strategy',
                     title='Trades by Strategy'
                 )
-                st.plotly_chart(fig, width='stretch')
+                st.plotly_chart(fig, use_container_width=True)
             else:
                 st.info("No closed trades for strategy analysis")
 
-            st.markdown("---")
 
             # Performance by Ticker
             st.markdown("### 📊 Top Performers by Ticker")
@@ -680,7 +714,6 @@ def show_xtrades_page():
                 else:
                     st.error("Please enter a username")
 
-        st.markdown("---")
 
         # List existing profiles
         st.markdown("### 📋 Existing Profiles")
@@ -785,10 +818,20 @@ def show_xtrades_page():
                 col1, col2 = st.columns(2)
 
                 with col1:
-                    status_filter = st.selectbox("Filter by Status", ['All', 'success', 'partial', 'failed', 'running'], key="sync_status_filter")
+                    status_filter = st.selectbox(
+                        "Filter by Status",
+                        ['All', 'success', 'partial', 'failed', 'running'],
+                        key="sync_status_filter",
+                        help="Filter sync history by status"
+                    )
 
                 with col2:
-                    date_filter = st.selectbox("Date Range", ['All', 'Last 24 Hours', 'Last 7 Days', 'Last 30 Days'], key="sync_date_filter")
+                    date_filter = st.selectbox(
+                        "Date Range",
+                        ['All', 'Last 24 Hours', 'Last 7 Days', 'Last 30 Days'],
+                        key="sync_date_filter",
+                        help="Filter sync history by date range"
+                    )
 
                 # Apply filters
                 filtered_logs = sync_logs.copy()
@@ -837,7 +880,7 @@ def show_xtrades_page():
                     # Format
                     df['Duration (s)'] = df['Duration (s)'].apply(lambda x: f'{x:.1f}s' if x else 'N/A')
 
-                    st.dataframe(df, hide_index=True, width='stretch', height=600)
+                    st.dataframe(df, hide_index=True, use_container_width=True, height=600)
 
                     # Show errors in expandable sections
                     errors_found = [log for log in filtered_logs if log.get('errors')]
@@ -885,7 +928,6 @@ def show_xtrades_page():
 
             st.caption("Limit alerts retrieved to avoid timeouts")
 
-        st.markdown("---")
 
         st.markdown("### 📱 Telegram Notifications")
 
@@ -912,7 +954,6 @@ def show_xtrades_page():
                     except Exception as e:
                         st.error(f"Failed to send notification: {e}")
 
-        st.markdown("---")
 
         st.markdown("### 🌐 Discord/Scraper Settings")
 
@@ -943,7 +984,6 @@ def show_xtrades_page():
                     except Exception as e:
                         st.error(f"❌ Connection failed: {e}")
 
-        st.markdown("---")
 
         st.markdown("### 🗑️ Maintenance")
 
@@ -961,7 +1001,6 @@ def show_xtrades_page():
             if st.button("📊 Recalculate Stats", key="recalc_stats"):
                 st.info("Recalculating all profile statistics...")
 
-        st.markdown("---")
 
         # Save settings button
         if st.button("💾 Save All Settings", type="primary", key="save_settings"):

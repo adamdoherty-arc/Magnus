@@ -50,8 +50,7 @@ class GameAnalysisAgent(BaseAgent):
             'match_games_to_markets',
             'calculate_opportunities',
             'compare_odds',
-            'generate_recommendations',
-            'game_by_game_analysis'
+            'generate_recommendations'
         ]
     
     async def execute(self, state: AgentState) -> AgentState:

@@ -11,11 +11,18 @@ from typing import Dict, List, Optional, Any, Tuple
 import os
 from dotenv import load_dotenv
 import logging
+from src.services.rate_limiter import rate_limit
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-load_dotenv()
+load_dotenv(override=True)
+
+# PERFORMANCE FIX: Rate-limited Robinhood API wrapper
+@rate_limit("robinhood", tokens=1, timeout=30)
+def get_earnings_rate_limited(symbol: str):
+    """Rate-limited wrapper for rh.get_earnings()"""
+    return rh.get_earnings(symbol)
 
 
 class EarningsManager:
@@ -301,7 +308,8 @@ class EarningsManager:
                     progress_callback(i + 1, len(symbols), symbol)
 
                 # Fetch earnings from Robinhood
-                earnings_data = rh.get_earnings(symbol)
+                # PERFORMANCE: Rate-limited API call
+                earnings_data = get_earnings_rate_limited(symbol)
 
                 if earnings_data and isinstance(earnings_data, list):
                     # Process each earnings record (last 8 quarters)

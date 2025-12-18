@@ -1,44 +1,235 @@
 version: '3.8'
 
 services:
+  # PostgreSQL Database
   postgres:
-    image: postgres:15
-    container_name: wheel-strategy-db
+    image: postgres:15-alpine
+    container_name: magnus-postgres
+    restart: unless-stopped
     environment:
-      POSTGRES_DB: magnus
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres123!
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB environment variable required}
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER environment variable required}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD environment variable required}
+      PGDATA: /var/lib/postgresql/data/pgdata
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./database_schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+      - ./src/database/additional_performance_indexes.sql:/docker-entrypoint-initdb.d/02-indexes.sql
     networks:
-      - wheel-strategy-network
+      - magnus-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
+  # Redis Cache & Message Broker
+  redis:
+    image: redis:7-alpine
+    container_name: magnus-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD environment variable required}
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - magnus-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Magnus Streamlit Application
   app:
-    build: .
-    container_name: wheel-strategy-app
+    build:
+      context: .
+      target: application
+    container_name: magnus-app
+    restart: unless-stopped
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     environment:
+      # Database
       DB_HOST: postgres
       DB_PORT: 5432
-      DB_NAME: magnus
-      DB_USER: postgres
-      DB_PASSWORD: postgres123!
-      DATABASE_URL: postgresql://postgres:postgres123!@postgres:5432/magnus
-      NODE_ENV: production
+      DB_NAME: ${POSTGRES_DB:?POSTGRES_DB required}
+      DB_USER: ${POSTGRES_USER:?POSTGRES_USER required}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD required}
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+
+      # Redis
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD required}
+
+      # Celery
+      CELERY_BROKER_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      CELERY_RESULT_BACKEND: redis://:${REDIS_PASSWORD}@redis:6379/0
+
+      # API Keys (from .env file)
+      ROBINHOOD_USERNAME: ${ROBINHOOD_USERNAME}
+      ROBINHOOD_PASSWORD: ${ROBINHOOD_PASSWORD}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      GROQ_API_KEY: ${GROQ_API_KEY}
+      KALSHI_API_KEY: ${KALSHI_API_KEY}
+      KALSHI_API_SECRET: ${KALSHI_API_SECRET}
+
+      # Application
+      PYTHONPATH: /app
+      STREAMLIT_SERVER_PORT: 8501
+      STREAMLIT_SERVER_ADDRESS: 0.0.0.0
+    ports:
+      - "${APP_PORT:-8501}:8501"
     volumes:
       - ./logs:/app/logs
       - ./data:/app/data
-      - ./exports:/app/exports
+      - ./models:/app/models
+      - ./.env:/app/.env:ro
     networks:
-      - wheel-strategy-network
-    command: npm start
+      - magnus-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8501/_stcore/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Celery Worker (Background Tasks)
+  celery-worker:
+    build:
+      context: .
+      target: application
+    container_name: magnus-celery-worker
+    restart: unless-stopped
+    command: celery -A src.services.celery_app worker --loglevel=info --concurrency=4
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      # Database
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ${POSTGRES_DB:?POSTGRES_DB required}
+      DB_USER: ${POSTGRES_USER:?POSTGRES_USER required}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD required}
+
+      # Redis
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD required}
+
+      # Celery
+      CELERY_BROKER_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      CELERY_RESULT_BACKEND: redis://:${REDIS_PASSWORD}@redis:6379/0
+
+      # API Keys
+      ROBINHOOD_USERNAME: ${ROBINHOOD_USERNAME}
+      ROBINHOOD_PASSWORD: ${ROBINHOOD_PASSWORD}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      KALSHI_API_KEY: ${KALSHI_API_KEY}
+
+      PYTHONPATH: /app
+    volumes:
+      - ./logs:/app/logs
+      - ./data:/app/data
+      - ./.env:/app/.env:ro
+    networks:
+      - magnus-network
+
+  # Celery Beat (Scheduled Tasks)
+  celery-beat:
+    build:
+      context: .
+      target: application
+    container_name: magnus-celery-beat
+    restart: unless-stopped
+    command: celery -A src.services.celery_app beat --loglevel=info --scheduler django_celery_beat.schedulers:DatabaseScheduler
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      # Database
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ${POSTGRES_DB:?POSTGRES_DB required}
+      DB_USER: ${POSTGRES_USER:?POSTGRES_USER required}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD required}
+
+      # Redis
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD required}
+
+      # Celery
+      CELERY_BROKER_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      CELERY_RESULT_BACKEND: redis://:${REDIS_PASSWORD}@redis:6379/0
+
+      PYTHONPATH: /app
+    volumes:
+      - ./logs:/app/logs
+      - ./.env:/app/.env:ro
+    networks:
+      - magnus-network
+
+  # Flower (Celery Monitoring UI)
+  flower:
+    build:
+      context: .
+      target: application
+    container_name: magnus-flower
+    restart: unless-stopped
+    command: celery -A src.services.celery_app flower --port=5555 --broker=redis://:${REDIS_PASSWORD}@redis:6379/0
+    depends_on:
+      - redis
+      - celery-worker
+    environment:
+      CELERY_BROKER_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      CELERY_RESULT_BACKEND: redis://:${REDIS_PASSWORD}@redis:6379/0
+      FLOWER_PORT: 5555
+    ports:
+      - "${FLOWER_PORT:-5555}:5555"
+    networks:
+      - magnus-network
+
+  # Nginx Reverse Proxy (Optional - for production)
+  nginx:
+    image: nginx:alpine
+    container_name: magnus-nginx
+    restart: unless-stopped
+    profiles:
+      - production
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - app
+    networks:
+      - magnus-network
 
 volumes:
   postgres_data:
+    driver: local
+  redis_data:
+    driver: local
 
 networks:
-  wheel-strategy-network:
+  magnus-network:
     driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16

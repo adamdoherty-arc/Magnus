@@ -1,25 +1,29 @@
 """
 Magnus RAG System
-=================
+Retrieval Augmented Generation for financial knowledge base
 
-Production-ready Retrieval-Augmented Generation system with:
-- Hybrid search (semantic + keyword)
-- Adaptive retrieval
-- Reranking
-- Semantic chunking
-- Autonomous learning
-- Comprehensive evaluation
-
-Based on 2025 best practices from:
-- GitHub: NirDiamant/RAG_Techniques
-- kapa.ai: Production lessons from 100+ teams
-- Morgan Stanley: Financial AI assistant patterns
+Components:
+- SimpleRAG: Basic RAG query interface
+- DocumentIngestionPipeline: Document ingestion and embedding
+- Daily XTrades sync (automated via Celery)
 """
 
-from .rag_service import RAGService
-from .document_indexer import DocumentIndexer
+from src.rag.simple_rag import SimpleRAG
+from src.rag.document_ingestion_pipeline import (
+    DocumentIngestionPipeline,
+    DocumentCategory,
+    DocumentSource,
+    ingest_xtrades_daily,
+    ingest_all_xtrades_history
+)
+
+__version__ = "1.0.0"
 
 __all__ = [
-    'RAGService',
-    'DocumentIndexer'
+    "SimpleRAG",
+    "DocumentIngestionPipeline",
+    "DocumentCategory",
+    "DocumentSource",
+    "ingest_xtrades_daily",
+    "ingest_all_xtrades_history",
 ]

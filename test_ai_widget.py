@@ -9,28 +9,24 @@ from src.components.ai_research_widget import display_consolidated_ai_research_s
 st.title("AI Research Widget Test")
 st.caption("Testing the modular AI Research component")
 
-st.markdown("---")
 
 # Example 1: Simple usage
 st.markdown("### Example 1: Simple Symbol List")
 test_symbols_1 = ['AAPL', 'MSFT', 'GOOGL', 'TSLA', 'NVDA']
 display_consolidated_ai_research_section(test_symbols_1, key_prefix="test1")
 
-st.markdown("---")
 
 # Example 2: Different page context
 st.markdown("### Example 2: Watchlist Context")
 watchlist_symbols = ['AMD', 'INTC', 'MU', 'QCOM']
 display_consolidated_ai_research_section(watchlist_symbols, key_prefix="watchlist")
 
-st.markdown("---")
 
 # Example 3: Strategy context
 st.markdown("### Example 3: Strategy Context")
 strategy_symbols = ['SPY', 'QQQ', 'IWM', 'DIA']
 display_consolidated_ai_research_section(strategy_symbols, key_prefix="strategy")
 
-st.markdown("---")
 st.success("✅ Widget is fully modular and reusable!")
 st.info("""
 **Usage Instructions:**

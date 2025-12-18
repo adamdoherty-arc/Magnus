@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 class KalshiClient:
     """Client for Kalshi prediction market API"""
 
-    BASE_URL = "https://trading-api.kalshi.com/trade-api/v2"
+    BASE_URL = "https://api.elections.kalshi.com/trade-api/v2"
 
     def __init__(self, email: Optional[str] = None, password: Optional[str] = None):
         """
@@ -85,28 +85,26 @@ class KalshiClient:
             return self.login()
         return True
 
-    def get_all_markets(self, status: str = "open", limit: int = 1000) -> List[Dict]:
+    def get_all_markets_public(self, status: str = "open", limit: int = 200) -> List[Dict]:
         """
-        Get all markets from Kalshi
+        Get markets from Kalshi using public API (no auth required)
 
         Args:
             status: Market status filter ('open', 'closed', 'settled')
-            limit: Results per page (max 1000)
+            limit: Results per page (max 200 for public API)
 
         Returns:
             List of market dictionaries
         """
-        if not self._ensure_authenticated():
-            return []
-
         all_markets = []
         cursor = None
 
         try:
+            # Use public API endpoint (no authentication)
             while True:
                 url = f"{self.BASE_URL}/markets"
                 params = {
-                    "limit": limit,
+                    "limit": min(limit, 200),  # Public API has lower limit
                     "status": status
                 }
 
@@ -114,8 +112,8 @@ class KalshiClient:
                     params['cursor'] = cursor
 
                 headers = {
-                    "accept": "application/json",
-                    "Authorization": self.bearer_token
+                    "accept": "application/json"
+                    # No Authorization header for public API
                 }
 
                 response = requests.get(url, headers=headers, params=params, timeout=10)
@@ -127,18 +125,75 @@ class KalshiClient:
 
                 # Check for next page
                 cursor = data.get('cursor')
-                if not cursor:
+                if not cursor or len(all_markets) >= 1000:  # Cap at 1000 for performance
                     break
 
                 # Small delay to avoid rate limits
                 time.sleep(0.5)
 
-            logger.info(f"Retrieved {len(all_markets)} markets from Kalshi")
+            logger.info(f"Retrieved {len(all_markets)} markets from Kalshi (public API)")
             return all_markets
 
         except requests.exceptions.RequestException as e:
-            logger.error(f"Error fetching markets: {e}")
+            logger.error(f"Error fetching markets (public API): {e}")
             return []
+
+    def get_all_markets(self, status: str = "open", limit: int = 1000) -> List[Dict]:
+        """
+        Get all markets from Kalshi (tries authenticated, falls back to public)
+
+        Args:
+            status: Market status filter ('open', 'closed', 'settled')
+            limit: Results per page (max 1000)
+
+        Returns:
+            List of market dictionaries
+        """
+        # Try authenticated API first
+        if self._ensure_authenticated():
+            all_markets = []
+            cursor = None
+
+            try:
+                while True:
+                    url = f"{self.BASE_URL}/markets"
+                    params = {
+                        "limit": limit,
+                        "status": status
+                    }
+
+                    if cursor:
+                        params['cursor'] = cursor
+
+                    headers = {
+                        "accept": "application/json",
+                        "Authorization": self.bearer_token
+                    }
+
+                    response = requests.get(url, headers=headers, params=params, timeout=10)
+                    response.raise_for_status()
+
+                    data = response.json()
+                    markets = data.get('markets', [])
+                    all_markets.extend(markets)
+
+                    # Check for next page
+                    cursor = data.get('cursor')
+                    if not cursor:
+                        break
+
+                    # Small delay to avoid rate limits
+                    time.sleep(0.5)
+
+                logger.info(f"Retrieved {len(all_markets)} markets from Kalshi (authenticated)")
+                return all_markets
+
+            except requests.exceptions.RequestException as e:
+                logger.warning(f"Authenticated fetch failed: {e}, falling back to public API")
+
+        # Fall back to public API if auth fails
+        logger.info("Using public API (no authentication)")
+        return self.get_all_markets_public(status, limit)
 
     def filter_football_markets(self, markets: List[Dict]) -> Dict[str, List[Dict]]:
         """
@@ -191,6 +246,67 @@ class KalshiClient:
         """
         all_markets = self.get_all_markets(status='open')
         return self.filter_football_markets(all_markets)
+
+    def get_non_sports_markets(self) -> Dict[str, List[Dict]]:
+        """
+        Get all non-sports markets grouped by sector
+
+        Returns:
+            Dictionary with sector keys containing filtered markets
+        """
+        all_markets = self.get_all_markets(status='open')
+
+        # Sports keywords to exclude
+        sports_keywords = ['nfl', 'nba', 'mlb', 'nhl', 'ncaa', 'college football',
+                          'super bowl', 'playoffs', 'world series', 'stanley cup',
+                          'chiefs', 'bills', 'ravens', 'packers', '49ers', 'cowboys',
+                          'eagles', 'lions', 'rams', 'alabama', 'georgia', 'ohio state']
+
+        # Categorize by sector
+        markets_by_sector = {
+            'Politics': [],
+            'Economics': [],
+            'Crypto': [],
+            'Tech': [],
+            'Climate': [],
+            'World': [],
+            'Other': []
+        }
+
+        for market in all_markets:
+            title = market.get('title', '').lower()
+            ticker = market.get('ticker', '').lower()
+            subtitle = market.get('subtitle', '').lower()
+            category = market.get('category', '').lower()
+
+            combined_text = f"{title} {ticker} {subtitle} {category}"
+
+            # Skip sports markets
+            if any(keyword in combined_text for keyword in sports_keywords):
+                continue
+
+            # Categorize by keywords
+            if any(kw in combined_text for kw in ['election', 'president', 'congress', 'senate', 'vote', 'poll', 'debate', 'candidate']):
+                markets_by_sector['Politics'].append(market)
+            elif any(kw in combined_text for kw in ['gdp', 'inflation', 'interest rate', 'jobs', 'unemployment', 'fed', 'treasury', 'economy']):
+                markets_by_sector['Economics'].append(market)
+            elif any(kw in combined_text for kw in ['bitcoin', 'ethereum', 'crypto', 'btc', 'eth', 'blockchain']):
+                markets_by_sector['Crypto'].append(market)
+            elif any(kw in combined_text for kw in ['tech', 'ai', 'apple', 'google', 'meta', 'amazon', 'microsoft', 'tesla']):
+                markets_by_sector['Tech'].append(market)
+            elif any(kw in combined_text for kw in ['climate', 'temperature', 'hurricane', 'weather', 'carbon', 'emissions']):
+                markets_by_sector['Climate'].append(market)
+            elif any(kw in combined_text for kw in ['war', 'conflict', 'china', 'russia', 'ukraine', 'israel', 'international']):
+                markets_by_sector['World'].append(market)
+            else:
+                markets_by_sector['Other'].append(market)
+
+        # Log results
+        for sector, sector_markets in markets_by_sector.items():
+            if sector_markets:
+                logger.info(f"Found {len(sector_markets)} {sector} markets")
+
+        return markets_by_sector
 
     def get_market_details(self, market_ticker: str) -> Optional[Dict]:
         """

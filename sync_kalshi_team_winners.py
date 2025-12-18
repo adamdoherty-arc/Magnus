@@ -14,9 +14,9 @@ from dotenv import load_dotenv
 if sys.platform == 'win32':
     sys.stdout.reconfigure(encoding='utf-8')
 
-load_dotenv()
+load_dotenv(override=True)
 
-from src.kalshi_public_client import KalshiPublicClient
+from src.kalshi_integration import KalshiIntegration
 from src.kalshi_db_manager import KalshiDBManager
 
 logging.basicConfig(
@@ -30,7 +30,7 @@ class TeamWinnerMarketSync:
     """Sync only team vs team winner markets from Kalshi"""
 
     def __init__(self):
-        self.client = KalshiPublicClient()  # No auth needed!
+        self.client = KalshiIntegration()
         self.db = KalshiDBManager()
         self.synced_count = 0
         self.skipped_count = 0

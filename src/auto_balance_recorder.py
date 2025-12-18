@@ -1,135 +1,109 @@
-"""Automated Daily Balance Recorder - Records portfolio balances once per day"""
-
-from datetime import date
-from typing import Optional, Dict
+"""Auto Balance Recorder - Automatically tracks portfolio balance changes"""
 import logging
-from src.portfolio_balance_tracker import PortfolioBalanceTracker
+from datetime import datetime
+from typing import Optional, Dict
+import psycopg2
+from dotenv import load_dotenv
+import os
 
+load_dotenv(override=True)
 logger = logging.getLogger(__name__)
 
 
 class AutoBalanceRecorder:
-    """Automatically records daily portfolio balances once per day"""
+    """Automatically records portfolio balance changes to database"""
 
     def __init__(self):
-        self.tracker = PortfolioBalanceTracker()
+        self.db_config = {
+            'host': os.getenv('DB_HOST', 'localhost'),
+            'port': os.getenv('DB_PORT', '5432'),
+            'user': os.getenv('DB_USER', 'postgres'),
+            'password': os.getenv('DB_PASSWORD'),
+            'database': os.getenv('DB_NAME', 'magnus')
+        }
 
-    def should_record_today(self) -> bool:
-        """
-        Check if we need to record balance for today
-
-        Returns:
-            True if no record exists for today
-        """
-        try:
-            latest = self.tracker.get_latest_balance()
-
-            if not latest:
-                # No records at all, should record
-                return True
-
-            latest_date = latest.get('date')
-
-            if isinstance(latest_date, str):
-                from datetime import datetime
-                latest_date = datetime.strptime(latest_date, '%Y-%m-%d').date()
-
-            # Record if latest is not today
-            return latest_date < date.today()
-
-        except Exception as e:
-            logger.error(f"Error checking if should record: {e}")
-            return True  # Default to recording if error
-
-    def auto_record_balance(
+    def record_balance(
         self,
-        total_equity: float,
+        total_balance: float,
         buying_power: float,
-        options_value: float,
-        stock_value: float,
-        total_positions: int
-    ) -> Dict[str, any]:
+        total_equity: Optional[float] = None,
+        options_buying_power: Optional[float] = None
+    ) -> bool:
         """
-        Automatically record today's balance if not already recorded
+        Record portfolio balance snapshot
 
         Args:
-            total_equity: Total account equity
+            total_balance: Total account balance
             buying_power: Available buying power
-            options_value: Total value of options
-            stock_value: Total value of stocks
-            total_positions: Number of positions
+            total_equity: Total equity (optional)
+            options_buying_power: Options buying power (optional)
 
         Returns:
-            Dictionary with status and message
+            True if recorded successfully
         """
         try:
-            # Check if we should record
-            if not self.should_record_today():
-                return {
-                    'recorded': False,
-                    'reason': 'already_recorded',
-                    'message': 'Balance already recorded for today'
-                }
+            conn = psycopg2.connect(**self.db_config)
+            cur = conn.cursor()
 
-            # Record the balance
-            success = self.tracker.record_daily_balance(
-                balance_date=date.today(),
-                ending_balance=total_equity,
-                buying_power=buying_power,
-                options_value=options_value,
-                stock_value=stock_value,
-                cash_value=buying_power,
-                total_positions=total_positions
-            )
+            # Ensure table exists
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS portfolio_balance_history (
+                    id SERIAL PRIMARY KEY,
+                    recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    total_balance DECIMAL(15, 2),
+                    buying_power DECIMAL(15, 2),
+                    total_equity DECIMAL(15, 2),
+                    options_buying_power DECIMAL(15, 2)
+                )
+            """)
 
-            if success:
-                logger.info(f"✅ Auto-recorded balance for {date.today()}: ${total_equity:,.2f}")
-                return {
-                    'recorded': True,
-                    'reason': 'success',
-                    'message': f'Balance recorded for {date.today()}',
-                    'balance': total_equity
-                }
-            else:
-                return {
-                    'recorded': False,
-                    'reason': 'error',
-                    'message': 'Failed to record balance'
-                }
+            # Insert balance record
+            cur.execute("""
+                INSERT INTO portfolio_balance_history
+                (total_balance, buying_power, total_equity, options_buying_power)
+                VALUES (%s, %s, %s, %s)
+            """, (total_balance, buying_power, total_equity, options_buying_power))
+
+            conn.commit()
+            cur.close()
+            conn.close()
+
+            logger.info(f"Recorded balance: ${total_balance:,.2f}")
+            return True
 
         except Exception as e:
-            logger.error(f"Error auto-recording balance: {e}")
-            return {
-                'recorded': False,
-                'reason': 'exception',
-                'message': str(e)
-            }
+            logger.error(f"Error recording balance: {e}")
+            return False
 
-    def get_recording_status(self) -> str:
-        """
-        Get a human-readable status message
-
-        Returns:
-            Status message string
-        """
+    def get_latest_balance(self) -> Optional[Dict]:
+        """Get the most recent balance record"""
         try:
-            latest = self.tracker.get_latest_balance()
+            conn = psycopg2.connect(**self.db_config)
+            cur = conn.cursor()
 
-            if not latest:
-                return "⏳ No balance history yet"
+            cur.execute("""
+                SELECT total_balance, buying_power, total_equity,
+                       options_buying_power, recorded_at
+                FROM portfolio_balance_history
+                ORDER BY recorded_at DESC
+                LIMIT 1
+            """)
 
-            latest_date = latest.get('date')
+            result = cur.fetchone()
+            cur.close()
+            conn.close()
 
-            if isinstance(latest_date, str):
-                from datetime import datetime
-                latest_date = datetime.strptime(latest_date, '%Y-%m-%d').date()
+            if result:
+                return {
+                    'total_balance': float(result[0]),
+                    'buying_power': float(result[1]),
+                    'total_equity': float(result[2]) if result[2] else None,
+                    'options_buying_power': float(result[3]) if result[3] else None,
+                    'recorded_at': result[4]
+                }
 
-            if latest_date == date.today():
-                balance = latest.get('ending_balance', 0)
-                return f"✅ Today's balance recorded: ${float(balance):,.2f}"
-            else:
-                return f"⏳ Last recorded: {latest_date}"
+            return None
 
         except Exception as e:
-            logger.error(f"Error getting status: {e}")
-            return "⚠️ Status unavailable"
+            logger.error(f"Error getting latest balance: {e}")
+            return None

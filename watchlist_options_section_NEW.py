@@ -266,7 +266,6 @@ else:
         symbol = st.session_state.expanded_symbol
         stock_price = df[df['Symbol'] == symbol]['Stock Price'].iloc[0] if symbol in df['Symbol'].values else 0
 
-        st.markdown("---")
         st.markdown(f"### 📋 {symbol} - Stock Price: ${stock_price:.2f}")
 
         col_close1, col_close2 = st.columns([6, 1])

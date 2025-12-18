@@ -128,13 +128,39 @@ def normalize_team_name(team: str) -> str:
     if not team:
         return ""
 
+    team = team.strip()
+
+    # Remove mascot (last word) from full team names
+    # "Florida State Seminoles" -> "Florida State"
+    parts = team.split()
+    if len(parts) > 1:
+        # Check if last word is likely a mascot
+        last_word = parts[-1].lower()
+        common_mascots = [
+            'seminoles', 'wolfpack', 'buckeyes', 'wolverines', 'broncos',
+            'bulldogs', 'tigers', 'bears', 'wildcats', 'eagles', 'hawks',
+            'panthers', 'lions', 'aggies', 'cowboys', 'knights', 'trojans',
+            'spartans', 'huskies', 'crimson', 'tide', 'gators', 'gamecocks',
+            'volunteers', 'rebels', 'commodores', 'razorbacks', 'sooners',
+            'longhorns', 'horns', 'hurricanes', 'hokies', 'tar heels', 'heels',
+            'cardinals', 'rams', 'ducks', 'beavers', 'cougars', 'utes'
+        ]
+        # Remove if it's a known mascot or ends with 's' (plural mascot)
+        if last_word in common_mascots or (last_word.endswith('s') and len(last_word) > 4):
+            team = ' '.join(parts[:-1])
+
+    # Normalize to lowercase
+    team = team.lower()
+
     # Remove common suffixes
-    team = team.lower().strip()
     for suffix in [' football', ' basketball', ' fc', ' sc']:
         if team.endswith(suffix):
             team = team[:-len(suffix)].strip()
 
-    return team
+    # Handle "St." vs "State" variations
+    team = team.replace(' st.', ' state').replace(' st ', ' state ')
+
+    return team.strip()
 
 
 def match_game_to_market_fast(game: Dict, market_index: Dict[str, Dict]) -> Optional[Dict]:
@@ -233,7 +259,7 @@ def enrich_games_with_kalshi_odds_optimized(games: List[Dict], sport: str = 'nfl
     # Map sport parameter to sector values and ticker patterns
     sport_config = {
         'nfl': {'sector': 'nfl', 'ticker_pattern': 'KXNFLGAME'},
-        'ncaaf': {'sector': 'ncaaf', 'ticker_pattern': 'KXCFBGAME', 'market_type': 'cfb'},
+        'ncaaf': {'sector': 'ncaaf', 'ticker_pattern': 'KXNCAAFGAME', 'market_type': 'cfb'},
         'nba': {'sector': 'nba', 'ticker_pattern': 'KXNBAGAME'},
         'mlb': {'sector': 'mlb', 'ticker_pattern': 'KXMLBGAME'}
     }

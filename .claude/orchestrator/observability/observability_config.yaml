@@ -1,0 +1,144 @@
+# Observability Configuration for Local Orchestrator
+# 100% Free, No Cloud Services
+
+observability:
+  enabled: true
+
+  # Tracing Configuration
+  tracing:
+    enabled: true
+    backend: opentelemetry
+    storage: sqlite  # Local SQLite database
+    database_path: ".claude/orchestrator/databases/traces.db"
+
+    # What to trace
+    trace_all_agents: true
+    trace_state_transitions: true
+    trace_tool_calls: true
+    trace_spec_validation: true
+    trace_errors: true
+
+    # Sampling (1.0 = 100%, reduce if too much data)
+    sampling_rate: 1.0
+
+    # Export options
+    export:
+      console: true  # Print to console (dev)
+      sqlite: true   # Store in SQLite (prod)
+      file: false    # Export to JSON files
+
+  # Metrics Configuration
+  metrics:
+    enabled: true
+    storage: sqlite  # Local SQLite database
+    database_path: ".claude/orchestrator/databases/metrics.db"
+
+    # Collection settings
+    collection_interval: 60  # seconds
+    retention_days: 30  # Raw data retention
+    rollup_hourly: true  # Create hourly aggregates
+
+    # What to track
+    track_latency: true
+    track_token_usage: true
+    track_success_rate: true
+    track_agent_performance: true
+    track_feature_usage: true
+
+    # Prometheus export
+    prometheus:
+      enabled: true
+      port: 9090
+      path: "/metrics"
+
+  # Dashboard Configuration
+  dashboards:
+    enabled: true
+    output_dir: ".claude/orchestrator/dashboards"
+    auto_generate: true
+    generation_interval: 300  # seconds (5 minutes)
+
+    # Dashboard types
+    types:
+      - html  # Static HTML dashboards
+      # - grafana  # Optional: Grafana JSON config
+
+  # Alerting Configuration
+  alerting:
+    enabled: true
+    log_path: ".claude/orchestrator/logs/alerts.log"
+
+    # Alert channels
+    channels:
+      - log     # Write to log files
+      - file    # Write to alerts.log
+      # - email  # Configure SMTP for email alerts
+      # - slack  # Configure webhook for Slack
+
+    # Alert conditions
+    conditions:
+      # Error rate
+      - type: error_rate
+        threshold: 0.10  # 10% error rate
+        severity: warning
+        description: "Agent error rate exceeds 10%"
+
+      # Latency
+      - type: latency_p95
+        threshold: 5000  # 5 seconds
+        severity: warning
+        description: "P95 latency exceeds 5 seconds"
+
+      # Consecutive failures
+      - type: consecutive_failures
+        threshold: 3
+        severity: error
+        description: "3 consecutive failures detected"
+
+      # High execution volume (optional)
+      - type: total_executions
+        threshold: 1000
+        severity: info
+        description: "High execution volume detected"
+
+    # Email configuration (optional)
+    email:
+      enabled: false
+      smtp_server: "smtp.gmail.com"
+      smtp_port: 587
+      from_address: "alerts@magnus.local"
+      to_addresses:
+        - "admin@magnus.local"
+      username: ""
+      password: ""
+
+    # Slack configuration (optional)
+    slack:
+      enabled: false
+      webhook_url: ""
+      channel: "#alerts"
+
+  # Logging Configuration
+  logging:
+    level: INFO  # DEBUG, INFO, WARNING, ERROR, CRITICAL
+    format: json  # json or text
+    output_dir: ".claude/orchestrator/logs"
+    include_traces: true
+    rotation:
+      enabled: true
+      max_bytes: 10485760  # 10MB
+      backup_count: 5
+
+  # Cleanup Configuration
+  cleanup:
+    enabled: true
+    schedule: "0 2 * * *"  # Daily at 2 AM (cron format)
+    keep_raw_data_days: 30
+    keep_aggregates_days: 90
+    keep_dashboards_count: 50
+
+  # Performance Settings
+  performance:
+    async_export: true  # Export traces/metrics asynchronously
+    batch_size: 100     # Batch size for exports
+    queue_size: 1000    # Max queue size before blocking

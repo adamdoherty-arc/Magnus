@@ -34,6 +34,9 @@ from ..agents.monitoring.watchlist_monitor_agent import WatchlistMonitorAgent
 from ..agents.monitoring.xtrades_monitor_agent import XtradesMonitorAgent
 from ..agents.monitoring.alert_agent import AlertAgent
 from ..agents.monitoring.price_action_agent import PriceActionMonitorAgent
+from ..agents.monitoring.discord_agent import DiscordAgent  # NEW: Discord integration
+from ..agents.monitoring.analytics_agent import AnalyticsAgent  # NEW: Analytics performance
+from ..agents.monitoring.cache_metrics_agent import CacheMetricsAgent  # NEW: Cache monitoring
 
 from ..agents.research.knowledge_agent import KnowledgeAgent
 from ..agents.research.research_agent import ResearchAgent
@@ -93,6 +96,9 @@ def initialize_all_agents(registry: Optional[AgentRegistry] = None) -> List:
         agents.append(XtradesMonitorAgent())
         agents.append(AlertAgent())
         agents.append(PriceActionMonitorAgent())
+        agents.append(DiscordAgent())  # NEW: Discord message monitoring
+        agents.append(AnalyticsAgent())  # NEW: Performance analytics
+        agents.append(CacheMetricsAgent())  # NEW: Cache metrics tracking
         
         # Research Agents
         agents.append(KnowledgeAgent())

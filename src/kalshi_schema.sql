@@ -67,6 +67,7 @@ CREATE INDEX IF NOT EXISTS idx_kalshi_markets_game_date ON kalshi_markets(game_d
 CREATE INDEX IF NOT EXISTS idx_kalshi_markets_close_time ON kalshi_markets(close_time);
 CREATE INDEX IF NOT EXISTS idx_kalshi_markets_home_team ON kalshi_markets(home_team);
 CREATE INDEX IF NOT EXISTS idx_kalshi_markets_away_team ON kalshi_markets(away_team);
+CREATE INDEX IF NOT EXISTS idx_kalshi_markets_active ON kalshi_markets(status, game_date) WHERE status = 'open';
 
 -- ============================================================================
 -- Table 2: kalshi_predictions

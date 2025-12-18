@@ -112,8 +112,8 @@ class StockDataSync:
                 logger.warning(f"No data available for {symbol} - may be delisted")
                 return False
 
-            current_price = hist['Close'].iloc[-1]
-            prev_close = hist['Close'].iloc[-2] if len(hist) > 1 else current_price
+            current_price = float(hist['Close'].iloc[-1])
+            prev_close = float(hist['Close'].iloc[-2]) if len(hist) > 1 else current_price
             change = current_price - prev_close
             change_pct = (change / prev_close * 100) if prev_close > 0 else 0
 
@@ -150,8 +150,8 @@ class StockDataSync:
                 current_price,
                 change,
                 change_pct,
-                hist['High'].iloc[-1],
-                hist['Low'].iloc[-1],
+                float(hist['High'].iloc[-1]),
+                float(hist['Low'].iloc[-1]),
                 int(hist['Volume'].iloc[-1]),
                 int(hist['Volume'].mean()),
                 info.get('marketCap', 0),
@@ -226,11 +226,11 @@ class StockDataSync:
                 target_strike = round(current_price * multiplier, 0)
                 closest_strike = puts.iloc[(puts['strike'] - target_strike).abs().argsort()[0]]
 
-                bid = closest_strike['bid']
-                ask = closest_strike['ask']
+                bid = float(closest_strike['bid'])
+                ask = float(closest_strike['ask'])
                 mid = (bid + ask) / 2
                 premium = mid * 100
-                capital = closest_strike['strike'] * 100
+                capital = float(closest_strike['strike']) * 100
                 premium_pct = (premium / capital * 100) if capital > 0 else 0
                 monthly_return = (premium_pct / dte * 30) if dte > 0 else 0
                 annual_return = (premium_pct / dte * 365) if dte > 0 else 0
@@ -241,7 +241,7 @@ class StockDataSync:
                         bid, ask, mid, premium, premium_pct, monthly_return, annual_return,
                         implied_volatility, volume, open_interest, last_updated
                     ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())
-                    ON CONFLICT (symbol, expiration_date, strike_type) DO UPDATE SET
+                    ON CONFLICT (symbol, expiration_date, strike_price) DO UPDATE SET
                         dte = EXCLUDED.dte,
                         strike_price = EXCLUDED.strike_price,
                         bid = EXCLUDED.bid,
@@ -256,9 +256,9 @@ class StockDataSync:
                         open_interest = EXCLUDED.open_interest,
                         last_updated = NOW()
                 """, (
-                    symbol, closest_exp, dte, strike_type, closest_strike['strike'],
+                    symbol, closest_exp, dte, strike_type, float(closest_strike['strike']),
                     bid, ask, mid, premium, premium_pct, monthly_return, annual_return,
-                    closest_strike.get('impliedVolatility', 0) * 100,
+                    float(closest_strike.get('impliedVolatility', 0)) * 100,
                     int(closest_strike['volume']) if closest_strike['volume'] else 0,
                     int(closest_strike['openInterest']) if closest_strike['openInterest'] else 0
                 ))

@@ -1,0 +1,552 @@
+# Feature Registry - World-Class Edition
+# Maps features to pages, specifications, agents, and critical rules
+# Auto-updated by orchestrator when new features are added
+# Version: 2.0 - Complete Agent Mapping
+
+features:
+  # ===================
+  # TRADING & POSITIONS
+  # ===================
+
+  robinhood-positions:
+    pages:
+      - positions_page_improved.py
+    description: "Live Robinhood positions with P/L tracking, Greeks, and recovery strategies"
+    specs_location: .claude/specs/robinhood-positions/
+    key_components:
+      - Stock positions display
+      - Option positions (CSP, CC, Long Calls/Puts)
+      - Theta decay forecasts
+      - Recovery strategies
+      - Trade history sync
+    critical_rules:
+      - no_horizontal_lines
+      - use_real_greeks
+      - rate_limited_api_calls
+    # Agent assignment
+    primary_agent: full-stack-developer
+    supporting_agents:
+      - spec-requirements-validator
+      - spec-design-validator
+      - spec-task-executor
+      - python-pro
+      - frontend-developer
+      - database-optimizer
+      - performance-engineer
+    qa_agents:
+      - qa-tester
+      - code-reviewer
+      - spec-integration-tester
+      - spec-test-generator
+
+  options-analysis:
+    pages:
+      - options_analysis_page.py
+      - options_analysis_hub_page.py
+    description: "AI-powered options analysis with delta/DTE filtering"
+    specs_location: .claude/specs/options-analysis/
+    key_components:
+      - Options scanner
+      - Delta/DTE filters
+      - Premium analysis
+      - AI recommendations
+    critical_rules:
+      - no_horizontal_lines
+      - accurate_greeks_display
+    primary_agent: ai-engineer
+    supporting_agents:
+      - spec-requirements-validator
+      - spec-design-validator
+      - spec-task-executor
+      - data-scientist
+      - python-pro
+      - frontend-developer
+    qa_agents:
+      - qa-tester
+      - code-reviewer
+      - spec-test-generator
+
+  premium-scanner:
+    pages:
+      - premium_scanner_page.py
+    description: "Premium flow scanner for high-volume options"
+    specs_location: .claude/specs/premium-scanner/
+    key_components:
+      - Premium flow detection
+      - Volume analysis
+      - Alert system
+    critical_rules:
+      - no_horizontal_lines
+      - real_time_updates
+      - no_data_export
+      - main_page_filters
+    primary_agent: data-scientist
+    supporting_agents:
+      - spec-requirements-validator
+      - spec-design-validator
+      - data-engineer
+      - database-optimizer
+      - performance-engineer
+    qa_agents:
+      - qa-tester
+      - spec-integration-tester
+
+  seven-day-dte:
+    pages:
+      - seven_day_dte_scanner_page.py
+    description: "7-day DTE scanner for theta decay strategies"
+    specs_location: .claude/specs/seven-day-dte/
+    key_components:
+      - 7-day expiration filtering
+      - Theta decay analysis
+      - High-probability plays
+    critical_rules:
+      - no_horizontal_lines
+      - accurate_dte_calculation
+    primary_agent: dte-scanner-specialist
+    supporting_agents:
+      - spec-requirements-validator
+      - spec-design-validator
+      - data-scientist
+      - python-pro
+      - performance-engineer
+    qa_agents:
+      - qa-tester
+      - spec-test-generator
+      - spec-performance-analyzer
+
+  calendar-spreads:
+    pages:
+      - calendar_spreads_page.py
+    description: "AI-powered calendar spread analysis"
+    specs_location: .claude/specs/calendar-spreads/
+    key_components:
+      - Calendar spread finder
+      - Volatility skew analysis
+      - Multi-leg pricing
+    critical_rules:
+      - no_horizontal_lines
+      - accurate_spread_pricing
+    primary_agent: calendar-spreads-specialist
+    supporting_agents:
+      - spec-requirements-validator
+      - spec-design-validator
+      - data-scientist
+      - ai-engineer
+      - python-pro
+    qa_agents:
+      - qa-tester
+      - spec-integration-tester
+      - spec-performance-analyzer
+
+  earnings-calendar:
+    pages:
+      - earnings_calendar_page.py
+    description: "Earnings calendar with avoidance strategies"
+    specs_location: .claude/specs/earnings-calendar/
+    key_components:
+      - Earnings dates
+      - Volatility analysis
+      - Avoidance recommendations
+    critical_rules:
+      - no_horizontal_lines
+      - accurate_earnings_dates
+    primary_agent: earnings-specialist
+    supporting_agents:
+      - spec-requirements-validator
+      - spec-design-validator
+      - data-engineer
+      - python-pro
+    qa_agents:
+      - qa-tester
+      - spec-test-generator
+
+  # ===============
+  # SPORTS BETTING
+  # ===============
+
+  sports-betting:
+    pages:
+      - sports_betting_hub_page.py
+      - game_cards_visual_page.py
+    description: "Sports betting integration with Kalshi and ESPN"
+    specs_location: .claude/specs/sports-betting/
+    key_components:
+      - Game cards
+      - Live odds
+      - Prediction markets
+      - Kalshi integration
+      - ESPN data sync
+    critical_rules:
+      - no_horizontal_lines
+      - live_data_sync
+    primary_agent: sports-betting-specialist
+    supporting_agents:
+      - spec-requirements-validator
+      - spec-design-validator
+      - data-engineer
+      - frontend-developer
+      - ai-engineer
+      - database-optimizer
+    qa_agents:
+      - qa-tester
+      - code-reviewer
+      - spec-integration-tester
+
+  prediction-markets:
+    pages:
+      - prediction_markets_page.py
+    description: "Kalshi prediction markets analysis"
+    specs_location: .claude/specs/prediction-markets/
+    key_components:
+      - Market tracking
+      - Odds analysis
+      - AI predictions
+    critical_rules:
+      - no_horizontal_lines
+      - accurate_odds
+    primary_agent: sports-betting-specialist
+    supporting_agents:
+      - spec-requirements-validator
+      - ai-engineer
+      - data-scientist
+    qa_agents:
+      - qa-tester
+      - spec-test-generator
+
+  # ==============
+  # DATA & SOCIAL
+  # ==============
+
+  xtrades-watchlists:
+    pages:
+      - xtrades_watchlists_page.py
+    description: "XTrades premium alerts integration"
+    specs_location: .claude/specs/xtrades-watchlists/
+    key_components:
+      - Alert parsing
+      - Signal extraction
+      - Trade recommendations
+    critical_rules:
+      - no_horizontal_lines
+      - alert_accuracy
+    primary_agent: data-engineer
+    supporting_agents:
+      - spec-requirements-validator
+      - spec-design-validator
+      - python-pro
+      - ai-engineer
+    qa_agents:
+      - qa-tester
+      - spec-integration-tester
+
+  discord-messages:
+    pages:
+      - discord_messages_page.py
+    description: "Discord premium alerts sync"
+    specs_location: .claude/specs/discord-messages/
+    key_components:
+      - Message sync
+      - Signal extraction
+      - Alert filtering
+    critical_rules:
+      - no_horizontal_lines
+      - message_deduplication
+    primary_agent: data-engineer
+    supporting_agents:
+      - spec-requirements-validator
+      - spec-design-validator
+      - python-pro
+      - database-optimizer
+    qa_agents:
+      - qa-tester
+      - spec-integration-tester
+      - spec-duplication-detector
+
+  # ===============
+  # AI & CHATBOT
+  # ===============
+
+  ava-chatbot:
+    pages:
+      - ava_chatbot_page.py
+    description: "AVA - AI trading assistant"
+    specs_location: .claude/specs/ava-chatbot/
+    key_components:
+      - Conversational interface
+      - Trade recommendations
+      - Portfolio analysis
+      - RAG integration
+    critical_rules:
+      - no_horizontal_lines
+      - personality_consistency
+    primary_agent: ai-engineer
+    supporting_agents:
+      - spec-requirements-validator
+      - spec-design-validator
+      - prompt-engineer
+      - frontend-developer
+      - ux-designer
+    qa_agents:
+      - qa-tester
+      - code-reviewer
+      - spec-test-generator
+
+  rag-knowledge-base:
+    pages:
+      - rag_knowledge_base_page.py
+    description: "RAG-powered knowledge base for trading"
+    specs_location: .claude/specs/rag-knowledge-base/
+    key_components:
+      - Document ingestion
+      - Semantic search
+      - Context retrieval
+      - Vector database
+    critical_rules:
+      - no_horizontal_lines
+      - accurate_retrieval
+    primary_agent: ai-engineer
+    supporting_agents:
+      - spec-requirements-validator
+      - spec-design-validator
+      - data-engineer
+      - database-optimizer
+      - performance-engineer
+    qa_agents:
+      - qa-tester
+      - spec-performance-analyzer
+      - spec-integration-tester
+
+  # ==================
+  # DASHBOARD & HUBS
+  # ==================
+
+  dashboard:
+    pages:
+      - dashboard.py
+    description: "Main trading dashboard"
+    specs_location: .claude/specs/dashboard/
+    key_components:
+      - Portfolio overview
+      - Quick metrics
+      - Navigation hub
+      - Balance forecasts
+    critical_rules:
+      - no_horizontal_lines
+      - performance_optimized
+    primary_agent: frontend-developer
+    supporting_agents:
+      - spec-requirements-validator
+      - spec-design-validator
+      - ui-designer
+      - ux-designer
+      - performance-engineer
+      - full-stack-developer
+    qa_agents:
+      - qa-tester
+      - code-reviewer
+      - spec-performance-analyzer
+
+  health-dashboard:
+    pages:
+      - health_dashboard_page.py
+    description: "System health monitoring"
+    specs_location: .claude/specs/health-dashboard/
+    key_components:
+      - Service status
+      - Database health
+      - API monitoring
+      - Error tracking
+    critical_rules:
+      - no_horizontal_lines
+      - real_time_monitoring
+    primary_agent: devops-incident-responder
+    supporting_agents:
+      - spec-requirements-validator
+      - spec-design-validator
+      - backend-architect
+      - database-optimizer
+      - cloud-architect
+    qa_agents:
+      - qa-tester
+      - spec-integration-tester
+
+  # ====================
+  # ANALYSIS & TOOLS
+  # ====================
+
+  supply-demand-zones:
+    pages:
+      - supply_demand_zones_page.py
+    description: "Technical analysis with supply/demand zones"
+    specs_location: .claude/specs/supply-demand-zones/
+    key_components:
+      - Zone detection
+      - Support/resistance
+      - Chart integration
+      - Price action analysis
+    critical_rules:
+      - no_horizontal_lines
+      - accurate_zone_calculation
+    primary_agent: data-scientist
+    supporting_agents:
+      - spec-requirements-validator
+      - spec-design-validator
+      - python-pro
+      - performance-engineer
+    qa_agents:
+      - qa-tester
+      - spec-performance-analyzer
+      - spec-test-generator
+
+  sector-analysis:
+    pages:
+      - sector_analysis_page.py
+    description: "Sector rotation and analysis"
+    specs_location: .claude/specs/sector-analysis/
+    key_components:
+      - Sector performance
+      - Rotation signals
+      - Correlation analysis
+    critical_rules:
+      - no_horizontal_lines
+      - real_time_data
+    primary_agent: data-scientist
+    supporting_agents:
+      - spec-requirements-validator
+      - spec-design-validator
+      - data-engineer
+      - database-optimizer
+    qa_agents:
+      - qa-tester
+      - spec-integration-tester
+
+# ==================
+# AGENT MAPPING
+# ==================
+
+# Which specialized agent handles which feature type
+agent_mapping:
+  options_trading:
+    agent_group: trading_specialists
+    features:
+      - robinhood-positions
+      - options-analysis
+      - premium-scanner
+      - seven-day-dte
+      - calendar-spreads
+      - earnings-calendar
+    primary_agents:
+      - calendar-spreads-specialist
+      - earnings-specialist
+      - dte-scanner-specialist
+
+  sports_betting:
+    agent_group: trading_specialists
+    features:
+      - sports-betting
+      - prediction-markets
+    primary_agents:
+      - sports-betting-specialist
+
+  data_integration:
+    agent_group: development
+    features:
+      - xtrades-watchlists
+      - discord-messages
+    primary_agents:
+      - data-engineer
+      - database-optimizer
+
+  ai_features:
+    agent_group: development
+    features:
+      - ava-chatbot
+      - rag-knowledge-base
+      - options-analysis
+    primary_agents:
+      - ai-engineer
+      - prompt-engineer
+
+  analysis:
+    agent_group: development
+    features:
+      - supply-demand-zones
+      - sector-analysis
+      - premium-scanner
+    primary_agents:
+      - data-scientist
+      - python-pro
+
+  infrastructure:
+    agent_group: operations
+    features:
+      - health-dashboard
+      - dashboard
+    primary_agents:
+      - devops-incident-responder
+      - frontend-developer
+      - full-stack-developer
+
+# ===================
+# SPEC WORKFLOW AGENTS
+# ===================
+
+# These agents apply to ALL features
+global_agents:
+  critical_priority:
+    - spec-requirements-validator
+    - spec-breaking-change-detector
+    - code-reviewer
+    - rule_engine
+
+  high_priority:
+    - spec-design-validator
+    - spec-task-validator
+    - spec-dependency-analyzer
+    - spec-task-executor
+    - spec-task-implementation-reviewer
+    - spec-integration-tester
+    - qa-tester
+
+  medium_priority:
+    - spec-performance-analyzer
+    - spec-duplication-detector
+    - spec-test-generator
+    - spec-design-web-researcher
+
+  low_priority:
+    - spec-documentation-generator
+    - steering-document-updater
+
+# ====================
+# CROSS-CUTTING CONCERNS
+# ====================
+
+shared:
+  components:
+    - src/components/ai_research_widget.py
+    - src/components/expert_position_advisory.py
+    - src/components/position_summary_dashboard.py
+  description: "Shared components used across multiple features"
+  critical_rules:
+    - reusable_design
+    - consistent_styling
+    - no_horizontal_lines
+  agents:
+    - frontend-developer
+    - ui-designer
+    - react-pro
+
+# ==================
+# FEATURE STATISTICS
+# ==================
+
+stats:
+  total_features: 16
+  total_pages: 18
+  total_agents_available: 45
+  agents_utilized: 45
+  agent_utilization: 100%
+  features_with_specs: 16
+  spec_coverage: 100%

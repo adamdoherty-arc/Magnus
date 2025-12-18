@@ -1,0 +1,106 @@
+# Feedback Loop Configuration for Self-Healing
+# 100% Local, No Cloud Dependencies
+
+feedback_loops:
+  enabled: true
+
+  # Execution Tracking
+  execution_tracking:
+    enabled: true
+    database_path: ".claude/orchestrator/databases/execution_history.db"
+    store_all_executions: true
+    retention_days: 90
+    track_context: true
+    track_files_modified: true
+
+  # Pattern Analysis
+  pattern_analysis:
+    enabled: true
+    min_samples: 10  # Minimum executions before learning patterns
+    confidence_threshold: 0.7  # Minimum confidence to apply patterns
+
+    # What to analyze
+    analyze_success_patterns: true
+    analyze_failure_patterns: true
+    analyze_performance_patterns: true
+
+    # Pattern types
+    pattern_types:
+      - agent_selection  # Which agent works best for what
+      - error_recovery   # How to recover from specific errors
+      - optimization     # Performance optimization patterns
+
+  # Self-Healing
+  self_healing:
+    enabled: true
+    max_retries: 3
+    retry_delay_ms: 1000
+
+    # Auto-fix categories
+    auto_fix_categories:
+      - syntax_errors  # Simple syntax fixes
+      # - import_errors  # Disabled: requires user approval for installs
+      # - type_errors    # Disabled: may change logic
+
+    # Require manual review for
+    require_review_for:
+      - logic_changes
+      - breaking_changes
+      - security_issues
+      - database_changes
+
+    # Retry strategies
+    retry_strategies:
+      - type: different_agent
+        when: agent_failure
+        confidence: 0.7
+
+      - type: simpler_approach
+        when: complexity_error
+        confidence: 0.8
+
+      - type: add_context
+        when: missing_context
+        confidence: 0.7
+
+  # Continuous Improvement
+  continuous_improvement:
+    enabled: true
+    review_frequency: daily  # daily, weekly, monthly
+
+    # Metrics to improve
+    target_metrics:
+      - success_rate: ">= 95%"
+      - avg_latency: "<= 2000ms"
+      - first_try_success: ">= 90%"
+
+    # Learning strategies
+    learning_strategies:
+      - analyze_common_errors
+      - optimize_agent_selection
+      - improve_prompts
+      - cache_successful_patterns
+
+  # LLM Analysis (using local Ollama)
+  llm_analysis:
+    enabled: true
+    model: "llama3.2"  # Local Ollama model
+    use_for:
+      - complex_error_analysis
+      - pattern_discovery
+      - optimization_suggestions
+    max_tokens: 1000
+    temperature: 0.3  # Low temperature for analysis
+
+  # Notifications
+  notifications:
+    enabled: true
+    notify_on:
+      - pattern_discovered
+      - auto_fix_applied
+      - retry_exhausted
+      - improvement_milestone
+
+    channels:
+      - log  # Write to log file
+      # - email  # Optional

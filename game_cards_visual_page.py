@@ -1,5 +1,5 @@
 """
-Visual Game Cards - Sports Betting Dashboard with Modern UI
+Sports Game Hub - Live Game Monitoring and Betting Dashboard with Modern UI
 Compact, responsive design inspired by DraftKings, FanDuel, and ESPN
 """
 
@@ -13,16 +13,42 @@ import logging
 import os
 import time
 import random
-from src.kalshi_db_manager import KalshiDBManager
+
+# CRITICAL: Load environment variables FIRST before any other imports
+from dotenv import load_dotenv
+load_dotenv()
+
+from src.services import get_kalshi_manager  # Use centralized service registry
 from src.kalshi_client import KalshiClient
+from src.kalshi_db_manager import KalshiDBManager
 from src.espn_live_data import get_espn_client
 from src.espn_ncaa_live_data import get_espn_ncaa_client
 from src.ncaa_team_database import NCAA_LOGOS, get_team_logo_url, find_team_by_name
 from src.game_watchlist_manager import GameWatchlistManager
+from src.watchlist_monitor_service import get_monitor_service
 from src.prediction_agents import NFLPredictor, NCAAPredictor
 
 # Initialize logger first
 logger = logging.getLogger(__name__)
+
+# PERFORMANCE: Cache ML models as resources to avoid memory bloat in session state
+@st.cache_resource
+def get_nfl_predictor():
+    """Get cached NFL predictor instance"""
+    try:
+        return NFLPredictor()
+    except Exception as e:
+        logger.warning(f"Could not initialize NFL Predictor: {e}")
+        return None
+
+@st.cache_resource
+def get_ncaa_predictor():
+    """Get cached NCAA predictor instance"""
+    try:
+        return NCAAPredictor()
+    except Exception as e:
+        logger.warning(f"Could not initialize NCAA Predictor: {e}")
+        return None
 
 # Optional auto-refresh (graceful degradation if not installed)
 try:
@@ -138,6 +164,253 @@ def load_game_cards_css():
         logger.warning(f"CSS file not found: {css_path}")
         return ""
 
+def show_subscription_settings(watchlist_manager):
+    """Show subscription management and monitoring settings"""
+
+    st.markdown("### ⚙️ Subscription Settings & Monitoring")
+
+    # Initialize session state for monitoring settings
+    if 'monitor_interval' not in st.session_state:
+        st.session_state.monitor_interval = 5  # Default 5 minutes
+
+    # Get monitor service
+    monitor_service = get_monitor_service()
+    service_status = monitor_service.get_status()
+
+    # ==================== MONITORING CONTROLS ====================
+    st.markdown("#### 🔔 Live Monitoring Controls")
+
+    col1, col2, col3 = st.columns([2, 2, 2])
+
+    with col1:
+        # Update interval selector
+        interval_options = {
+            "1 minute (Fast)": 1,
+            "3 minutes": 3,
+            "5 minutes (Recommended)": 5,
+            "10 minutes": 10,
+            "15 minutes (Battery Saver)": 15
+        }
+
+        selected_interval_label = st.selectbox(
+            "📊 Update Interval",
+            options=list(interval_options.keys()),
+            index=2,  # Default to 5 minutes
+            help="How often to check for game updates",
+            disabled=service_status['running']  # Disable when monitoring is active
+        )
+
+        st.session_state.monitor_interval = interval_options[selected_interval_label]
+
+    with col2:
+        # Monitoring status - use actual service status
+        if service_status['running']:
+            st.success(f"🟢 **Status:** Monitoring Active ({service_status['interval_minutes']} min)")
+            if service_status.get('next_run'):
+                next_run = service_status['next_run'].strftime('%I:%M %p')
+                st.caption(f"Next check: {next_run}")
+        else:
+            st.info("⚪ **Status:** Monitoring Stopped")
+
+    with col3:
+        # Start/Stop button - controls actual service
+        if service_status['running']:
+            if st.button("⏸️ Stop Monitoring", type="secondary", use_container_width=True):
+                with st.spinner("Stopping monitoring..."):
+                    success = monitor_service.stop()
+                    if success:
+                        st.success("✅ Monitoring stopped")
+                    else:
+                        st.error("❌ Failed to stop monitoring")
+        else:
+            if st.button("▶️ Start Monitoring", type="primary", use_container_width=True):
+                with st.spinner(f"Starting monitoring (every {st.session_state.monitor_interval} min)..."):
+                    success = monitor_service.start(interval_minutes=st.session_state.monitor_interval)
+                    if success:
+                        st.success(f"✅ Monitoring started - Updates every {st.session_state.monitor_interval} minutes")
+                        st.caption("Check your Telegram for confirmation!")
+                    else:
+                        st.error("❌ Failed to start monitoring - Check Telegram credentials in .env")
+
+
+    # ==================== HOW TO USE ====================
+    with st.expander("📖 How Live Monitoring Works", expanded=False):
+        st.markdown("""
+        **Live Monitoring automatically checks your subscribed games and sends Telegram updates when:**
+
+        ✅ **Score Changes** - Get instant score updates
+        ✅ **Quarter/Period Changes** - Know when quarters start/end
+        ✅ **Game Status Changes** - Pre-game → Live → Final
+        ✅ **Odds Movements** - Kalshi odds shift >10¢
+        ✅ **AI Prediction Changes** - Confidence swings >10%
+        ✅ **Your Team Status** - When your team starts winning or losing
+
+        **How to Start Monitoring:**
+        1. Subscribe to games from the NFL/NCAA/NBA tabs
+        2. Choose your update interval above
+        3. Click **"Start Monitoring"**
+        4. Keep this browser tab open (or run `python game_watchlist_monitor.py` in terminal for background monitoring)
+
+        **Important Notes:**
+        - Updates are SMART - only sent when meaningful changes occur
+        - No spam - never repeats the same message twice
+        - Telegram messages include AI recommendations (increase/decrease bet, hedge, etc.)
+        - Lower intervals (1-3 min) = more frequent checks but higher data usage
+        - Higher intervals (10-15 min) = less frequent but saves battery/data
+        """)
+
+
+    # ==================== TELEGRAM TEST ====================
+    st.markdown("#### 🧪 Test Telegram Connection")
+
+    col_test1, col_test2 = st.columns([3, 3])
+
+    with col_test1:
+        if st.button("📱 Send Test Message", type="secondary", use_container_width=True, help="Send a test message to verify Telegram is working"):
+            with st.spinner("Sending test message..."):
+                try:
+                    from src.telegram_notifier import TelegramNotifier
+
+                    notifier = TelegramNotifier()
+                    success = notifier.test_connection()
+
+                    if success:
+                        st.success("✅ Test message sent successfully! Check your Telegram app.")
+                    else:
+                        st.error("❌ Failed to send test message. Check your Telegram credentials in .env file.")
+                        st.caption("**Required .env settings:**")
+                        st.code("""TELEGRAM_ENABLED=true
+TELEGRAM_BOT_TOKEN=your_bot_token_here
+TELEGRAM_CHAT_ID=your_chat_id_here""")
+
+                except Exception as e:
+                    st.error(f"❌ Error: {str(e)}")
+                    st.caption("Make sure python-telegram-bot is installed: `pip install python-telegram-bot==20.7`")
+
+    with col_test2:
+        with st.expander("🔧 Telegram Setup Help", expanded=False):
+            st.markdown("""
+            **If test message fails, verify your .env file has:**
+
+            1. `TELEGRAM_ENABLED=true`
+            2. `TELEGRAM_BOT_TOKEN` from [@BotFather](https://t.me/BotFather)
+            3. `TELEGRAM_CHAT_ID` from [@userinfobot](https://t.me/userinfobot)
+
+            **Quick Setup:**
+            - Message [@BotFather](https://t.me/BotFather) on Telegram
+            - Create a new bot with `/newbot`
+            - Copy the token to your .env file
+            - Message [@userinfobot](https://t.me/userinfobot) to get your chat ID
+            - Add both to .env and restart the app
+            """)
+
+    st.markdown("---")  # Divider
+
+
+    # ==================== SUBSCRIBED GAMES ====================
+    st.markdown("#### 📋 Your Subscribed Games")
+
+    # DEBUG: Show user_id being used
+    with st.expander("🔍 Debug Info", expanded=False):
+        st.code(f"User ID: {st.session_state.user_id}")
+        st.caption(f"Fetching watchlist from database...")
+
+    # Get all subscriptions
+    watchlist = watchlist_manager.get_user_watchlist(st.session_state.user_id)
+
+    if not watchlist:
+        st.info("👋 No subscribed games yet. Go to NFL, NCAA, or NBA tabs and click Subscribe on any game card!")
+        st.caption(f"🔍 Debug: Checked database for user_id: {st.session_state.user_id}")
+        return
+
+    # Count by sport
+    nfl_count = len([w for w in watchlist if w.get('sport') == 'NFL'])
+    ncaa_count = len([w for w in watchlist if w.get('sport') == 'CFB'])
+    nba_count = len([w for w in watchlist if w.get('sport') == 'NBA'])
+
+    # Stats cards
+    col_stat1, col_stat2, col_stat3, col_stat4 = st.columns(4)
+    with col_stat1:
+        st.metric("🏈 NFL Games", nfl_count)
+    with col_stat2:
+        st.metric("🎓 NCAA Games", ncaa_count)
+    with col_stat3:
+        st.metric("🏀 NBA Games", nba_count)
+    with col_stat4:
+        st.metric("📊 Total", len(watchlist))
+
+
+    # Display subscriptions by sport
+    for sport_name, sport_code in [("🏈 NFL", "NFL"), ("🎓 NCAA", "CFB"), ("🏀 NBA", "NBA")]:
+        sport_games = [w for w in watchlist if w.get('sport') == sport_code]
+
+        if not sport_games:
+            continue
+
+        st.markdown(f"**{sport_name} Subscriptions ({len(sport_games)})**")
+
+        for idx, watch_entry in enumerate(sport_games):
+            game_data = watch_entry.get('game_data', {})
+            away_team = game_data.get('away_team', watch_entry.get('away_team', 'Away'))
+            home_team = game_data.get('home_team', watch_entry.get('home_team', 'Home'))
+            selected_team = watch_entry.get('selected_team', '')
+            game_id = watch_entry.get('game_id', '')
+
+            # Display as table-like rows
+            col_game, col_pick, col_action = st.columns([3, 2, 1])
+
+            with col_game:
+                st.markdown(f"**{away_team}** @ **{home_team}**")
+
+            with col_pick:
+                if selected_team:
+                    st.caption(f"Your Pick: {selected_team}")
+                else:
+                    st.caption("No team selected")
+
+            with col_action:
+                unsub_key = f"settings_unsub_{sport_code}_{game_id}_{idx}"
+                if st.button("🗑️", key=unsub_key, help="Unsubscribe", use_container_width=True):
+                    if watchlist_manager.remove_game_from_watchlist(st.session_state.user_id, game_id):
+                        st.success(f"Unsubscribed from {away_team} @ {home_team}")
+                        st.rerun()
+
+        st.markdown("")  # Spacing
+
+
+    # ==================== COMMAND LINE OPTION ====================
+    with st.expander("💻 Advanced: Run Monitoring in Background (Terminal)", expanded=False):
+        st.markdown("""
+        **For continuous monitoring even when browser is closed:**
+
+        Run this command in your terminal:
+        ```bash
+        python game_watchlist_monitor.py --interval 5
+        ```
+
+        **Arguments:**
+        - `--interval N` - Update interval in minutes (default: 5)
+
+        **Examples:**
+        ```bash
+        # Check every 1 minute (fast updates)
+        python game_watchlist_monitor.py --interval 1
+
+        # Check every 10 minutes (battery saver)
+        python game_watchlist_monitor.py --interval 10
+        ```
+
+        **Benefits of Background Monitoring:**
+        - ✅ Runs independently of browser
+        - ✅ Continues even if you close this page
+        - ✅ More reliable for long sessions
+        - ✅ Lower resource usage
+
+        **To Stop:**
+        Press `Ctrl+C` in the terminal window
+        """)
+
+
 def show_game_cards():
     """Main function for visual game cards with modern compact UI"""
 
@@ -151,27 +424,39 @@ def show_game_cards():
     db = get_kalshi_db_manager()
     watchlist_manager = get_game_watchlist_manager()
 
-    # Initialize prediction agents (cached in session state)
-    if 'nfl_predictor' not in st.session_state:
-        try:
-            st.session_state.nfl_predictor = NFLPredictor()
-            logger.info("NFL Predictor initialized")
-        except Exception as e:
-            logger.warning(f"Could not initialize NFL Predictor: {e}")
-            st.session_state.nfl_predictor = None
+    # AUTO-START MONITORING: If user has subscribed games, auto-start monitoring service
+    if 'monitoring_auto_started' not in st.session_state:
+        st.session_state.monitoring_auto_started = False
 
-    if 'ncaa_predictor' not in st.session_state:
+    if not st.session_state.monitoring_auto_started:
         try:
-            st.session_state.ncaa_predictor = NCAAPredictor()
-            logger.info("NCAA Predictor initialized")
+            # Check if user has any watched games
+            temp_user_id = os.getenv('TELEGRAM_AUTHORIZED_USERS', 'default_user').split(',')[0]
+            watchlist = watchlist_manager.get_user_watchlist(temp_user_id)
+
+            if watchlist and len(watchlist) > 0:
+                # User has subscriptions, auto-start monitoring
+                from src.watchlist_monitor_service import get_monitor_service
+                monitor_service = get_monitor_service()
+                status = monitor_service.get_status()
+
+                if not status['running']:
+                    # Start monitoring with default 5-minute interval
+                    success = monitor_service.start(interval_minutes=5)
+                    if success:
+                        st.session_state.monitoring_auto_started = True
+                        logger.info("✅ Auto-started background monitoring for subscribed games")
         except Exception as e:
-            logger.warning(f"Could not initialize NCAA Predictor: {e}")
-            st.session_state.ncaa_predictor = None
+            logger.warning(f"Could not auto-start monitoring: {e}")
+            pass  # Non-critical, continue without auto-start
 
     # Initialize user ID (from Telegram or default)
-    if 'user_id' not in st.session_state:
-        telegram_user_id = os.getenv('TELEGRAM_AUTHORIZED_USERS', 'default_user').split(',')[0]
-        st.session_state.user_id = telegram_user_id
+    # CRITICAL: Always refresh from environment to ensure correct value
+    telegram_user_id = os.getenv('TELEGRAM_AUTHORIZED_USERS', '')
+    if telegram_user_id:
+        st.session_state.user_id = telegram_user_id.split(',')[0]
+    elif 'user_id' not in st.session_state:
+        st.session_state.user_id = 'default_user'
 
     # Store selected sport in session state
     if 'selected_sport' not in st.session_state:
@@ -193,24 +478,31 @@ def show_game_cards():
     import datetime
     cache_buster = st.session_state.get('css_cache_buster', int(time.time()))
     
-    # Show CSS version number at very top to verify changes are loading
-    css_version = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    st.caption(f"🎨 CSS Version: {css_version} | Cache Buster: {cache_buster}")
+    # Show monitoring status indicator
+    def is_monitor_running():
+        """Check if background watchlist monitor is running"""
+        try:
+            import psutil
+            for proc in psutil.process_iter(['name', 'cmdline']):
+                if proc.info['name'] and 'python' in proc.info['name'].lower():
+                    cmdline = proc.info.get('cmdline', [])
+                    if cmdline and any('game_watchlist_monitor' in str(cmd) for cmd in cmdline):
+                        return True
+        except:
+            pass
+        return False
 
-    col_refresh_top, col_title, col_watch, col_ai, col_refresh = st.columns([1, 3, 2, 2, 1])
-    
-    with col_refresh_top:
-        if st.button("🔄 Force Refresh", key="force_refresh_ui", help="Clear cache and refresh all styles", use_container_width=True):
-            st.cache_data.clear()
-            st.cache_resource.clear()
-            # Use random number to ensure uniqueness
-            st.session_state.css_cache_buster = int(time.time()) + random.randint(1000, 9999)
-            st.rerun()
+    monitor_running = is_monitor_running()
+    if monitor_running:
+        st.success("🟢 **Background Monitoring ACTIVE** - Checking watchlist every 5 minutes")
+    else:
+        st.warning("🟠 **Background Monitoring NOT RUNNING** - Start it in Settings tab for automatic updates")
 
-    # Title row - more compact
+    # Title row - compact single line
+    col_title, col_watch, col_ai, col_refresh = st.columns([3, 2, 2, 1])
 
     with col_title:
-        st.markdown("## 🏟️ Sports Game Cards")
+        st.markdown('<h2 style="margin:0; padding:0;">🏟️ Sports Game Hub</h2>', unsafe_allow_html=True)
 
     with col_watch:
         # Watch list count
@@ -241,20 +533,57 @@ def show_game_cards():
             llm_available = False
             available_providers = []
 
-        # Compact AI model selector
-        model_options = ["Local AI"]
+        # Compact AI model selector with Ollama support
+        model_options = []
+
+        # Check for Ollama models
+        ollama_models = []
+        try:
+            import requests
+            response = requests.get('http://localhost:11434/api/tags', timeout=2)
+            if response.status_code == 200:
+                data = response.json()
+                ollama_models = [m.get('name', '') for m in data.get('models', [])]
+                # Add Ollama models to dropdown
+                for model in ollama_models:
+                    model_options.append(f"Ollama: {model}")
+        except:
+            pass  # Ollama not running
+
+        # Add default local AI
+        if not ollama_models:
+            model_options.append("Local AI (Basic)")
+
+        # Add cloud providers
         if llm_available and "groq" in available_providers:
-            model_options.append("Groq")
+            model_options.append("Groq Cloud")
         if llm_available and "deepseek" in available_providers:
-            model_options.append("DeepSeek")
+            model_options.append("DeepSeek Cloud")
+
+        # Set default model (prefer qwen2.5-coder, then qwen2.5, then llama, then first ollama, then basic)
+        default_index = 0
+        if ollama_models:
+            # Find best model
+            qwen_coder = [i for i, m in enumerate(model_options) if 'qwen2.5-coder' in m.lower()]
+            qwen = [i for i, m in enumerate(model_options) if 'qwen2.5' in m.lower() and 'coder' not in m.lower()]
+            llama = [i for i, m in enumerate(model_options) if 'llama' in m.lower()]
+
+            if qwen_coder:
+                default_index = qwen_coder[0]
+            elif qwen:
+                default_index = qwen[0]
+            elif llama:
+                default_index = llama[0]
 
         selected_model = st.selectbox(
             "AI Model",
             model_options,
+            index=default_index,
             label_visibility="collapsed",
-            key="ai_model_selector"
+            key="ai_model_selector",
+            help="Select AI model for game analysis"
         )
-        st.session_state.ai_model = f"{selected_model} (Fast & Free)" if selected_model == "Local AI" else selected_model
+        st.session_state.ai_model = selected_model
 
     with col_refresh:
         # Auto-refresh toggle
@@ -285,7 +614,6 @@ def show_game_cards():
                     st.markdown(f"**{team_display}**", unsafe_allow_html=True)
         if len(watchlist) > 6:
             st.caption(f"... and {len(watchlist) - 6} more")
-        st.markdown("---")
 
     # ==================== WATCH LIST SIDEBAR (ONCE, NOT PER TAB) ====================
     # Display sidebar watchlist BEFORE tabs to avoid duplication
@@ -326,7 +654,7 @@ def show_game_cards():
                         st.rerun()
 
     # ==================== SPORT TABS (Horizontal at top) ====================
-    sport_tabs = st.tabs(["🏈 NFL", "🎓 NCAA", "🏀 NBA", "⚾ MLB"])
+    sport_tabs = st.tabs(["🏈 NFL", "🎓 NCAA", "🏀 NBA", "⚾ MLB", "⚙️ Settings"])
 
     with sport_tabs[0]:  # NFL
         sport_filter = "NFL"
@@ -345,6 +673,9 @@ def show_game_cards():
 
     with sport_tabs[3]:  # MLB
         st.info("⚾ **MLB Coming Soon** - Integration in progress")
+
+    with sport_tabs[4]:  # Settings
+        show_subscription_settings(watchlist_manager)
 
 
 def show_sport_games(db, watchlist_manager, sport_filter, sport_name, llm_service=None, auto_refresh=False):
@@ -376,11 +707,36 @@ def show_sport_games(db, watchlist_manager, sport_filter, sport_name, llm_servic
         )
 
     with col2:
-        filter_status = st.selectbox(
-            "Game Status",
-            ["All Games", "Live Only", "Upcoming", "Final"],
-            key=f"filter_{sport_filter}"
+        # Combined Status & Date Filter
+        unified_filter = st.selectbox(
+            "🔍 Filter Games",
+            ["All Games", "🔴 Live Only", "⏰ Upcoming", "✅ Final", "📅 Today Only", "📅 Next 7 Days", "📅 Custom Range"],
+            key=f"unified_filter_{sport_filter}",
+            help="Filter by game status or date"
         )
+
+        # Parse the unified filter into status and date components
+        if unified_filter == "🔴 Live Only":
+            filter_status = "Live Only"
+            date_filter_mode = "All Games"
+        elif unified_filter == "⏰ Upcoming":
+            filter_status = "Upcoming"
+            date_filter_mode = "All Games"
+        elif unified_filter == "✅ Final":
+            filter_status = "Final"
+            date_filter_mode = "All Games"
+        elif unified_filter == "📅 Today Only":
+            filter_status = "All Games"
+            date_filter_mode = "Today Only"
+        elif unified_filter == "📅 Next 7 Days":
+            filter_status = "All Games"
+            date_filter_mode = "Next 7 Days"
+        elif unified_filter == "📅 Custom Range":
+            filter_status = "All Games"
+            date_filter_mode = "Custom Range"
+        else:  # "All Games"
+            filter_status = "All Games"
+            date_filter_mode = "All Games"
 
     with col3:
         odds_filter = st.selectbox(
@@ -412,22 +768,14 @@ def show_sport_games(db, watchlist_manager, sport_filter, sport_name, llm_servic
             help="Filter out completed games"
         )
 
-    # Second filter row for additional options
-    col7, col8, col_spacer = st.columns([2, 2, 2])
+    # Second filter row - Custom Range, Lopsided Odds, and Auto-Refresh
+    col7, col8, col9, col10 = st.columns([2, 2, 1.5, 1.5])
 
     with col7:
-        date_filter_mode = st.selectbox(
-            "📅 Date Filter",
-            ["All Games", "Today Only", "Custom Range", "Next 7 Days"],
-            index=0,
-            key=f"date_filter_mode_{sport_filter}",
-            help="Filter games by date range"
-        )
-
-    with col8:
-        if date_filter_mode == "Custom Range":
+        # Show custom date range selector when Custom Range is selected
+        if unified_filter == "📅 Custom Range":
             date_range = st.date_input(
-                "Select Date Range",
+                "📅 Select Date Range",
                 value=(datetime.now().date(), datetime.now().date() + timedelta(days=6)),
                 key=f"date_range_{sport_filter}",
                 help="Select start and end dates"
@@ -435,16 +783,33 @@ def show_sport_games(db, watchlist_manager, sport_filter, sport_name, llm_servic
         else:
             date_range = None
 
-    # Auto-refresh settings row
-    col_auto1, col_auto2 = st.columns([1, 1])
-    with col_auto1:
+    with col8:
+        hide_lopsided = st.checkbox(
+            "🎯 Hide Lopsided Odds",
+            value=False,
+            key=f"hide_lopsided_{sport_filter}",
+            help="Filter out games with heavily favored teams (96%+ odds = low payout potential)"
+        )
+
+        if hide_lopsided:
+            lopsided_threshold = st.slider(
+                "Max Odds %",
+                70, 99, 90,
+                key=f"lopsided_threshold_{sport_filter}",
+                help="Hide games where one team's odds exceed this percentage"
+            )
+        else:
+            lopsided_threshold = 90
+
+    with col9:
         auto_refresh_enabled = st.checkbox(
             "⚡ Auto-Refresh",
             value=False,
             key=f"auto_refresh_{sport_filter}",
             help="Automatically sync live data at set interval"
         )
-    with col_auto2:
+
+    with col10:
         if auto_refresh_enabled:
             refresh_interval = st.selectbox(
                 "Interval",
@@ -486,8 +851,6 @@ def show_sport_games(db, watchlist_manager, sport_filter, sport_name, llm_servic
         import datetime
         current_time = datetime.datetime.now().strftime("%H:%M")
         st.caption(f"🕐 {current_time}")
-
-    st.markdown("---")
 
     # Auto-refresh logic
     if auto_refresh_enabled and refresh_interval:
@@ -582,10 +945,35 @@ def show_sport_games(db, watchlist_manager, sport_filter, sport_name, llm_servic
         # Detect sport type from filter
         sport = 'nfl' if sport_filter == 'NFL' else 'ncaaf'
         espn_games = enrich_games_with_kalshi_odds_optimized(espn_games, sport=sport)
+
+        # FILTER OUT LOPSIDED ODDS (where you can't make money)
+        # Remove games where market odds are >85% or <15% (too one-sided)
+        games_before_filter = len([g for g in espn_games if g.get('kalshi_odds')])
+        espn_games_filtered = []
+        for game in espn_games:
+            kalshi_odds = game.get('kalshi_odds')
+            if kalshi_odds:
+                away_price = kalshi_odds.get('away_win_price', 0.5)
+                home_price = kalshi_odds.get('home_win_price', 0.5)
+
+                # Skip if either price is too lopsided (>0.85 or <0.15)
+                if (away_price > 0.85 or away_price < 0.15 or
+                    home_price > 0.85 or home_price < 0.15):
+                    logger.debug(f"Filtered out lopsided odds: {game['away_team']} @ {game['home_team']} "
+                               f"(Away: {away_price:.1%}, Home: {home_price:.1%})")
+                    continue  # Skip this game
+
+            espn_games_filtered.append(game)
+
+        espn_games = espn_games_filtered
+        games_filtered = games_before_filter - len([g for g in espn_games if g.get('kalshi_odds')])
+        if games_filtered > 0:
+            logger.info(f"Filtered out {games_filtered} games with lopsided odds (>85% or <15%)")
+
         kalshi_matched = sum(1 for g in espn_games if g.get('kalshi_odds'))
         if kalshi_matched > 0:
             logger.info(f"Matched {kalshi_matched}/{len(espn_games)} ESPN games with Kalshi odds")
-            kalshi_status = f"✅ {kalshi_matched}/{len(espn_games)} games with odds"
+            kalshi_status = f"✅ {kalshi_matched}/{len(espn_games)} games"
         else:
             kalshi_status = f"⚠️ 0/{len(espn_games)} games matched"
     except Exception as e:
@@ -638,6 +1026,75 @@ def show_sport_games(db, watchlist_manager, sport_filter, sport_name, llm_servic
         st.warning(f"No live {sport_name} games available at this time")
         return
 
+    # Extract unique team names for team filter dropdown
+    all_teams = set()
+    for game in espn_games:
+        away_team = game.get('away_team', '')
+        home_team = game.get('home_team', '')
+        if away_team:
+            all_teams.add(away_team)
+        if home_team:
+            all_teams.add(home_team)
+
+    team_list = sorted(list(all_teams))
+
+    # Team-specific filter dropdown
+    col_team_sel, col_subs = st.columns([3, 3])
+    with col_team_sel:
+        team_options = ["All Teams"] + team_list
+        selected_team_name = st.selectbox(
+            "🏈 Select Team",
+            team_options,
+            key=f"team_selector_{sport_filter}",
+            help="Filter to show only games involving this team"
+        )
+
+    with col_subs:
+        # Show subscriptions count and management
+        watchlist = watchlist_manager.get_user_watchlist(st.session_state.user_id)
+        sub_count = len([w for w in watchlist if w.get('game_data', {}).get('sport') == sport_filter])
+        if sub_count > 0:
+            if st.button(f"📋 My Subscriptions ({sub_count})", key=f"show_subs_{sport_filter}", use_container_width=True):
+                st.session_state[f'show_subscriptions_{sport_filter}'] = not st.session_state.get(f'show_subscriptions_{sport_filter}', False)
+        else:
+            st.info("No active subscriptions")
+
+    # Show subscriptions if toggled
+    if st.session_state.get(f'show_subscriptions_{sport_filter}', False) and watchlist:
+        st.markdown("### 📋 Your Subscribed Games")
+
+        # Table-like list view
+        for idx, watch_game in enumerate(watchlist):
+            game_data = watch_game.get('game_data', {})
+            if game_data.get('sport') != sport_filter:
+                continue
+
+            away_team = game_data.get('away_team', 'Away')
+            home_team = game_data.get('home_team', 'Home')
+            selected_team = watch_game.get('selected_team', '')
+            status = game_data.get('status_detail', 'Scheduled')
+            away_score = game_data.get('away_score', 0)
+            home_score = game_data.get('home_score', 0)
+            is_live = game_data.get('is_live', False)
+
+            col_sub1, col_sub2, col_sub3 = st.columns([3, 2, 1])
+            with col_sub1:
+                st.markdown(f"**{away_team}** @ **{home_team}**")
+            with col_sub2:
+                if is_live:
+                    st.markdown(f"🔴 **{away_score} - {home_score}** • {status}")
+                else:
+                    st.caption(f"Your Pick: {selected_team or 'Not selected'} • {status}")
+            with col_sub3:
+                if st.button("🗑️ Unsubscribe", key=f"unsub_{watch_game.get('game_id')}", help="Remove from watchlist", use_container_width=True):
+                    watchlist_manager.remove_game_from_watchlist(
+                        st.session_state.user_id,
+                        watch_game.get('game_id')
+                    )
+                    st.success("Unsubscribed!")
+                    st.rerun()
+
+
     # Calculate live count for display in pagination
     live_count = sum(1 for g in espn_games if g.get('is_live', False))
 
@@ -659,7 +1116,11 @@ def show_sport_games(db, watchlist_manager, sport_filter, sport_name, llm_servic
             'min_opportunity': min_opportunity,
             'hide_final': hide_final,
             'date_filter_mode': date_filter_mode,
-            'date_range': date_range
+            'date_range': date_range,
+            'selected_team_name': selected_team_name,
+            'team_filter': st.session_state.get(f'{sport_filter.lower()}_team_filter', 'All Teams'),
+            'hide_lopsided': hide_lopsided,
+            'lopsided_threshold': lopsided_threshold
         }
     )
 
@@ -688,11 +1149,11 @@ def get_sports_prediction_cached(game_id, sport_filter, home_team, away_team, ga
             except:
                 pass
 
-        # Get appropriate predictor
+        # Get appropriate predictor from cached resources
         if sport_filter == 'NFL':
-            predictor = st.session_state.get('nfl_predictor')
+            predictor = get_nfl_predictor()
         else:  # CFB / NCAA
-            predictor = st.session_state.get('ncaa_predictor')
+            predictor = get_ncaa_predictor()
 
         if not predictor:
             logger.warning(f"No predictor available for {sport_filter}")
@@ -741,18 +1202,19 @@ def get_ai_predictions_cached(game_id, away_team, home_team, away_score, home_sc
         ai_agent = AdvancedBettingAIAgent()
 
         # Reconstruct game and market data from hashable parameters
+        import json
+        kalshi_odds = json.loads(kalshi_odds_str) if kalshi_odds_str else {}
+
         game = {
             'game_id': game_id,
             'away_team': away_team,
             'home_team': home_team,
             'away_score': away_score,
-            'home_score': home_score
+            'home_score': home_score,
+            'kalshi_odds': kalshi_odds  # Embed odds in game data for AI agent
         }
 
-        import json
-        kalshi_odds = json.loads(kalshi_odds_str) if kalshi_odds_str else {}
-
-        ai_pred = ai_agent.analyze_betting_opportunity(game, kalshi_odds)
+        ai_pred = ai_agent.analyze_betting_opportunity(game, {})
         
         # VALIDATE: Ensure prediction matches the teams we requested
         if ai_pred:
@@ -824,6 +1286,23 @@ def display_espn_live_games(espn_games, sport_name, sport_filter, watchlist_mana
         if hide_final:
             filtered_games = [g for g in filtered_games if not g.get('is_completed', False)]
 
+        # Apply "Hide Lopsided Odds" filter - exclude games with heavily favored teams
+        hide_lopsided = filter_settings.get('hide_lopsided', False)
+        lopsided_threshold = filter_settings.get('lopsided_threshold', 90) / 100  # Convert to decimal
+
+        if hide_lopsided:
+            def is_not_lopsided(game):
+                """Check if game has competitive odds (neither team heavily favored)"""
+                yes_price = game.get('yes_price', 0.5)
+                no_price = game.get('no_price', 0.5)
+
+                # If either team's odds exceed threshold, it's lopsided (not profitable)
+                if yes_price > lopsided_threshold or no_price > lopsided_threshold:
+                    return False
+                return True
+
+            filtered_games = [g for g in filtered_games if is_not_lopsided(g)]
+
         # Apply date filter
         date_filter_mode = filter_settings.get('date_filter_mode', 'All Games')
         date_range = filter_settings.get('date_range', None)
@@ -881,6 +1360,25 @@ def display_espn_live_games(espn_games, sport_name, sport_filter, watchlist_mana
 
             filtered_games = [g for g in filtered_games if is_in_date_range(g.get('game_time'), start_date, end_date)]
             logger.info(f"Post-filter game count: {len(filtered_games)}")
+
+        # Apply team-specific filter
+        selected_team_name = filter_settings.get('selected_team_name', 'All Teams')
+        if selected_team_name and selected_team_name != "All Teams":
+            # Filter for games involving the selected team
+            filtered_games = [g for g in filtered_games
+                            if g.get('away_team') == selected_team_name
+                            or g.get('home_team') == selected_team_name]
+
+        # Apply team filters from dropdown (legacy filters)
+        team_filter = filter_settings.get('team_filter', 'All Teams')
+        if team_filter == "Top 25 Only":
+            # Filter for ranked teams (NCAA)
+            filtered_games = [g for g in filtered_games if g.get('away_rank') or g.get('home_rank')]
+        elif team_filter == "Playoff Contenders":
+            # Filter for teams with good records (NFL) - simplified for now
+            filtered_games = [g for g in filtered_games if g.get('is_live', False) or True]  # Show all for now
+        elif team_filter == "Live Games Only":
+            filtered_games = [g for g in filtered_games if g.get('is_live', False)]
 
         # Apply money-making filters (simplified - no AI required for initial filter)
         odds_filter = filter_settings.get('odds_filter', 'All Games')
@@ -963,17 +1461,32 @@ def display_espn_live_games(espn_games, sport_name, sport_filter, watchlist_mana
             st.cache_data.clear()
             st.rerun()
 
+    # OPTIMIZATION: Fetch watchlist ONCE before the game loop (prevents connection pool exhaustion)
+    # Instead of calling watchlist_manager.is_game_watched() for each game (database call per card),
+    # we fetch the entire watchlist once and use set membership for O(1) lookup
+    user_id = st.session_state.get('user_id', 'default_user')
+    watchlist = watchlist_manager.get_user_watchlist(user_id)
+    watched_game_ids = {w.get('game_id') for w in watchlist if w.get('game_id')}
+
     # Display in grid (dynamic columns based on user selection)
     for i in range(0, len(paginated_games), cards_per_row):
         cols = st.columns(cards_per_row)
 
         for col_idx, game in enumerate(paginated_games[i:i+cards_per_row]):
             with cols[col_idx]:
-                display_espn_game_card(game, sport_filter, watchlist_manager, llm_service)
+                display_espn_game_card(game, sport_filter, watchlist_manager, llm_service, watched_game_ids)
 
 
-def display_espn_game_card(game, sport_filter, watchlist_manager, llm_service=None):
-    """Display a single ESPN game as a compact card with AI prediction"""
+def display_espn_game_card(game, sport_filter, watchlist_manager, llm_service=None, watched_game_ids=None):
+    """Display a single ESPN game as a compact card with AI prediction
+
+    Args:
+        game: Game data dictionary
+        sport_filter: Sport filter code (NFL, CFB)
+        watchlist_manager: Watchlist manager instance
+        llm_service: Optional LLM service for AI predictions
+        watched_game_ids: Set of game IDs that are in user's watchlist (for O(1) lookup instead of DB calls)
+    """
     from src.nfl_team_database import get_team_logo_url as get_nfl_logo
     from src.ncaa_team_database import get_team_logo_url as get_ncaa_logo
     from src.advanced_betting_ai_agent import AdvancedBettingAIAgent
@@ -1022,30 +1535,77 @@ def display_espn_game_card(game, sport_filter, watchlist_manager, llm_service=No
     # Get user ID from session state
     user_id = st.session_state.get('user_id', 'default_user')
 
-    # Check if game is in watchlist
-    is_watched = watchlist_manager.is_game_watched(user_id, game_id) if game_id else False
+    # OPTIMIZATION: Check if game is in watchlist using set membership (O(1) instead of database call)
+    # watched_game_ids is pre-fetched once before the game loop to avoid connection pool exhaustion
+    if watched_game_ids is None:
+        # Fallback for backward compatibility if called without watched_game_ids
+        is_watched = watchlist_manager.is_game_watched(user_id, game_id) if game_id else False
+    else:
+        # Use set membership check - O(1) instead of database call
+        is_watched = bool(game_id and game_id in watched_game_ids)
 
-    # Get sports-specific AI prediction FIRST (for dynamic border coloring)
-    game_date_str = game.get('game_time', '')
-    sports_prediction = get_sports_prediction_cached(
-        game_id=str(game_id),
-        sport_filter=sport_filter,
-        home_team=home_team,
-        away_team=away_team,
-        game_date_str=game_date_str if game_date_str else None
-    )
+    # Get Kalshi-based AI prediction FIRST (for dynamic border coloring)
+    # This uses actual market odds instead of Elo ratings
+    try:
+        import json
+        from decimal import Decimal
+        from datetime import datetime, date
+
+        kalshi_odds = game.get('kalshi_odds', {})
+        # Convert Decimal to float and datetime/date to ISO format for JSON serialization
+        if kalshi_odds:
+            kalshi_odds_clean = {}
+            for k, v in kalshi_odds.items():
+                if isinstance(v, Decimal):
+                    kalshi_odds_clean[k] = float(v)
+                elif isinstance(v, (datetime, date)):
+                    kalshi_odds_clean[k] = v.isoformat()
+                else:
+                    kalshi_odds_clean[k] = v
+            kalshi_odds_str = json.dumps(kalshi_odds_clean)
+        else:
+            kalshi_odds_str = ""
+
+        ai_prediction_early = get_ai_predictions_cached(
+            game_id=str(game_id),
+            away_team=away_team,
+            home_team=home_team,
+            away_score=away_score,
+            home_score=home_score,
+            kalshi_odds_str=kalshi_odds_str
+        )
+    except Exception as e:
+        logger.warning(f"Error getting AI prediction for {away_team} @ {home_team}: {e}")
+        ai_prediction_early = None
 
     # Determine predicted winner and confidence for border coloring
-    if sports_prediction:
-        predicted_winner = sports_prediction.get('winner', '')
-        win_probability = sports_prediction.get('probability', 0.5)
-        confidence_level = sports_prediction.get('confidence', 'low')
-        predicted_spread = sports_prediction.get('spread', 0)
+    if ai_prediction_early:
+        predicted_winner_raw = ai_prediction_early.get('predicted_winner', '')
+
+        # Convert 'away'/'home' to actual team names
+        if predicted_winner_raw.lower() == 'away':
+            predicted_winner = away_team
+        elif predicted_winner_raw.lower() == 'home':
+            predicted_winner = home_team
+        else:
+            predicted_winner = predicted_winner_raw
+
+        win_probability = ai_prediction_early.get('win_probability', 0.5)
+        confidence_score = ai_prediction_early.get('confidence_score', 0)
+
+        # Convert confidence score (0-100) to confidence level
+        if confidence_score >= 75:
+            confidence_level = 'high'
+        elif confidence_score >= 60:
+            confidence_level = 'medium'
+        else:
+            confidence_level = 'low'
+
+        predicted_spread = ai_prediction_early.get('predicted_spread', 0)
 
         # VALIDATE: Ensure predicted winner matches one of the teams
         if predicted_winner and predicted_winner.lower() not in [home_team.lower(), away_team.lower()]:
             logger.warning(f"Invalid prediction winner '{predicted_winner}' for {away_team} @ {home_team}, clearing prediction")
-            sports_prediction = None
             predicted_winner = ''
             win_probability = 0.5
             confidence_level = 'low'
@@ -1058,7 +1618,7 @@ def display_espn_game_card(game, sport_filter, watchlist_manager, llm_service=No
 
     # Determine text color for predicted winner based on AI confidence
     if confidence_level == 'high':
-        winner_text_color = '#00ff00'  # Green for high confidence
+        winner_text_color = '#00ff00'  # Bright green for high confidence
         confidence_emoji = '🟢'
         confidence_text = 'HIGH CONFIDENCE'
     elif confidence_level == 'medium':
@@ -1066,7 +1626,7 @@ def display_espn_game_card(game, sport_filter, watchlist_manager, llm_service=No
         confidence_emoji = '🟡'
         confidence_text = 'MEDIUM CONFIDENCE'
     else:
-        winner_text_color = '#888888'  # Gray for low confidence
+        winner_text_color = '#87CEEB'  # Sky blue for low confidence (still highlighted but subtle)
         confidence_emoji = '⚪'
         confidence_text = 'Low Confidence'
 
@@ -1078,18 +1638,43 @@ def display_espn_game_card(game, sport_filter, watchlist_manager, llm_service=No
     with col_status:
         if is_live:
             st.markdown(f'<span class="live-indicator"></span><strong style="font-size:13px;">LIVE • {status}</strong>', unsafe_allow_html=True)
+
+            # Enhanced live game data - possession, down & distance
+            possession = game.get('possession', '')
+            down_distance = game.get('down_distance', '')
+            is_red_zone = game.get('is_red_zone', False)
+            home_timeouts = game.get('home_timeouts', 3)
+            away_timeouts = game.get('away_timeouts', 3)
+
+            if possession or down_distance:
+                live_detail = []
+                if possession:
+                    live_detail.append(f"🏈 {possession}")
+                if down_distance:
+                    if is_red_zone:
+                        live_detail.append(f"🔴 {down_distance}")  # Red zone indicator
+                    else:
+                        live_detail.append(down_distance)
+
+                st.markdown(f"<div style='font-size:11px; color:#aaa; margin-top:2px;'>{' • '.join(live_detail)}</div>", unsafe_allow_html=True)
+
+            # Show timeouts
+            if home_timeouts < 3 or away_timeouts < 3:
+                timeout_display = f"⏱️ {away_team[:3]}: {'●' * away_timeouts}{'○' * (3 - away_timeouts)} | {home_team[:3]}: {'●' * home_timeouts}{'○' * (3 - home_timeouts)}"
+                st.markdown(f"<div style='font-size:10px; color:#666; margin-top:2px;'>{timeout_display}</div>", unsafe_allow_html=True)
+
         elif is_completed:
             st.markdown(f"<strong style='font-size:13px;'>FINAL • {status}</strong>", unsafe_allow_html=True)
         else:
             st.markdown(f"<strong style='font-size:13px;'>{status}</strong>", unsafe_allow_html=True)
     with col_quick_tg:
-        # Subscribe button - gray text that turns green when subscribed
-        button_label = "Subscribe" if not is_watched else "Subscribed"
+        # Subscribe button - gray when not subscribed, bright green when subscribed
+        button_label = "📡 Subscribe" if not is_watched else "✅ Subscribed"
         button_key = f"subscribe_{unique_key}"
 
-        # Custom CSS for neutral dark gray/green subscribe button - FORCED
-        btn_bg_color = '#4CAF50' if is_watched else '#495057'  # Dark gray when not subscribed, green when subscribed
-        btn_hover_color = '#45a049' if is_watched else '#3d4146'
+        # Custom CSS for bright green when subscribed, gray when not
+        btn_bg_color = '#10B981' if is_watched else '#495057'  # Bright green when subscribed, dark gray when not
+        btn_hover_color = '#059669' if is_watched else '#3d4146'  # Darker green on hover
         btn_text_color = '#ffffff'  # White text for visibility
 
         # Wrapper div with unique class for targeting - FORCED STYLES
@@ -1135,14 +1720,16 @@ def display_espn_game_card(game, sport_filter, watchlist_manager, llm_service=No
 
         if st.button(button_label, key=button_key, use_container_width=False, help="Subscribe for live game updates"):
             if not is_watched:
-                watchlist_manager.add_game_to_watchlist(user_id, game, selected_team=None)
-                try:
-                    from src.telegram_notifier import TelegramNotifier
-                    notifier = TelegramNotifier()
-                    message = f"🏈 Subscribed: {away_team} @ {home_team}\nYou'll get live updates via Telegram!"
-                    notifier.send_message(message)
-                except: pass
-                st.rerun()
+                # Add sport field to game object (ESPN doesn't include it)
+                game['sport'] = sport_filter
+                # Add to watchlist - this triggers Telegram alert automatically via _send_subscription_alert()
+                success = watchlist_manager.add_game_to_watchlist(user_id, game, selected_team=None)
+                if success:
+                    # Update session state immediately without full page reload
+                    st.session_state[f'watched_{game_id}_{sport_filter}'] = True
+                    st.success("✅ Subscribed! Button will turn green on next page refresh. Check Telegram for confirmation.")
+                else:
+                    st.error("❌ Subscription failed. Check logs.")
 
         # Close wrapper div
         st.markdown('</div>', unsafe_allow_html=True)
@@ -1163,23 +1750,19 @@ def display_espn_game_card(game, sport_filter, watchlist_manager, llm_service=No
         if away_logo:
             st.image(away_logo, width=60)
 
-        # Team name with rank and record - colored if predicted winner
+        # Team name with rank and record - colored if predicted winner (ALWAYS highlighted, color varies by confidence)
         rank_display = f"#{away_rank} " if away_rank and away_rank <= 25 else ""
         away_record = game.get('away_record', '')
         record_display = f" ({away_record})" if away_record else ""
 
-        if is_away_winner and confidence_level != 'low':
-            # Color the team name for predicted winner
+        if is_away_winner:
+            # Color the team name for predicted winner (green=high, gold=medium, blue=low)
             st.markdown(f"<p style='font-weight:700; font-size:16px; color:{winner_text_color}; margin:4px 0;'>{rank_display}{away_team[:18]}{record_display}</p>", unsafe_allow_html=True)
         else:
             st.markdown(f"**{rank_display}{away_team[:18]}{record_display}**", unsafe_allow_html=True)
 
         # Score
         st.markdown(f"<h2 style='margin:6px 0 2px 0; font-weight:bold; line-height:1.1;'>{away_score}</h2>", unsafe_allow_html=True)
-
-        # Odds
-        if away_odds > 0:
-            st.markdown(f"<p style='font-size:17px; font-weight:600; color:#4CAF50; margin:0;'>{away_odds:.0f}¢</p>", unsafe_allow_html=True)
 
     with col2:
         st.markdown("<p style='text-align:center; padding-top:35px; font-size:18px; font-weight:700; color:#666;'>VS</p>", unsafe_allow_html=True)
@@ -1189,13 +1772,13 @@ def display_espn_game_card(game, sport_filter, watchlist_manager, llm_service=No
         if home_logo:
             st.image(home_logo, width=60)
 
-        # Team name with rank and record - colored if predicted winner
+        # Team name with rank and record - colored if predicted winner (ALWAYS highlighted, color varies by confidence)
         rank_display = f"#{home_rank} " if home_rank and home_rank <= 25 else ""
         home_record = game.get('home_record', '')
         record_display = f" ({home_record})" if home_record else ""
 
-        if is_home_winner and confidence_level != 'low':
-            # Color the team name for predicted winner
+        if is_home_winner:
+            # Color the team name for predicted winner (green=high, gold=medium, blue=low)
             st.markdown(f"<p style='font-weight:700; font-size:16px; color:{winner_text_color}; margin:4px 0;'>{rank_display}{home_team[:18]}{record_display}</p>", unsafe_allow_html=True)
         else:
             st.markdown(f"**{rank_display}{home_team[:18]}{record_display}**", unsafe_allow_html=True)
@@ -1203,15 +1786,64 @@ def display_espn_game_card(game, sport_filter, watchlist_manager, llm_service=No
         # Score
         st.markdown(f"<h2 style='margin:6px 0 2px 0; font-weight:bold; line-height:1.1;'>{home_score}</h2>", unsafe_allow_html=True)
 
-        # Odds
-        if home_odds > 0:
-            st.markdown(f"<p style='font-size:17px; font-weight:600; color:#4CAF50; margin:0;'>{home_odds:.0f}¢</p>", unsafe_allow_html=True)
+    # ==================== VISUAL ODDS BAR ====================
+    if away_odds > 0 and home_odds > 0:
+        # Normalize odds to 100% if they don't add up (sometimes they don't due to market inefficiency)
+        total_odds = away_odds + home_odds
+        if total_odds > 0:
+            away_width = (away_odds / total_odds) * 100
+            home_width = (home_odds / total_odds) * 100
+        else:
+            away_width = 50
+            home_width = 50
+
+        # Determine colors based on who's favored
+        if away_odds > home_odds:
+            away_color = "#4CAF50"  # Green for favorite
+            home_color = "#FF6B6B"  # Red for underdog
+            favorite_team = away_team[:15]
+        else:
+            away_color = "#FF6B6B"
+            home_color = "#4CAF50"
+            favorite_team = home_team[:15]
+
+        # Visual odds bar with percentage labels
+        st.markdown(f"""
+            <div style="margin:15px 0 10px 0;">
+                <div style="display:flex; height:20px; border-radius:12px; overflow:hidden; border:2px solid #333; position:relative;">
+                    <div style="width:{away_width:.1f}%; background:{away_color}; display:flex; align-items:center; justify-content:center; position:relative;">
+                        <span style="position:absolute; font-size:11px; font-weight:600; color:#fff; text-shadow:1px 1px 2px rgba(0,0,0,0.5);">{away_width:.0f}%</span>
+                    </div>
+                    <div style="width:{home_width:.1f}%; background:{home_color}; display:flex; align-items:center; justify-content:center; position:relative;">
+                        <span style="position:absolute; font-size:11px; font-weight:600; color:#fff; text-shadow:1px 1px 2px rgba(0,0,0,0.5);">{home_width:.0f}%</span>
+                    </div>
+                </div>
+                <div style="text-align:center; font-size:11px; color:#888; margin-top:4px;">
+                    💰 Market: {favorite_team} favored • Total: {total_odds:.0f}%
+                </div>
+            </div>
+        """, unsafe_allow_html=True)
 
     # Get AI prediction (CACHED for performance)
     try:
         import json
+        from decimal import Decimal
+        from datetime import datetime, date
+
         kalshi_odds = game.get('kalshi_odds', {})
-        kalshi_odds_str = json.dumps(kalshi_odds) if kalshi_odds else ""
+        # Convert Decimal to float and datetime/date to ISO format for JSON serialization
+        if kalshi_odds:
+            kalshi_odds_clean = {}
+            for k, v in kalshi_odds.items():
+                if isinstance(v, Decimal):
+                    kalshi_odds_clean[k] = float(v)
+                elif isinstance(v, (datetime, date)):
+                    kalshi_odds_clean[k] = v.isoformat()
+                else:
+                    kalshi_odds_clean[k] = v
+            kalshi_odds_str = json.dumps(kalshi_odds_clean)
+        else:
+            kalshi_odds_str = ""
 
         ai_prediction = get_ai_predictions_cached(
             game_id=str(game_id),
@@ -1231,9 +1863,17 @@ def display_espn_game_card(game, sport_filter, watchlist_manager, llm_service=No
         }
 
     # ==================== MULTI-AGENT AI ANALYSIS SECTION ====================
-    st.markdown("<h3 style='margin-top:15px;'>🤖 Multi-Agent AI Analysis</h3>", unsafe_allow_html=True)
+    # Check if game is live or final to label prediction appropriately
+    is_live_or_final = game.get('status') in ['STATUS_IN_PROGRESS', 'STATUS_FINAL']
+    prediction_label = "🤖 Pre-Game AI Analysis" if is_live_or_final else "🤖 Multi-Agent AI Analysis"
 
-    if sports_prediction:
+    st.markdown(f"<h3 style='margin-top:15px;'>{prediction_label}</h3>", unsafe_allow_html=True)
+
+    # Add explanatory caption for live/final games
+    if is_live_or_final:
+        st.caption("📊 Pre-game prediction based on Kalshi market odds and advanced betting analysis. Not updated for live score.")
+
+    if ai_prediction_early:
         # Confidence Badge with detailed stats
         col_conf, col_pred, col_spread = st.columns(3)
 
@@ -1393,15 +2033,30 @@ def display_espn_game_card(game, sport_filter, watchlist_manager, llm_service=No
             st.info("⏸️ **PASS** - No clear betting edge detected")
 
         # Detailed Analysis Expandable
-        explanation = sports_prediction.get('explanation', '')
-        features = sports_prediction.get('features', {})
-        adjustments = sports_prediction.get('adjustments', {})
+        # Get reasoning from AI prediction (Kalshi-based)
+        reasoning = ai_prediction.get('reasoning', [])
+        factors_analyzed = ai_prediction.get('factors_analyzed', {})
 
-        with st.expander("📊 Deep Analytics & Team Intelligence", expanded=True):
-            # Advanced Stats Comparison
-            st.markdown("### 📈 Advanced Performance Metrics")
+        with st.expander("📊 AI Analysis & Reasoning", expanded=False):
+            # Display AI reasoning
+            if reasoning:
+                st.markdown("### 🧠 AI Analysis Factors")
+                for reason in reasoning:
+                    st.markdown(f"• {reason}")
+                st.markdown("---")
 
-            if features:
+            # Market odds analysis
+            if factors_analyzed.get('odds'):
+                odds_info = factors_analyzed['odds']
+                st.markdown("### 📊 Market Odds Analysis")
+                st.markdown(f"**Away Team Implied Probability:** {odds_info.get('away_implied_prob', 0.5)*100:.1f}%")
+                st.markdown(f"**Home Team Implied Probability:** {odds_info.get('home_implied_prob', 0.5)*100:.1f}%")
+                st.markdown(f"**Market Efficiency:** {odds_info.get('market_efficiency', 0)*100:.2f}% deviation")
+                st.markdown("---")
+
+            # Team records (keep this simple display)
+            st.markdown("### 📈 Team Performance")
+            if False:  # Disable Elo features
                 # Visual stat comparison bars
                 col_away_adv, col_home_adv = st.columns(2)
 
@@ -1507,33 +2162,28 @@ def display_espn_game_card(game, sport_filter, watchlist_manager, llm_service=No
                         st.markdown(f"- Conference Power: **{features.get('home_conf_power', 0):.2f}**")
                         st.markdown(f"- Recruiting: **{features.get('home_recruiting', 0):.0f}/100**")
 
-            # Matchup Context
-            st.markdown("#### Matchup Context")
-            if sport_filter == 'NFL':
-                if features.get('is_divisional') == 1.0:
-                    st.warning("🔥 **DIVISIONAL RIVALRY** - Historically competitive, expect closer margins")
-                if adjustments and adjustments.get('injury_impact', 0) != 0:
-                    impact = "favors home" if adjustments['injury_impact'] > 0 else "favors away"
-                    st.info(f"🏥 **Injury Report:** Current injuries {impact}")
-            else:  # NCAA
-                if features.get('is_rivalry') == 1.0:
-                    st.warning("🔥 **HISTORIC RIVALRY** - Emotion and history favor unpredictability")
-                if adjustments and adjustments.get('crowd_size', 0) > 80000:
-                    st.info(f"👥 **Massive Crowd:** {adjustments['crowd_size']:,} fans expected - significant home advantage")
+            # Team records display
+            col_away_rec, col_home_rec = st.columns(2)
 
-            # AI Explanation
-            if explanation:
-                st.markdown("#### Why This Prediction?")
-                st.markdown(explanation)
+            with col_away_rec:
+                st.markdown(f"**{away_team}**")
+                if away_record:
+                    st.markdown(f"📊 Record: {away_record}")
+
+            with col_home_rec:
+                st.markdown(f"**{home_team}**")
+                if home_record:
+                    st.markdown(f"📊 Record: {home_record}")
 
             # Risk Assessment
-            st.markdown("#### ⚠️ Risk Assessment")
+            st.markdown("---")
+            st.markdown("### ⚠️ Risk Assessment")
             if confidence_level == 'high':
-                st.success("✅ **Low Risk** - Strong statistical edge, recommended play size: 3-5% of bankroll")
+                st.success("✅ **Low Risk** - Strong market consensus, recommended play size: 3-5% of bankroll")
             elif confidence_level == 'medium':
-                st.warning("⚠️ **Medium Risk** - Moderate edge, recommended play size: 1-2% of bankroll")
+                st.warning("⚠️ **Medium Risk** - Moderate market confidence, recommended play size: 1-2% of bankroll")
             else:
-                st.error("🚫 **High Risk** - Weak edge, recommend pass or minimal exposure (<1%)")
+                st.error("🚫 **High Risk** - Uncertain market, recommend pass or minimal exposure (<1%)")
     else:
         st.info("⚠️ AI analysis unavailable for this game")
 
@@ -1692,11 +2342,36 @@ def show_sport_games_nba(db, watchlist_manager, llm_service=None, auto_refresh=F
         )
 
     with col2:
-        filter_status = st.selectbox(
-            "Game Status",
-            ["All Games", "Live Only", "Upcoming", "Final"],
-            key="nba_filter_status"
+        # Combined Status & Date Filter for NBA
+        unified_filter_nba = st.selectbox(
+            "🔍 Filter Games",
+            ["All Games", "🔴 Live Only", "⏰ Upcoming", "✅ Final", "📅 Today Only", "📅 Next 7 Days", "📅 Custom Range"],
+            key="nba_unified_filter",
+            help="Filter by game status or date"
         )
+
+        # Parse the unified filter into status and date components
+        if unified_filter_nba == "🔴 Live Only":
+            filter_status = "Live Only"
+            date_filter_mode = "All Games"
+        elif unified_filter_nba == "⏰ Upcoming":
+            filter_status = "Upcoming"
+            date_filter_mode = "All Games"
+        elif unified_filter_nba == "✅ Final":
+            filter_status = "Final"
+            date_filter_mode = "All Games"
+        elif unified_filter_nba == "📅 Today Only":
+            filter_status = "All Games"
+            date_filter_mode = "Today Only"
+        elif unified_filter_nba == "📅 Next 7 Days":
+            filter_status = "All Games"
+            date_filter_mode = "Next 7 Days"
+        elif unified_filter_nba == "📅 Custom Range":
+            filter_status = "All Games"
+            date_filter_mode = "Custom Range"
+        else:  # "All Games"
+            filter_status = "All Games"
+            date_filter_mode = "All Games"
 
     with col3:
         odds_filter = st.selectbox(
@@ -1728,28 +2403,38 @@ def show_sport_games_nba(db, watchlist_manager, llm_service=None, auto_refresh=F
             help="Filter out completed games"
         )
 
-    # Second filter row for additional options
-    col7, col8, col_spacer = st.columns([2, 2, 2])
+    # Second filter row - Custom Range and Lopsided Odds
+    col7, col8 = st.columns([3, 3])
 
     with col7:
-        date_filter_mode = st.selectbox(
-            "📅 Date Filter",
-            ["All Games", "Today Only", "Custom Range", "Next 7 Days"],
-            index=0,
-            key="nba_date_filter_mode",
-            help="Filter games by date range"
-        )
-
-    with col8:
-        if date_filter_mode == "Custom Range":
+        # Show custom date range selector when Custom Range is selected
+        if unified_filter_nba == "📅 Custom Range":
             date_range = st.date_input(
-                "Select Date Range",
+                "📅 Select Date Range",
                 value=(datetime.now().date(), datetime.now().date() + timedelta(days=6)),
                 key="nba_date_range",
                 help="Select start and end dates"
             )
         else:
             date_range = None
+
+    with col8:
+        hide_lopsided_nba = st.checkbox(
+            "🎯 Hide Lopsided Odds",
+            value=False,
+            key="nba_hide_lopsided",
+            help="Filter out games with heavily favored teams (96%+ odds = low payout potential)"
+        )
+
+        if hide_lopsided_nba:
+            lopsided_threshold_nba = st.slider(
+                "Max Odds %",
+                70, 99, 90,
+                key="nba_lopsided_threshold",
+                help="Hide games where one team's odds exceed this percentage"
+            )
+        else:
+            lopsided_threshold_nba = 90
 
     # ==================== FETCH MULTI-DAY NBA DATA ====================
     try:
@@ -1794,6 +2479,31 @@ def show_sport_games_nba(db, watchlist_manager, llm_service=None, auto_refresh=F
     try:
         from src.espn_kalshi_matcher_optimized import enrich_games_with_kalshi_odds_optimized
         nba_games = enrich_games_with_kalshi_odds_optimized(nba_games, sport='nba')
+
+        # FILTER OUT LOPSIDED ODDS (where you can't make money)
+        # Remove games where market odds are >85% or <15% (too one-sided)
+        games_before_filter = len([g for g in nba_games if g.get('kalshi_odds')])
+        nba_games_filtered = []
+        for game in nba_games:
+            kalshi_odds = game.get('kalshi_odds')
+            if kalshi_odds:
+                away_price = kalshi_odds.get('away_win_price', 0.5)
+                home_price = kalshi_odds.get('home_win_price', 0.5)
+
+                # Skip if either price is too lopsided (>0.85 or <0.15)
+                if (away_price > 0.85 or away_price < 0.15 or
+                    home_price > 0.85 or home_price < 0.15):
+                    logger.debug(f"Filtered out lopsided odds: {game['away_team']} @ {game['home_team']} "
+                               f"(Away: {away_price:.1%}, Home: {home_price:.1%})")
+                    continue  # Skip this game
+
+            nba_games_filtered.append(game)
+
+        nba_games = nba_games_filtered
+        games_filtered = games_before_filter - len([g for g in nba_games if g.get('kalshi_odds')])
+        if games_filtered > 0:
+            logger.info(f"Filtered out {games_filtered} NBA games with lopsided odds (>85% or <15%)")
+
         kalshi_matched = sum(1 for g in nba_games if g.get('kalshi_odds'))
         logger.info(f"Matched {kalshi_matched}/{len(nba_games)} NBA games with Kalshi odds")
     except Exception as e:
@@ -1812,6 +2522,72 @@ def show_sport_games_nba(db, watchlist_manager, llm_service=None, auto_refresh=F
     with col_stat3:
         st.info(f"**With Odds:** {kalshi_matched}")
 
+    # ==================== TEAM-SPECIFIC FILTER DROPDOWN ====================
+    # Extract unique team names for team filter dropdown
+    all_teams = set()
+    for game in nba_games:
+        away_team = game.get('away_team', '')
+        home_team = game.get('home_team', '')
+        if away_team:
+            all_teams.add(away_team)
+        if home_team:
+            all_teams.add(home_team)
+
+    team_list = sorted(list(all_teams))
+
+    # Team-specific filter dropdown
+    col_team_sel, col_subs = st.columns([3, 3])
+    with col_team_sel:
+        team_options = ["All Teams"] + team_list
+        selected_team_name = st.selectbox(
+            "🏀 Select Team",
+            team_options,
+            key="nba_team_selector",
+            help="Filter to show only games involving this team"
+        )
+
+    with col_subs:
+        # Show subscriptions count and management
+        watchlist = watchlist_manager.get_user_watchlist(st.session_state.user_id)
+        sub_count = len([w for w in watchlist if w.get('game_data', {}).get('sport') == 'NBA'])
+        if sub_count > 0:
+            if st.button(f"📋 My Subscriptions ({sub_count})", key="nba_show_subs", use_container_width=True):
+                st.session_state['show_subscriptions_NBA'] = not st.session_state.get('show_subscriptions_NBA', False)
+        else:
+            st.info("No active subscriptions")
+
+    # Show subscriptions if toggled
+    if st.session_state.get('show_subscriptions_NBA', False) and watchlist:
+        st.markdown("### 📋 Your Subscribed Games")
+
+        # Table-like list view
+        for idx, watch_game in enumerate(watchlist):
+            game_data = watch_game.get('game_data', {})
+            if game_data.get('sport') != 'NBA':
+                continue
+
+            away_team = game_data.get('away_team', 'Away')
+            home_team = game_data.get('home_team', 'Home')
+            selected_team = watch_game.get('selected_team', '')
+            status = game_data.get('status_detail', 'Scheduled')
+            away_score = game_data.get('away_score', 0)
+            home_score = game_data.get('home_score', 0)
+            is_live = game_data.get('is_live', False)
+
+            # Display subscription entry
+            col_game, col_btn = st.columns([4, 1])
+            with col_game:
+                live_badge = "🔴 LIVE • " if is_live else ""
+                st.markdown(f"**{live_badge}{away_team}** @ **{home_team}** • Following: {selected_team} • {status}")
+                if is_live and away_score is not None and home_score is not None:
+                    st.caption(f"Score: {away_team} {away_score} - {home_team} {home_score}")
+            with col_btn:
+                if st.button("✖", key=f"nba_unsub_list_{idx}", help="Remove from subscriptions"):
+                    game_id = game_data.get('game_id', '')
+                    if game_id:
+                        watchlist_manager.remove_game_from_watchlist(st.session_state.user_id, game_id)
+                        st.rerun()
+
     # ==================== APPLY FILTERS ====================
     filtered_games = nba_games
 
@@ -1826,6 +2602,22 @@ def show_sport_games_nba(db, watchlist_manager, llm_service=None, auto_refresh=F
     # Hide final filter
     if hide_final:
         filtered_games = [g for g in filtered_games if not g.get('is_completed', False)]
+
+    # Apply "Hide Lopsided Odds" filter - exclude games with heavily favored teams
+    if hide_lopsided_nba:
+        lopsided_threshold_decimal = lopsided_threshold_nba / 100  # Convert to decimal
+
+        def is_not_lopsided(game):
+            """Check if game has competitive odds (neither team heavily favored)"""
+            yes_price = game.get('yes_price', 0.5)
+            no_price = game.get('no_price', 0.5)
+
+            # If either team's odds exceed threshold, it's lopsided (not profitable)
+            if yes_price > lopsided_threshold_decimal or no_price > lopsided_threshold_decimal:
+                return False
+            return True
+
+        filtered_games = [g for g in filtered_games if is_not_lopsided(g)]
 
     # Apply date filter
     if date_filter_mode != "All Games":
@@ -1874,6 +2666,13 @@ def show_sport_games_nba(db, watchlist_manager, llm_service=None, auto_refresh=F
 
         filtered_games = [g for g in filtered_games if is_in_date_range(g.get('game_time'), start_date, end_date)]
 
+    # Apply team-specific filter
+    if selected_team_name and selected_team_name != "All Teams":
+        # Filter for games involving the selected team
+        filtered_games = [g for g in filtered_games
+                        if g.get('away_team') == selected_team_name
+                        or g.get('home_team') == selected_team_name]
+
     # ==================== APPLY SORTING ====================
     if sort_by == "⏰ Game Time":
         filtered_games.sort(key=lambda x: x.get('game_time') or '9999-12-31 23:59')
@@ -1917,17 +2716,31 @@ def show_sport_games_nba(db, watchlist_manager, llm_service=None, auto_refresh=F
 
     st.markdown(f"**Showing {len(filtered_games)} games**")
 
+    # OPTIMIZATION: Fetch watchlist ONCE before the game loop (prevents connection pool exhaustion)
+    # Instead of calling watchlist_manager.is_game_watched() for each game (database call per card),
+    # we fetch the entire watchlist once and use set membership for O(1) lookup
+    user_id = st.session_state.get('user_id', 'default_user')
+    watchlist = watchlist_manager.get_user_watchlist(user_id)
+    watched_game_ids = {w.get('game_id') for w in watchlist if w.get('game_id')}
+
     # ==================== DISPLAY GAMES IN GRID ====================
     for i in range(0, len(filtered_games), cards_per_row):
         cols = st.columns(cards_per_row)
 
         for col_idx, game in enumerate(filtered_games[i:i+cards_per_row]):
             with cols[col_idx]:
-                display_nba_game_card_enhanced(game, watchlist_manager, llm_service)
+                display_nba_game_card_enhanced(game, watchlist_manager, llm_service, watched_game_ids)
 
 
-def display_nba_game_card_enhanced(game, watchlist_manager, llm_service=None):
-    """Display an enhanced NBA game card with AI predictions and Kalshi odds - matches NFL feature set"""
+def display_nba_game_card_enhanced(game, watchlist_manager, llm_service=None, watched_game_ids=None):
+    """Display an enhanced NBA game card with AI predictions and Kalshi odds - matches NFL feature set
+
+    Args:
+        game: Game data dictionary
+        watchlist_manager: Watchlist manager instance
+        llm_service: Optional LLM service for AI predictions
+        watched_game_ids: Set of game IDs that are in user's watchlist (for O(1) lookup instead of DB calls)
+    """
     from src.nba_team_database import get_team_logo_url
     import hashlib
 
@@ -1981,9 +2794,15 @@ def display_nba_game_card_enhanced(game, watchlist_manager, llm_service=None):
     key_hash = hashlib.md5(key_base.encode()).hexdigest()[:8]
     unique_key = f"nba_{game_id}_{key_hash}".replace(' ', '_')
 
-    # Check if in watchlist
+    # OPTIMIZATION: Check if game is in watchlist using set membership (O(1) instead of database call)
+    # watched_game_ids is pre-fetched once before the game loop to avoid connection pool exhaustion
     user_id = st.session_state.get('user_id', 'default_user')
-    is_watched = watchlist_manager.is_game_watched(user_id, game_id) if game_id else False
+    if watched_game_ids is None:
+        # Fallback for backward compatibility if called without watched_game_ids
+        is_watched = watchlist_manager.is_game_watched(user_id, game_id) if game_id else False
+    else:
+        # Use set membership check - O(1) instead of database call
+        is_watched = bool(game_id and game_id in watched_game_ids)
 
     # ==================== CARD CONTAINER ====================
     st.markdown('<div class="game-card">', unsafe_allow_html=True)
@@ -1993,19 +2812,58 @@ def display_nba_game_card_enhanced(game, watchlist_manager, llm_service=None):
     with col_status:
         if is_live:
             st.markdown(f'<span class="live-indicator"></span><strong style="font-size:13px;">LIVE • {quarter} {clock}</strong>', unsafe_allow_html=True)
+
+            # Enhanced live game data - possession, down & distance
+            possession = game.get('possession', '')
+            down_distance = game.get('down_distance', '')
+            is_red_zone = game.get('is_red_zone', False)
+
+            if possession or down_distance:
+                live_detail = []
+                if possession:
+                    live_detail.append(f"🏈 {possession}")
+                if down_distance:
+                    if is_red_zone:
+                        live_detail.append(f"🔴 {down_distance}")  # Red zone indicator
+                    else:
+                        live_detail.append(down_distance)
+
+                st.markdown(f"<div style='font-size:11px; color:#aaa; margin-top:2px;'>{' • '.join(live_detail)}</div>", unsafe_allow_html=True)
+
         elif is_completed:
             st.markdown(f"<strong style='font-size:13px;'>FINAL • {status_detail}</strong>", unsafe_allow_html=True)
         else:
             st.markdown(f"<strong style='font-size:13px;'>{status_detail}</strong>", unsafe_allow_html=True)
 
     with col_quick_tg:
-        button_label = "Subscribe" if not is_watched else "Subscribed"
+        button_label = "📡 Subscribe" if not is_watched else "✅ Subscribed"
         button_key = f"subscribe_{unique_key}"
-        btn_bg_color = '#4CAF50' if is_watched else '#495057'
+        btn_bg_color = '#10B981' if is_watched else '#495057'  # Bright green when subscribed
+        btn_hover_color = '#059669' if is_watched else '#3d4146'
 
-        if st.button(button_label, key=button_key, help="Subscribe for live game updates"):
+        # Add custom CSS for green button
+        st.markdown(f"""
+            <style>
+            div[data-testid="stHorizontalBlock"] > div:has(button[kind="secondary"]) button {{
+                background-color: {btn_bg_color} !important;
+                color: white !important;
+            }}
+            div[data-testid="stHorizontalBlock"] > div:has(button[kind="secondary"]) button:hover {{
+                background-color: {btn_hover_color} !important;
+            }}
+            </style>
+        """, unsafe_allow_html=True)
+
+        if st.button(button_label, key=button_key, help="Subscribe for live game updates", type="secondary"):
             if not is_watched:
-                watchlist_manager.add_game_to_watchlist(user_id, game, selected_team=None)
+                # Add sport field to game object (ESPN doesn't include it)
+                game['sport'] = 'NBA'  # This is for NBA games
+                # Add to watchlist - this triggers Telegram alert automatically via _send_subscription_alert()
+                success = watchlist_manager.add_game_to_watchlist(user_id, game, selected_team=None)
+                if success:
+                    st.success("✅ Subscribed! Check Telegram for confirmation.")
+                else:
+                    st.error("❌ Subscription failed. Check logs.")
                 st.rerun()
 
     # Team matchup with logos and scores - colored winner
@@ -2030,10 +2888,6 @@ def display_nba_game_card_enhanced(game, watchlist_manager, llm_service=None):
             st.caption(away_record)
         st.markdown(f"<h2 style='margin:0'>{away_score}</h2>", unsafe_allow_html=True)
 
-        # Display Kalshi odds
-        if away_odds > 0:
-            st.caption(f"💰 Kalshi: {away_odds:.0f}¢")
-
     with col2:
         st.markdown("<p style='text-align:center; padding-top:30px;'>@</p>", unsafe_allow_html=True)
 
@@ -2053,14 +2907,55 @@ def display_nba_game_card_enhanced(game, watchlist_manager, llm_service=None):
             st.caption(home_record)
         st.markdown(f"<h2 style='margin:0'>{home_score}</h2>", unsafe_allow_html=True)
 
-        # Display Kalshi odds
-        if home_odds > 0:
-            st.caption(f"💰 Kalshi: {home_odds:.0f}¢")
+    # ==================== VISUAL ODDS BAR ====================
+    if away_odds > 0 and home_odds > 0:
+        # Normalize odds to 100% if they don't add up
+        total_odds = away_odds + home_odds
+        if total_odds > 0:
+            away_width = (away_odds / total_odds) * 100
+            home_width = (home_odds / total_odds) * 100
+        else:
+            away_width = 50
+            home_width = 50
+
+        # Determine colors based on who's favored
+        if away_odds > home_odds:
+            away_color = "#4CAF50"  # Green for favorite
+            home_color = "#FF6B6B"  # Red for underdog
+            favorite_team = away_team[:15]
+        else:
+            away_color = "#FF6B6B"
+            home_color = "#4CAF50"
+            favorite_team = home_team[:15]
+
+        # Visual odds bar with percentage labels
+        st.markdown(f"""
+            <div style="margin:15px 0 10px 0;">
+                <div style="display:flex; height:20px; border-radius:12px; overflow:hidden; border:2px solid #333; position:relative;">
+                    <div style="width:{away_width:.1f}%; background:{away_color}; display:flex; align-items:center; justify-content:center; position:relative;">
+                        <span style="position:absolute; font-size:11px; font-weight:600; color:#fff; text-shadow:1px 1px 2px rgba(0,0,0,0.5);">{away_width:.0f}%</span>
+                    </div>
+                    <div style="width:{home_width:.1f}%; background:{home_color}; display:flex; align-items:center; justify-content:center; position:relative;">
+                        <span style="position:absolute; font-size:11px; font-weight:600; color:#fff; text-shadow:1px 1px 2px rgba(0,0,0,0.5);">{home_width:.0f}%</span>
+                    </div>
+                </div>
+                <div style="text-align:center; font-size:11px; color:#888; margin-top:4px;">
+                    💰 Market: {favorite_team} favored • Total: {total_odds:.0f}%
+                </div>
+            </div>
+        """, unsafe_allow_html=True)
 
     # AI Prediction Section (if we have odds)
     if away_odds > 0 or home_odds > 0:
-        st.markdown("---")
-        st.markdown("### 🤖 AI Market Prediction")
+        # Check if game is live or final to label prediction appropriately
+        is_live_or_final_nba = game.get('status') in ['STATUS_IN_PROGRESS', 'STATUS_FINAL']
+        nba_prediction_label = "### 🤖 Pre-Game Market Analysis" if is_live_or_final_nba else "### 🤖 AI Market Prediction"
+
+        st.markdown(nba_prediction_label)
+
+        # Add explanatory caption for live/final games
+        if is_live_or_final_nba:
+            st.caption("📊 Pre-game prediction based on market odds and team strength. Not updated for live score.")
 
         # Confidence badge
         col_conf, col_pred = st.columns(2)

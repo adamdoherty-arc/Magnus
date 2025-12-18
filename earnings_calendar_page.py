@@ -5,9 +5,100 @@ import streamlit as st
 import pandas as pd
 import os
 import time
-from src.tradingview_db_manager import TradingViewDBManager
+from src.services import get_tradingview_manager  # Use centralized service registry
 import robin_stocks.robinhood as rh
 from src.components.pagination_component import paginate_dataframe
+
+
+def display_quality_opportunities():
+    """Display high-quality earnings opportunities"""
+    st.markdown("### ⭐ High-Quality Earnings Opportunities")
+    st.caption("Top-rated stocks reporting earnings in next 7 days")
+
+    tv = get_tv_db_manager()
+    conn = tv.get_connection()
+    cur = conn.cursor()
+
+    # Get upcoming earnings with quality patterns
+    cur.execute("""
+        SELECT
+            e.symbol,
+            e.earnings_date,
+            e.earnings_time,
+            e.expected_move_pct,
+            e.pre_earnings_iv,
+            p.beat_rate_8q,
+            p.avg_surprise_pct_8q,
+            p.quality_score,
+            s.company_name,
+            s.sector
+        FROM earnings_events e
+        LEFT JOIN earnings_pattern_analysis p ON e.symbol = p.symbol
+        LEFT JOIN stocks s ON e.symbol = s.symbol
+        WHERE e.earnings_date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '7 days'
+          AND e.has_occurred = FALSE
+          AND p.quality_score IS NOT NULL
+        ORDER BY p.quality_score DESC, e.earnings_date
+        LIMIT 10
+    """)
+
+    opportunities = cur.fetchall()
+    cur.close()
+    conn.close()
+
+    if opportunities:
+        df_opp = pd.DataFrame(opportunities, columns=[
+            'Symbol', 'Date', 'Time', 'Expected Move %', 'IV Rank',
+            'Beat Rate %', 'Avg Surprise %', 'Quality Score', 'Company', 'Sector'
+        ])
+
+        # Format columns
+        df_opp['Date'] = pd.to_datetime(df_opp['Date']).dt.strftime('%Y-%m-%d')
+        df_opp['Expected Move %'] = df_opp['Expected Move %'].apply(lambda x: f"±{x:.1f}%" if pd.notna(x) else "N/A")
+        df_opp['IV Rank'] = df_opp['IV Rank'].apply(lambda x: f"{x:.2f}" if pd.notna(x) else "N/A")
+        df_opp['Beat Rate %'] = df_opp['Beat Rate %'].apply(lambda x: f"{x:.1f}%" if pd.notna(x) else "N/A")
+        df_opp['Avg Surprise %'] = df_opp['Avg Surprise %'].apply(lambda x: f"{x:+.1f}%" if pd.notna(x) else "N/A")
+
+        st.dataframe(
+            df_opp,
+            hide_index=True,
+            column_config={
+                "Quality Score": st.column_config.ProgressColumn(
+                    "Quality",
+                    min_value=0,
+                    max_value=100,
+                    format="%d"
+                ),
+                "Symbol": st.column_config.TextColumn("Symbol", width="small"),
+                "Company": st.column_config.TextColumn("Company", width="large"),
+                "Date": st.column_config.TextColumn("Date", width="medium"),
+                "Time": st.column_config.TextColumn("Time", width="small"),
+                "Expected Move %": st.column_config.TextColumn("Exp Move", width="small"),
+                "Beat Rate %": st.column_config.TextColumn("Beat Rate", width="small"),
+                "Avg Surprise %": st.column_config.TextColumn("Avg Surprise", width="small")
+            },
+            use_container_width=True
+        )
+
+        # Add explanation
+        with st.expander("ℹ️ What is Quality Score?"):
+            st.markdown("""
+            **Quality Score (0-100)** measures earnings predictability and opportunity:
+
+            - **70-100**: Excellent - Consistent beaters with strong patterns
+            - **50-69**: Good - Reliable earnings with moderate consistency
+            - **Below 50**: Caution - Unpredictable or inconsistent results
+
+            **Components:**
+            - Beat Rate (40%): Percentage of earnings beats
+            - Avg Surprise (30%): Average EPS surprise magnitude
+            - Consistency (30%): Standard deviation of surprises (lower is better)
+
+            **Expected Move** is calculated from options pricing (ATM straddle × 0.85)
+            """)
+    else:
+        st.info("📭 No high-quality opportunities in next 7 days")
+        st.caption("Opportunities appear here when stocks with quality scores >70 have upcoming earnings")
 
 
 # ========================================================================
@@ -16,8 +107,12 @@ from src.components.pagination_component import paginate_dataframe
 
 @st.cache_resource
 def get_tv_db_manager():
-    """Cached database manager for connection pooling"""
-    return TradingViewDBManager()
+    """
+    Get TradingViewDBManager from centralized service registry.
+
+    The registry ensures singleton behavior across the application.
+    """
+    return get_tradingview_manager()
 
 
 @st.cache_data(ttl=300)  # 5-minute cache
@@ -79,10 +174,10 @@ def get_earnings_data_cached(date_filter, time_filter, result_filter):
                 WHEN e.eps_actual = e.eps_estimate THEN 'Meet'
                 ELSE 'Pending'
             END as result,
-            s.name as company_name,
+            s.company_name,
             s.sector
         FROM earnings_events e
-        LEFT JOIN stocks s ON e.symbol = s.ticker
+        LEFT JOIN stocks s ON e.symbol = s.symbol
         WHERE 1=1
     """
 
@@ -225,7 +320,6 @@ def show_earnings_calendar():
     with col_s3:
         st.caption("💡 Auto-syncs daily at 6 AM")
 
-    st.markdown("---")
 
     # Display earnings data (PERFORMANCE: Use cached count)
     count = get_earnings_count()
@@ -252,7 +346,7 @@ def sync_earnings_from_robinhood(conn, cur):
             rh.login(username, password)
 
             # Get stocks to sync
-            cur.execute("SELECT ticker FROM stocks WHERE asset_type = 'STOCK' LIMIT 100")
+            cur.execute("SELECT symbol FROM stocks WHERE is_active = TRUE LIMIT 100")
             symbols = [row[0] for row in cur.fetchall()]
 
             synced = 0
@@ -316,6 +410,13 @@ def sync_earnings_from_robinhood(conn, cur):
 
 def display_earnings_table():
     """Display earnings data in a table - PERFORMANCE OPTIMIZED"""
+
+    # Show high-quality opportunities first
+    display_quality_opportunities()
+
+    st.markdown("---")
+    st.markdown("### 📅 Full Earnings Calendar")
+
     # Filters
     col_f1, col_f2, col_f3 = st.columns(3)
 

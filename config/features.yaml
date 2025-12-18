@@ -25,7 +25,7 @@ features:
   enable_notifications: false  # Not yet implemented
   enable_email_alerts: false
   enable_sms_alerts: false
-  enable_discord_alerts: false
+  enable_discord_alerts: false  # Webhook not configured (code exists in alert_agent.py)
   enable_telegram_alerts: true
 
   # Auto Trading (Safety)
@@ -58,3 +58,4 @@ features:
   enable_debug_mode: false
   enable_verbose_logging: false
   enable_api_endpoints: true
+  enable_test_pages: false  # Test pages moved to dev_tests/ directory

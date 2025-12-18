@@ -1,0 +1,387 @@
+# Test Coverage Strategy - World-Class Edition
+# Defines testing requirements and strategies for all features
+# Version: 2.0
+
+test_coverage:
+  # ===================
+  # COVERAGE THRESHOLDS
+  # ===================
+
+  thresholds:
+    unit_tests: 70%        # Target: 70% unit test coverage
+    integration_tests: 50%  # Target: 50% integration test coverage
+    e2e_tests: 30%          # Target: 30% E2E test coverage
+    overall_target: 60%     # Overall coverage target
+
+  # ================
+  # TEST STRATEGIES
+  # ================
+
+  strategies:
+    # TRADING & POSITIONS
+    robinhood-positions:
+      unit_tests:
+        - Test Greeks calculation accuracy
+        - Test P/L calculations
+        - Test position parsing from API
+        - Test theta decay forecasts
+        - Test recovery strategy logic
+      integration_tests:
+        - Test Robinhood API integration
+        - Test database sync
+        - Test rate limiting
+      e2e_tests:
+        - Test full position display workflow
+        - Test trade history sync
+        - Test filter interactions
+      ui_tests:
+        - Test page loads without errors
+        - Test filters work correctly
+        - Test charts render with data
+        - Test error states display properly
+
+    options-analysis:
+      unit_tests:
+        - Test delta filtering logic
+        - Test DTE filtering logic
+        - Test premium calculation
+        - Test AI analysis algorithms
+      integration_tests:
+        - Test options chain API integration
+        - Test AI model integration
+      e2e_tests:
+        - Test scan execution end-to-end
+        - Test AI analysis workflow
+      ui_tests:
+        - Test scanner UI interactions
+        - Test results display
+        - Test export functionality
+
+    premium-scanner:
+      unit_tests:
+        - Test premium flow detection
+        - Test volume analysis algorithms
+        - Test alert generation logic
+      integration_tests:
+        - Test real-time data feeds
+        - Test alert system integration
+      e2e_tests:
+        - Test full scanning workflow
+        - Test alert delivery
+      ui_tests:
+        - Test live data updates
+        - Test alert notifications
+
+    seven-day-dte:
+      unit_tests:
+        - Test DTE calculation accuracy
+        - Test theta decay analysis
+        - Test high-probability filtering
+      integration_tests:
+        - Test options data integration
+        - Test database queries
+      e2e_tests:
+        - Test full scan workflow
+        - Test opportunity ranking
+      ui_tests:
+        - Test DTE filter
+        - Test results sorting
+
+    calendar-spreads:
+      unit_tests:
+        - Test spread pricing calculation
+        - Test volatility skew analysis
+        - Test multi-leg pricing
+        - Test Greeks calculation
+      integration_tests:
+        - Test options chain data
+        - Test spread scanner
+      e2e_tests:
+        - Test spread finding workflow
+        - Test profit/loss modeling
+      ui_tests:
+        - Test spread display
+        - Test interactive charts
+
+    earnings-calendar:
+      unit_tests:
+        - Test earnings date parsing
+        - Test volatility analysis
+        - Test avoidance recommendations
+      integration_tests:
+        - Test earnings data API
+        - Test calendar sync
+      e2e_tests:
+        - Test full calendar display
+        - Test alert generation
+      ui_tests:
+        - Test calendar view
+        - Test date filtering
+
+    # SPORTS BETTING
+    sports-betting:
+      unit_tests:
+        - Test odds parsing
+        - Test Kalshi integration
+        - Test ESPN data parsing
+        - Test prediction algorithms
+      integration_tests:
+        - Test Kalshi API
+        - Test ESPN API
+        - Test database sync
+      e2e_tests:
+        - Test full betting workflow
+        - Test game card display
+        - Test live data updates
+      ui_tests:
+        - Test game cards rendering
+        - Test odds display
+        - Test live score updates
+
+    prediction-markets:
+      unit_tests:
+        - Test market data parsing
+        - Test odds calculation
+        - Test AI prediction logic
+      integration_tests:
+        - Test Kalshi market API
+        - Test prediction model
+      e2e_tests:
+        - Test market tracking
+        - Test prediction workflow
+      ui_tests:
+        - Test market display
+        - Test prediction visualization
+
+    # DATA & SOCIAL
+    xtrades-watchlists:
+      unit_tests:
+        - Test alert parsing
+        - Test signal extraction
+        - Test recommendation logic
+      integration_tests:
+        - Test XTrades API
+        - Test database sync
+      e2e_tests:
+        - Test alert ingestion workflow
+        - Test signal display
+      ui_tests:
+        - Test alert list
+        - Test signal details
+
+    discord-messages:
+      unit_tests:
+        - Test message parsing
+        - Test signal extraction
+        - Test deduplication logic
+      integration_tests:
+        - Test Discord API
+        - Test database sync
+      e2e_tests:
+        - Test message sync workflow
+        - Test alert filtering
+      ui_tests:
+        - Test message display
+        - Test filtering
+
+    # AI & CHATBOT
+    ava-chatbot:
+      unit_tests:
+        - Test conversation logic
+        - Test recommendation algorithms
+        - Test portfolio analysis
+      integration_tests:
+        - Test LLM integration
+        - Test RAG system
+      e2e_tests:
+        - Test full chat workflow
+        - Test recommendation flow
+      ui_tests:
+        - Test chat interface
+        - Test message rendering
+
+    rag-knowledge-base:
+      unit_tests:
+        - Test document ingestion
+        - Test embedding generation
+        - Test semantic search
+        - Test context retrieval
+      integration_tests:
+        - Test vector database
+        - Test search accuracy
+      e2e_tests:
+        - Test knowledge query workflow
+        - Test document upload
+      ui_tests:
+        - Test search interface
+        - Test results display
+
+    # DASHBOARD & HUBS
+    dashboard:
+      unit_tests:
+        - Test portfolio calculations
+        - Test metric aggregation
+        - Test forecast logic
+      integration_tests:
+        - Test data integration
+        - Test performance
+      e2e_tests:
+        - Test full dashboard load
+        - Test navigation
+      ui_tests:
+        - Test page load performance
+        - Test all widgets render
+        - Test responsive design
+
+    health-dashboard:
+      unit_tests:
+        - Test health check logic
+        - Test monitoring calculations
+        - Test alert thresholds
+      integration_tests:
+        - Test service monitoring
+        - Test database health checks
+      e2e_tests:
+        - Test full monitoring workflow
+        - Test alert generation
+      ui_tests:
+        - Test status display
+        - Test live updates
+
+    # ANALYSIS & TOOLS
+    supply-demand-zones:
+      unit_tests:
+        - Test zone detection algorithms
+        - Test support/resistance calculation
+        - Test price action analysis
+      integration_tests:
+        - Test price data integration
+        - Test chart generation
+      e2e_tests:
+        - Test full analysis workflow
+        - Test zone identification
+      ui_tests:
+        - Test chart rendering
+        - Test zone visualization
+
+    sector-analysis:
+      unit_tests:
+        - Test sector performance calculation
+        - Test rotation detection
+        - Test correlation analysis
+      integration_tests:
+        - Test market data integration
+        - Test real-time updates
+      e2e_tests:
+        - Test full sector analysis
+        - Test rotation signals
+      ui_tests:
+        - Test sector charts
+        - Test performance tables
+
+  # =======================
+  # AUTOMATED TEST GENERATION
+  # =======================
+
+  auto_generate:
+    enabled: true
+    agents:
+      - spec-test-generator      # Generate tests from requirements
+      - spec-integration-tester  # Create integration tests
+    templates:
+      unit_test: .claude/templates/unit-test-template.py
+      integration_test: .claude/templates/integration-test-template.py
+      e2e_test: .claude/templates/e2e-test-template.py
+      ui_test: .claude/templates/ui-test-template.py
+
+  # ====================
+  # TEST EXECUTION SCHEDULE
+  # ====================
+
+  execution:
+    on_commit: true           # Run tests on git commit
+    on_pr: true               # Run tests on PR creation
+    nightly: true             # Full test suite nightly
+    continuous: false         # Continuous testing (resource intensive)
+
+  # Test suites by trigger
+  test_suites:
+    on_commit:
+      - unit_tests
+      - critical_integration_tests
+    on_pr:
+      - all_unit_tests
+      - all_integration_tests
+      - critical_e2e_tests
+    nightly:
+      - full_test_suite
+      - performance_tests
+      - ui_tests
+
+  # ===================
+  # PLAYWRIGHT UI TESTING
+  # ===================
+
+  playwright:
+    enabled: true
+    test_all_pages: true
+    critical_paths:
+      - "Load dashboard"
+      - "Navigate to positions page"
+      - "Run options scan"
+      - "View game cards"
+      - "Chat with AVA"
+
+    test_scenarios:
+      - page_loads
+      - user_interactions
+      - error_states
+      - data_updates
+      - filters_work
+      - charts_render
+
+    browsers:
+      - chromium
+      - firefox
+      - webkit  # Safari
+
+    screenshots_on_failure: true
+    video_recording: on_failure
+    trace_on_failure: true
+
+  # =====================
+  # PERFORMANCE TESTING
+  # =====================
+
+  performance:
+    enabled: true
+    thresholds:
+      page_load_time: 3  # seconds
+      api_response_time: 500  # milliseconds
+      database_query_time: 100  # milliseconds
+
+    load_testing:
+      concurrent_users: 10
+      requests_per_second: 50
+      duration: 60  # seconds
+
+  # ====================
+  # TEST REPORTING
+  # ====================
+
+  reporting:
+    format: html
+    output_dir: .claude/orchestrator/test_reports
+    coverage_report: true
+    failed_tests_screenshot: true
+    trend_analysis: true
+
+  # ====================
+  # QUALITY GATES
+  # ====================
+
+  quality_gates:
+    min_coverage_to_merge: 60%
+    max_failed_tests: 0
+    max_critical_issues: 0
+    performance_regression_threshold: 10%  # Max 10% slower

@@ -12,7 +12,6 @@ def render_options_analysis_hub_page():
     st.title("📊 Options Analysis Hub")
     st.markdown("**Choose the right tool for your analysis needs**")
 
-    st.markdown("---")
 
     # Introduction
     st.markdown("""
@@ -22,7 +21,6 @@ def render_options_analysis_hub_page():
     Choose the tool that best fits your current goal:
     """)
 
-    st.markdown("---")
 
     # Side-by-side tool comparison
     col1, col2 = st.columns(2)
@@ -123,7 +121,6 @@ def render_options_analysis_hub_page():
             st.session_state.page = "Comprehensive Strategy Analysis"
             st.rerun()
 
-    st.markdown("---")
 
     # Comparison table
     st.markdown("### 📋 Quick Comparison")
@@ -168,7 +165,6 @@ def render_options_analysis_hub_page():
     df = pd.DataFrame(comparison_data)
     st.dataframe(df, use_container_width=True, hide_index=True)
 
-    st.markdown("---")
 
     # Recommended workflows
     st.markdown("### 🔄 Recommended Workflows")
@@ -257,7 +253,6 @@ def render_options_analysis_hub_page():
         - Comprehensive view before risk capital
         """)
 
-    st.markdown("---")
 
     # Tips section
     st.markdown("### 💡 Pro Tips")
@@ -284,7 +279,6 @@ def render_options_analysis_hub_page():
         - Download JSON reports for documentation
         """)
 
-    st.markdown("---")
 
     # FAQ
     with st.expander("❓ Frequently Asked Questions"):
@@ -308,7 +302,6 @@ def render_options_analysis_hub_page():
         A: Not required. LLM reasoning is optional in AI Options Agent, and Comprehensive Strategy uses free providers.
         """)
 
-    st.markdown("---")
 
     # Footer
     st.markdown("### 🚀 Ready to get started?")

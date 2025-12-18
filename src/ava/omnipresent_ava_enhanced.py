@@ -33,15 +33,59 @@ import time  # PHASE 2: Response time tracking
 # Add parent to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-# AVA imports
-from src.ava.conversation_memory_manager import ConversationMemoryManager
-from src.ava.ava_visual import AvaVisual, AvaExpression, AvaAvatarWidget
-from src.watchlist_strategy_analyzer import WatchlistStrategyAnalyzer
-from src.task_db_manager import TaskDBManager
+# Setup logger
+logger = logging.getLogger(__name__)
 
-# PHASE 1 CRITICAL IMPORTS - RAG + LLM Integration
-from src.rag.rag_service import RAGService
-from src.services.llm_service import LLMService
+# AVA imports - Make them optional for graceful degradation
+try:
+    from src.ava.conversation_memory_manager import ConversationMemoryManager
+except ImportError:
+    ConversationMemoryManager = None
+
+try:
+    from src.ava.ava_visual import AvaVisual, AvaExpression, AvaAvatarWidget
+except ImportError:
+    AvaVisual = AvaExpression = AvaAvatarWidget = None
+
+try:
+    from src.ava.ava_personality import AVAPersonality, PersonalityMode, EmotionalState
+except ImportError:
+    AVAPersonality = PersonalityMode = EmotionalState = None
+
+try:
+    from src.ava.web_voice_handler import WebVoiceHandler
+except ImportError:
+    WebVoiceHandler = None
+
+try:
+    from src.watchlist_strategy_analyzer import WatchlistStrategyAnalyzer
+except ImportError:
+    WatchlistStrategyAnalyzer = None
+
+try:
+    from src.task_db_manager import TaskDBManager
+except ImportError:
+    TaskDBManager = None
+
+# PHASE 1 CRITICAL IMPORTS - RAG + LLM Integration (Optional)
+try:
+    from src.rag.rag_service import RAGService
+except ImportError:
+    logger.warning("RAGService not available - sentence_transformers not installed")
+    RAGService = None
+
+try:
+    from src.services.llm_service import LLMService
+except ImportError:
+    logger.warning("LLMService not available")
+    LLMService = None
+
+try:
+    from src.magnus_local_llm import MagnusLocalLLM, TaskComplexity
+except ImportError:
+    logger.warning("MagnusLocalLLM not available")
+    MagnusLocalLLM = None
+    TaskComplexity = None
 
 import psycopg2
 from psycopg2.extras import RealDictCursor
@@ -70,21 +114,57 @@ class EnhancedAVA:
         """Initialize enhanced AVA with RAG and LLM"""
         self.memory_manager = ConversationMemoryManager()
 
+        # Initialize Personality System
+        if AVAPersonality is not None and PersonalityMode is not None:
+            try:
+                default_mode = PersonalityMode.FRIENDLY
+                self.personality = AVAPersonality(mode=default_mode)
+                logger.info(f"✅ Personality system initialized ({default_mode.value})")
+            except Exception as e:
+                logger.warning(f"⚠️ Personality init failed: {e}")
+                self.personality = None
+        else:
+            self.personality = None
+            logger.info("ℹ️ Personality system not available")
+
         # PHASE 1: Initialize RAG System (534-line production implementation)
-        try:
-            self.rag_service = RAGService(collection_name='magnus_knowledge')
-            logger.info("✅ RAGService initialized successfully")
-        except Exception as e:
-            logger.warning(f"⚠️ RAGService init failed: {e} - Using fallback")
+        if RAGService is not None:
+            try:
+                self.rag_service = RAGService(collection_name='magnus_knowledge')
+                logger.info("✅ RAGService initialized successfully")
+            except Exception as e:
+                logger.warning(f"⚠️ RAGService init failed: {e} - Using fallback")
+                self.rag_service = None
+        else:
             self.rag_service = None
+            logger.info("ℹ️ RAGService not available (optional dependency)")
 
         # PHASE 1: Initialize LLM Service (FREE Groq/Llama-3.3-70b)
-        try:
-            self.llm_service = LLMService()
-            logger.info("✅ LLMService initialized with FREE providers")
-        except Exception as e:
-            logger.warning(f"⚠️ LLMService init failed: {e} - Using fallback")
+        if LLMService is not None:
+            try:
+                self.llm_service = LLMService()
+                logger.info("✅ LLMService initialized with FREE providers")
+            except Exception as e:
+                logger.warning(f"⚠️ LLMService init failed: {e} - Using fallback")
+                self.llm_service = None
+        else:
             self.llm_service = None
+            logger.info("ℹ️ LLMService not available (optional dependency)")
+
+        # Initialize Local LLM Service (Qwen models via Ollama)
+        if MagnusLocalLLM is not None:
+            try:
+                self.local_llm = MagnusLocalLLM(
+                    ollama_host="http://localhost:11434",
+                    default_complexity=TaskComplexity.FAST if TaskComplexity else None
+                )
+                logger.info("✅ Local LLM (Qwen) initialized successfully")
+            except Exception as e:
+                logger.warning(f"⚠️ Local LLM init failed: {e} - Using fallback")
+                self.local_llm = None
+        else:
+            self.local_llm = None
+            logger.info("ℹ️ Local LLM not available (optional)")
 
     def _log_feedback(self, message_index: int, feedback_type: str):
         """PHASE 2: Log user feedback for continuous improvement"""
@@ -564,8 +644,45 @@ Instructions:
 
 Response:"""
 
-            # Step 4: Generate response with LLM
+            # Step 4: Generate response with LLM (check selected model)
             confidence = 0.8  # Default confidence
+            selected_model = st.session_state.get('selected_model', 'Qwen 2.5 32B (Local)')
+
+            # Route to local LLM if Qwen model is selected
+            if 'Qwen' in selected_model and 'Local' in selected_model and self.local_llm:
+                try:
+                    logger.info(f"Using local LLM: {selected_model}")
+                    # Determine complexity based on selected model
+                    if 'Coder' in selected_model:
+                        complexity = TaskComplexity.CODING
+                    elif '14B' in selected_model:
+                        complexity = TaskComplexity.FAST
+                    else:
+                        complexity = TaskComplexity.BALANCED
+                    response_text = self.local_llm.query(
+                        prompt=prompt,
+                        complexity=complexity,
+                        use_trading_context=True,
+                        max_tokens=2000  # Increased from 500 for fuller responses
+                    )
+                    logger.info("✅ Local LLM generated response successfully")
+
+                    # PHASE 3: Parse confidence from response if LLM included it
+                    confidence_match = re.search(r"(\d+)%\s+confident", response_text.lower())
+                    if confidence_match:
+                        confidence = float(confidence_match.group(1)) / 100.0
+                        logger.info(f"✅ Parsed confidence: {confidence*100:.0f}%")
+
+                    return {
+                        'text': response_text.strip(),
+                        'confidence': confidence,
+                        'used_rag': bool(rag_context),
+                        'used_history': bool(history_text)
+                    }
+                except Exception as e:
+                    logger.warning(f"Local LLM generation failed: {e}, falling back to cloud LLM")
+
+            # Use cloud LLM service (Groq, Gemini, etc.)
             if self.llm_service:
                 try:
                     response = self.llm_service.generate(
@@ -885,6 +1002,24 @@ I'm **AVA**, your AI assistant. I can help you analyze positions, create tasks, 
             response = f"❌ I encountered an error: {str(e)}\n\nPlease try again or type 'help' for assistance."
             success = False
 
+        # Apply personality styling to response
+        if response and self.personality:
+            try:
+                # Detect emotional context from data
+                data_context = {
+                    'confidence': confidence_score,
+                    'success': success,
+                    'intent': intent
+                }
+                emotional_state = self.personality.detect_emotional_context(data_context)
+                self.personality.set_emotional_state(emotional_state)
+
+                # Apply personality styling
+                response = self.personality.style_response(response, data_context)
+                logger.debug(f"Applied personality: {self.personality.mode.value}, emotion: {emotional_state.value}")
+            except Exception as e:
+                logger.warning(f"Personality styling failed: {e}")
+
         # PHASE 2: Calculate response time
         elapsed_time = time.time() - start_time
 
@@ -945,13 +1080,37 @@ def show_enhanced_ava(key_prefix=""):
         .chat-container {
             background: transparent !important;
             border-radius: 0;
-            padding: 10px 0;
+            padding: 0;
             margin-bottom: 10px;
             box-shadow: none !important;
             min-height: 0;
             max-height: 500px;
             overflow-y: auto;
             border: none !important;
+        }
+
+        /* Ultra compact model selector - very small */
+        [data-testid="stSelectbox"] {
+            max-height: 9px !important;
+        }
+
+        [data-testid="stSelectbox"] > div {
+            min-height: 9px !important;
+            height: 9px !important;
+        }
+
+        [data-testid="stSelectbox"] input {
+            min-height: 9px !important;
+            height: 9px !important;
+            padding: 0px 4px !important;
+            font-size: 9px !important;
+        }
+
+        /* Compact buttons for image controls */
+        [data-testid="stButton"] button {
+            padding: 4px 8px !important;
+            font-size: 12px !important;
+            min-height: 28px !important;
         }
 
         /* AVA image column */
@@ -1163,48 +1322,116 @@ def show_enhanced_ava(key_prefix=""):
     # Main AVA expander - compact and at top
     with st.expander("🤖 AVA - Your Expert Trading Assistant", expanded=True):
 
-        # Top row: AVA image on left (bigger), chat on right (smaller)
-        img_col, content_col = st.columns([2, 5])
+        # Top row: AVA image on left, chat on right
+        # AVA image with hourly rotation + manual control
+        from pathlib import Path
 
-        with img_col:
-            # AVA image with hourly rotation
-            from pathlib import Path
+        # Get all images from docs/ava/AnnaA folder
+        image_folder = Path("docs/ava/AnnaA")
+        image_files = sorted([f for f in image_folder.glob("*") if f.is_file() and f.suffix.lower() in ['.jpg', '.png', '.webp', '.avif', '.jpeg']])
 
-            # Get all images from AnnaA folder
-            image_folder = Path(r"C:\Code\Legion\repos\ava\docs\ava\AnnaA")
-            image_files = sorted([f for f in image_folder.glob("*.jpg") if f.is_file()])
+        # Fallback to default if no images found
+        if not image_files:
+            image_files = [Path("docs/ava/AnnaA/AvaMain.jpg")]
 
-            # Fallback to default if no images found
-            if not image_files:
-                image_files = [Path("assets/ava/ava_main.jpg")]
+        # Initialize manual rotation state
+        if 'ava_manual_image_index' not in st.session_state:
+            st.session_state.ava_manual_image_index = None
+        if 'ava_manual_mode' not in st.session_state:
+            st.session_state.ava_manual_mode = False
 
-            # Get current time for rotation (changes every 15 minutes)
+        # Determine which image to show
+        if st.session_state.ava_manual_mode and st.session_state.ava_manual_image_index is not None:
+            # Use manually selected image
+            image_index = st.session_state.ava_manual_image_index % len(image_files)
+        else:
+            # Use automatic time-based rotation (changes every 15 minutes)
             now = datetime.now()
             interval_15min = (now.hour * 4) + (now.minute // 15)
-
-            # Select image based on 15-minute intervals
             image_index = interval_15min % len(image_files)
-            avatar_path = image_files[image_index]
 
-            # Display rotating image
+        avatar_path = image_files[image_index]
+
+        # Main layout: Image column (left) and Control column (right)
+        img_col, control_col = st.columns([2, 3])
+
+        with img_col:
+            # Display rotating image (spans full height)
             if avatar_path.exists():
-                st.image(str(avatar_path), width=600)
-                # Show rotation info in small text
-                next_change = ((now.minute // 15) + 1) * 15
-                if next_change == 60:
-                    next_change_text = f"{(now.hour + 1) % 24}:00"
-                else:
-                    next_change_text = f"{now.hour}:{next_change:02d}"
-                st.caption(f"🕐 {image_index + 1}/{len(image_files)} • Rotates: {next_change_text}")
+                st.image(str(avatar_path), use_container_width=True)
             else:
-                # Fallback to default
                 try:
                     st.image("assets/ava_avatar.png", width=600)
                 except:
                     st.markdown("### 🤖 AVA")
 
-        with content_col:
+        with control_col:
+            # Top: Image rotation buttons + Model selector + Icon buttons (all in one row)
+            icon_row = st.columns([1.5, 0.3, 0.3, 0.3, 5.5, 0.5, 0.5, 0.5, 0.5, 0.5])
+
+            # Image rotation buttons
+            with icon_row[1]:
+                if st.button("◀️", key=f"{key_prefix}prev_image", help="Previous image"):
+                    st.session_state.ava_manual_mode = True
+                    current = st.session_state.ava_manual_image_index if st.session_state.ava_manual_image_index is not None else image_index
+                    st.session_state.ava_manual_image_index = (current - 1) % len(image_files)
+                    st.rerun()
+            with icon_row[2]:
+                if st.button("🔄", key=f"{key_prefix}auto_rotate", help="Auto rotate"):
+                    st.session_state.ava_manual_mode = False
+                    st.session_state.ava_manual_image_index = None
+                    st.rerun()
+            with icon_row[3]:
+                if st.button("▶️", key=f"{key_prefix}next_image", help="Next image"):
+                    st.session_state.ava_manual_mode = True
+                    current = st.session_state.ava_manual_image_index if st.session_state.ava_manual_image_index is not None else image_index
+                    st.session_state.ava_manual_image_index = (current + 1) % len(image_files)
+                    st.rerun()
+
+            # Model selector (between rotation and icon buttons)
+            with icon_row[4]:
+                selected_model = st.selectbox(
+                    "model",
+                    options=[
+                        "Groq (Llama 3.3 70B)",
+                        "Gemini 2.5 Pro",
+                        "DeepSeek Chat",
+                        "GPT-4 Turbo",
+                        "Claude Sonnet 3.5",
+                        "Qwen 2.5 32B (Local)",
+                        "Qwen 2.5 Coder 32B (Local - Coding)",
+                        "Qwen 2.5 14B (Local - Fast)"
+                    ],
+                    index=5,
+                    key=f"{key_prefix}model_sel_top",
+                    label_visibility="collapsed"
+                )
+                st.session_state.selected_model = selected_model
+
+            # Icon buttons
+            with icon_row[5]:
+                if st.button("➕", key=f"{key_prefix}new_chat_btn_top", help="New chat"):
+                    st.session_state.ava_messages = []
+                    st.rerun()
+            with icon_row[6]:
+                if st.button("🗑️", key=f"{key_prefix}clear_chat_top", help="Clear chat"):
+                    st.session_state.ava_messages = []
+                    st.rerun()
+            with icon_row[7]:
+                if st.button("🎭", key=f"{key_prefix}personality_btn_top", help="Personality"):
+                    st.session_state.show_personality = not st.session_state.get('show_personality', False)
+                    st.rerun()
+            with icon_row[8]:
+                if st.button("🎤", key=f"{key_prefix}voice_btn_top", help="Voice"):
+                    st.session_state.show_voice = not st.session_state.get('show_voice', False)
+                    st.rerun()
+            with icon_row[9]:
+                if st.button("⚙️", key=f"{key_prefix}settings_btn_top", help="Settings"):
+                    st.session_state.show_settings = not st.session_state.get('show_settings', False)
+                    st.rerun()
+
             # SECTION 1: Conversation History
+            st.markdown('<div style="margin-top: 10px;"></div>', unsafe_allow_html=True)
             if st.session_state.ava_messages:
                 # Wrap messages in chat container (transparent background)
                 st.markdown('<div class="chat-container">', unsafe_allow_html=True)
@@ -1245,7 +1472,7 @@ def show_enhanced_ava(key_prefix=""):
 
             # Initialize model selection in session state
             if 'selected_model' not in st.session_state:
-                st.session_state.selected_model = "Groq (Llama 3.3 70B)"
+                st.session_state.selected_model = "Qwen 2.5 32B (Local)"
 
             # Claude-style CSS - Single bordered container
             st.markdown("""
@@ -1477,45 +1704,142 @@ def show_enhanced_ava(key_prefix=""):
             # Wrapper container for the entire input area
             st.markdown('<div class="claude-wrapper">', unsafe_allow_html=True)
 
-            # Action buttons (moved to right side)
-            btn_row = st.columns([10, 0.5, 0.5, 0.5])
-            with btn_row[1]:
-                if st.button("➕", key=f"{key_prefix}new_chat_btn", help="New chat"):
-                    st.session_state.ava_messages = []
-                    st.rerun()
-            with btn_row[2]:
-                if st.button("⚙️", key=f"{key_prefix}settings_btn", help="Settings"):
-                    st.session_state.show_settings = not st.session_state.get('show_settings', False)
-                    st.rerun()
-            with btn_row[3]:
-                if st.button("🕐", key=f"{key_prefix}history_btn", help="History"):
-                    st.session_state.show_history = not st.session_state.get('show_history', False)
-                    st.rerun()
+            # Icon buttons moved to top of content area (removed from here)
 
-            # Model selector (above input)
-            selected_model = st.selectbox(
-                "model",
-                options=[
-                    "Groq (Llama 3.3 70B)",
-                    "Gemini 2.5 Pro",
-                    "DeepSeek Chat",
-                    "GPT-4 Turbo",
-                    "Claude Sonnet 3.5"
-                ],
-                index=0,
-                key=f"{key_prefix}model_sel",
-                label_visibility="collapsed"
-            )
-            st.session_state.selected_model = selected_model
+            # Personality Settings Panel
+            if st.session_state.get('show_personality', False) and PersonalityMode:
+                with st.expander("🎭 AVA Personality", expanded=True):
+                    st.markdown("### Choose AVA's Personality")
 
+                    # Initialize personality mode in session state
+                    if 'ava_personality_mode' not in st.session_state:
+                        st.session_state.ava_personality_mode = PersonalityMode.FRIENDLY.value
+
+                    # Personality mode selector
+                    personality_mode = st.selectbox(
+                        "Select Personality Mode",
+                        options=[mode.value for mode in PersonalityMode],
+                        index=list(PersonalityMode).index(PersonalityMode.FRIENDLY),
+                        key=f"{key_prefix}personality_mode",
+                        format_func=lambda x: {
+                            'professional': '📊 Professional - Formal & Data-Focused',
+                            'friendly': '😊 Friendly - Warm & Approachable',
+                            'witty': '😏 Witty - Clever & Humorous',
+                            'mentor': '🎓 Mentor - Teaching & Guiding',
+                            'concise': '⚡ Concise - Brief & Direct',
+                            'charming': '💕 Charming - Flirty & Romantic'
+                        }.get(x, x.title())
+                    )
+
+                    # Update AVA's personality
+                    if st.session_state.enhanced_ava.personality:
+                        new_mode = PersonalityMode(personality_mode)
+                        st.session_state.enhanced_ava.personality.set_mode(new_mode)
+                        st.session_state.ava_personality_mode = personality_mode
+
+                    # Show personality description
+                    if st.session_state.enhanced_ava.personality:
+                        st.info(st.session_state.enhanced_ava.personality.get_personality_description())
+
+                    # Preview greeting
+                    st.markdown("### Preview Greeting")
+                    if st.session_state.enhanced_ava.personality:
+                        preview_greeting = st.session_state.enhanced_ava.personality.get_greeting()
+                        st.markdown(f"> {preview_greeting}")
+
+            # Voice Settings Panel
+            if st.session_state.get('show_voice', False) and WebVoiceHandler:
+                # Inject voice system
+                WebVoiceHandler.inject_voice_controls()
+
+                with st.expander("🎤 Voice Controls", expanded=True):
+                    st.markdown("### Voice Settings")
+
+                    # Auto-speak toggle
+                    auto_speak = st.checkbox(
+                        "🔊 Auto-speak AVA responses",
+                        value=st.session_state.get('ava_auto_speak', False),
+                        key=f"{key_prefix}auto_speak_check",
+                        help="Automatically speak AVA's responses aloud"
+                    )
+                    st.session_state.ava_auto_speak = auto_speak
+
+                    # Voice controls in columns
+                    voice_col1, voice_col2 = st.columns(2)
+
+                    with voice_col1:
+                        st.markdown("**Speech Rate**")
+                        rate = st.slider(
+                            "Rate",
+                            min_value=0.5,
+                            max_value=2.0,
+                            value=st.session_state.get('ava_voice_rate', 1.0),
+                            step=0.1,
+                            key=f"{key_prefix}voice_rate_slider",
+                            label_visibility="collapsed"
+                        )
+                        st.session_state.ava_voice_rate = rate
+
+                    with voice_col2:
+                        st.markdown("**Speech Pitch**")
+                        pitch = st.slider(
+                            "Pitch",
+                            min_value=0.5,
+                            max_value=2.0,
+                            value=st.session_state.get('ava_voice_pitch', 1.0),
+                            step=0.1,
+                            key=f"{key_prefix}voice_pitch_slider",
+                            label_visibility="collapsed"
+                        )
+                        st.session_state.ava_voice_pitch = pitch
+
+                    # Preset buttons
+                    st.markdown("**Presets**")
+                    preset_cols = st.columns(5)
+                    with preset_cols[0]:
+                        if st.button("🐢 Slow", use_container_width=True, key=f"{key_prefix}preset_slow"):
+                            st.session_state.ava_voice_rate = 0.8
+                            st.rerun()
+                    with preset_cols[1]:
+                        if st.button("🎯 Normal", use_container_width=True, key=f"{key_prefix}preset_normal"):
+                            st.session_state.ava_voice_rate = 1.0
+                            st.session_state.ava_voice_pitch = 1.0
+                            st.rerun()
+                    with preset_cols[2]:
+                        if st.button("🚀 Fast", use_container_width=True, key=f"{key_prefix}preset_fast"):
+                            st.session_state.ava_voice_rate = 1.5
+                            st.rerun()
+                    with preset_cols[3]:
+                        if st.button("🎵 High", use_container_width=True, key=f"{key_prefix}preset_high"):
+                            st.session_state.ava_voice_pitch = 1.3
+                            st.rerun()
+                    with preset_cols[4]:
+                        if st.button("📻 Low", use_container_width=True, key=f"{key_prefix}preset_low"):
+                            st.session_state.ava_voice_pitch = 0.8
+                            st.rerun()
+
+                    # Test voice button
+                    if st.button("🎤 Test Voice", use_container_width=True, key=f"{key_prefix}test_voice"):
+                        test_text = "Hello! I'm AVA, your trading assistant. This is how I sound with your current settings."
+                        WebVoiceHandler.speak_text(test_text)
+
+                    st.markdown("---")
+                    st.caption("💡 Voice features use your browser's speech synthesis. Quality may vary by browser.")
+
+            # Model selector moved to top of content column
             st.markdown('</div>', unsafe_allow_html=True)
 
-            # Streamlit's native chat input with file attachment support
-            user_input = st.chat_input(
-                placeholder="How can I help you today?",
-                key=f"{key_prefix}ava_chat_input",
-                accept_file="multiple"  # Enable drag-and-drop file uploads
-            )
+            # Bring chat input up with negative margin (closer to top)
+            st.markdown('<div style="margin-top: -220px;"></div>', unsafe_allow_html=True)
+
+            # Streamlit's native chat input with file attachment support (92% width)
+            chat_spacer, chat_col = st.columns([0.08, 0.92])
+            with chat_col:
+                user_input = st.chat_input(
+                    placeholder="How can I help you today?",
+                    key=f"{key_prefix}ava_chat_input",
+                    accept_file="multiple"  # Enable drag-and-drop file uploads
+                )
 
             # Process message if sent
             if user_input:
@@ -1558,10 +1882,14 @@ def show_enhanced_ava(key_prefix=""):
                         'confidence': response_data.get('confidence', 0.8)
                     })
 
+                    # Auto-speak if enabled
+                    if st.session_state.get('ava_auto_speak', False) and WebVoiceHandler:
+                        WebVoiceHandler.speak_text(response_data['response'])
+
                     # Rerun to show new messages
                     st.rerun()
 
-    # Management buttons below expander - no header, no separator, no icons
+    # Action buttons below chat input
     action_col1, action_col2, action_col3, action_col4 = st.columns(4)
 
     with action_col1:

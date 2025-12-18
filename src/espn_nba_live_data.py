@@ -7,6 +7,7 @@ import requests
 import logging
 from typing import Dict, Optional, List
 from datetime import datetime
+from src.espn_rate_limiter import rate_limited
 
 logger = logging.getLogger(__name__)
 
@@ -23,13 +24,14 @@ class ESPNNBALiveData:
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
         })
 
+    @rate_limited
     def get_scoreboard(self, date: Optional[str] = None) -> List[Dict]:
         """
         Get current NBA scoreboard
-        
+
         Args:
             date: Date in YYYYMMDD format (optional, defaults to current date)
-        
+
         Returns:
             List of game dictionaries with scores and status
         """

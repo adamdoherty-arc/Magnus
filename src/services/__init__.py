@@ -7,6 +7,7 @@ This package provides thread-safe singleton services for:
 - LLM (Language Model) providers
 - Rate limiting
 - Service configuration
+- Database service registry (singleton database managers)
 
 All services follow these principles:
 - Thread-safe singleton pattern
@@ -35,16 +36,45 @@ from src.services.rate_limiter import (
     rate_limit_async,
 )
 
-from src.services.robinhood_client import (
-    RobinhoodClient,
-    get_robinhood_client,
-)
+# Optional import - robinhood_client may not have all dependencies
+try:
+    from src.services.robinhood_client import (
+        RobinhoodClient,
+        get_robinhood_client,
+    )
+    ROBINHOOD_AVAILABLE = True
+except ImportError:
+    ROBINHOOD_AVAILABLE = False
+    RobinhoodClient = None
+    get_robinhood_client = None
 
-from src.services.llm_service import (
-    LLMService,
-    ResponseCache,
-    UsageTracker,
-    get_llm_service,
+# Optional import - llm_service may not have all dependencies
+try:
+    from src.services.llm_service import (
+        LLMService,
+        ResponseCache,
+        UsageTracker,
+        get_llm_service,
+    )
+    LLM_SERVICE_AVAILABLE = True
+except ImportError:
+    LLM_SERVICE_AVAILABLE = False
+    LLMService = None
+    ResponseCache = None
+    UsageTracker = None
+    get_llm_service = None
+
+from src.services.data_service_registry import (
+    DataServiceRegistry,
+    get_tradingview_manager,
+    get_kalshi_manager,
+    get_xtrades_manager,
+    get_zone_manager,
+    get_nfl_manager,
+    get_technical_analysis_manager,
+    get_database_scanner,
+    get_registry_stats,
+    get_cached_registry,
 )
 
 
@@ -75,6 +105,18 @@ __all__ = [
     "ResponseCache",
     "UsageTracker",
     "get_llm_service",
+
+    # Database Service Registry
+    "DataServiceRegistry",
+    "get_tradingview_manager",
+    "get_kalshi_manager",
+    "get_xtrades_manager",
+    "get_zone_manager",
+    "get_nfl_manager",
+    "get_technical_analysis_manager",
+    "get_database_scanner",
+    "get_registry_stats",
+    "get_cached_registry",
 ]
 
 
