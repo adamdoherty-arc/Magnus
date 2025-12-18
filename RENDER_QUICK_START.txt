@@ -1,0 +1,94 @@
+================================================================================
+AVA PLATFORM - RENDER POSTGRESQL MIGRATION (5-Minute Quick Start)
+================================================================================
+
+STEP 1: Create Render Database
+-------------------------------
+1. Go to: https://dashboard.render.com
+2. Click "New +" → "PostgreSQL"
+3. Settings:
+   - Name: ava-trading-db
+   - Plan: Starter ($7/month)
+   - Region: Oregon
+4. Click "Create Database" (wait 2-3 minutes)
+
+STEP 2: Get Connection String
+------------------------------
+1. Click on your new database
+2. Scroll to "Connections" section
+3. Copy "External Connection String"
+   Example: postgresql://user:pass@dpg-xxx.oregon-postgres.render.com/dbname
+
+STEP 3: Deploy to Render (First Time)
+--------------------------------------
+Open Command Prompt:
+
+cd c:\Code\Legion\repos\ava
+scripts\deploy_to_render.bat
+
+Paste your connection string when prompted
+Wait ~30 seconds
+
+STEP 4: Update Environment
+---------------------------
+python scripts/update_env_for_render.py
+
+Paste your connection string again
+
+STEP 5: Test Connection
+------------------------
+scripts\test_render_connection.bat
+
+Should see: "✅ Connected successfully!"
+
+STEP 6: Start Your Application
+-------------------------------
+Your database is now on Render and ready to use!
+
+Start your application (frontend/backend) as usual.
+All database connections will now use Render PostgreSQL.
+
+🎉 Your AVA platform database is now on Render!
+
+================================================================================
+WHAT YOU GET
+================================================================================
+✅ 70+ tables deployed (all features enabled)
+✅ Automated daily backups (7-day retention)
+✅ Professional cloud database
+✅ Access from anywhere
+✅ No more manual table recreation
+✅ $7/month (saves hours of setup time)
+
+================================================================================
+TROUBLESHOOTING
+================================================================================
+Problem: Connection timeout
+Solution: Check internet connection, verify database is "Available"
+
+Problem: "relation already exists" warnings
+Solution: Normal - ignore these (schema uses IF NOT EXISTS)
+
+Problem: Can't find backup
+Solution: Run scripts\backup_database.bat first
+
+================================================================================
+FUTURE MIGRATIONS
+================================================================================
+When you need to switch hosting again:
+
+1. pg_dump "old-host-url" > backups/migration.sql
+2. scripts\deploy_to_render.bat (new host)
+3. psql "new-host-url" < backups/migration.sql
+4. Update .env (one time)
+
+NEVER manually recreate tables again!
+
+================================================================================
+SUPPORT
+================================================================================
+Full Guide: RENDER_MIGRATION_GUIDE.md
+Render Docs: https://render.com/docs/databases
+Render Support: help@render.com
+
+================================================================================

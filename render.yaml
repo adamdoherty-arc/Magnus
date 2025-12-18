@@ -1,0 +1,144 @@
+# Render Blueprint for AVA Trading Platform
+# Auto-deployment configuration for Render.com
+
+databases:
+  - name: ava-trading-db
+    databaseName: trading
+    user: ava_user
+    plan: starter  # $7/month - 10GB storage, 1GB RAM
+    region: oregon
+    ipAllowList: []  # Empty = allow all (configure in dashboard for security)
+
+  - name: ava-redis-cache
+    plan: starter  # $10/month - 100MB with persistence (or 'free' for 25MB)
+    region: oregon
+    maxmemoryPolicy: allkeys-lru  # Evict least recently used keys when full
+
+services:
+  # FastAPI Research API - AI-powered research endpoints
+  - type: web
+    name: ava-research-api
+    runtime: python
+    plan: starter  # $7/month - always on
+    region: oregon
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn src.api.research_endpoints:app --host 0.0.0.0 --port $PORT --workers 2
+    healthCheckPath: /health
+    envVars:
+      # PostgreSQL connection (auto-linked)
+      - key: DB_HOST
+        fromDatabase:
+          name: ava-trading-db
+          property: host
+      - key: DB_PORT
+        fromDatabase:
+          name: ava-trading-db
+          property: port
+      - key: DB_NAME
+        fromDatabase:
+          name: ava-trading-db
+          property: database
+      - key: DB_USER
+        fromDatabase:
+          name: ava-trading-db
+          property: user
+      - key: DB_PASSWORD
+        fromDatabase:
+          name: ava-trading-db
+          property: password
+      - key: DATABASE_URL
+        fromDatabase:
+          name: ava-trading-db
+          property: connectionString
+
+      # Redis connection (auto-linked)
+      - key: REDIS_HOST
+        fromDatabase:
+          name: ava-redis-cache
+          property: host
+      - key: REDIS_PORT
+        fromDatabase:
+          name: ava-redis-cache
+          property: port
+      - key: REDIS_DB
+        value: "0"
+      - key: REDIS_URL
+        fromDatabase:
+          name: ava-redis-cache
+          property: connectionString
+
+      # LLM Configuration
+      - key: LLM_PROVIDER
+        value: "ollama"  # or 'openai', 'anthropic', etc.
+      - key: LLM_MODEL
+        value: "llama3.2"
+
+      # API Keys (set these in Render dashboard for security)
+      - key: OPENAI_API_KEY
+        sync: false  # Prompt for value on first deploy
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: DEEPSEEK_API_KEY
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+
+      # Application Settings
+      - key: NODE_ENV
+        value: "production"
+      - key: LOG_LEVEL
+        value: "info"
+      - key: PORT
+        value: "8000"
+
+  # Telegram Webhook Server (Optional - uncomment if needed)
+  # - type: web
+  #   name: ava-telegram-webhook
+  #   runtime: python
+  #   plan: starter  # $7/month (or 'free' - spins down after 15min)
+  #   region: oregon
+  #   buildCommand: pip install -r requirements.txt
+  #   startCommand: uvicorn src.ava.webhook_server:app --host 0.0.0.0 --port $PORT
+  #   healthCheckPath: /health
+  #   envVars:
+  #     - key: TELEGRAM_BOT_TOKEN
+  #       sync: false  # Set in dashboard
+  #     - key: TELEGRAM_WEBHOOK_SECRET_TOKEN
+  #       sync: false
+  #     - key: REDIS_URL
+  #       fromDatabase:
+  #         name: ava-redis-cache
+  #         property: connectionString
+  #     - key: TELEGRAM_USE_WEBHOOKS
+  #       value: "true"
+
+# Background Jobs / Workers (Optional - uncomment if needed)
+# - type: worker
+#   name: ava-data-sync-worker
+#   runtime: python
+#   plan: starter
+#   buildCommand: pip install -r requirements.txt
+#   startCommand: python src/workers/data_sync_worker.py
+#   envVars:
+#     - key: DATABASE_URL
+#       fromDatabase:
+#         name: ava-trading-db
+#         property: connectionString
+#     - key: REDIS_URL
+#       fromDatabase:
+#         name: ava-redis-cache
+#         property: connectionString
+
+# Cron Jobs (Background tasks - uncomment if needed)
+# - type: cron
+#   name: ava-daily-sync
+#   runtime: python
+#   plan: starter
+#   schedule: "0 0 * * *"  # Daily at midnight UTC
+#   buildCommand: pip install -r requirements.txt
+#   startCommand: python sync_database_stocks_daily.py
+#   envVars:
+#     - key: DATABASE_URL
+#       fromDatabase:
+#         name: ava-trading-db
+#         property: connectionString
